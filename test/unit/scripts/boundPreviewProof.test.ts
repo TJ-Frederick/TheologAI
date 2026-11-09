@@ -38,13 +38,13 @@ it('keeps cumulative task allowance separate from the 4M daily admission ceiling
 });
 it.each(['valid', 'unbound-mode', 'wrong-version', 'wrong-deployment', 'wrong-binding', 'production-drift', 'second-scan-drift', 'post-inventory-race', 'additional-worker', 'expired'])('checks complete bound inventory and controls: %s', async fault => {
   const directory = mkdtempSync(join(tmpdir(), 'bound-preview-proof-'));
-  let time = now, scans = 0, sql = 0;
+  let time = now, scans = 0, sql = 0, providerCalls = 0;
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => time);
   try {
     const p = approval(); const context = { package: p, sourceCommit: p.authorization.sourceCommit, sourceTree: p.authorization.sourceTree, runId: '123' };
     const fixture = corpusTransportFixture({ role: 'preview', boundPreview: true, advance: () => { time += 1000; }, query: () => { sql++; return { rows: [], rowsRead: 1, rowsWritten: 0 }; } });
     const fetchImpl = (async (input: any, init: any) => {
-      const path = new URL(String(input)).pathname;
+      providerCalls++; const path = new URL(String(input)).pathname;
       const response = await fixture.fetch(input, init); const v = await response.json() as any;
       if (path.endsWith('/workers/scripts')) { scans++; if (fault === 'additional-worker') v.result.push({ id: 'other' }); }
       if (fault === 'additional-worker' && path.includes('/other/')) throw Error('unexpected candidate binding');
@@ -64,7 +64,7 @@ it.each(['valid', 'unbound-mode', 'wrong-version', 'wrong-deployment', 'wrong-bi
       await transport.start(); expect(transport.protectedAdmission().controls).toContainEqual(expect.objectContaining({ kind: 'bound-preview-corpus' }));
       await transport.finish();
     } else await expect(transport.start()).rejects.toThrow(fault === 'post-inventory-race' ? 'owner-pinned bound assignment changed' : undefined);
-    expect(sql).toBe(0);
+    expect(sql).toBe(0); if (fault === 'expired') expect(providerCalls).toBe(0);
   } finally { clock.mockRestore(); rmSync(directory, { recursive: true, force: true }); }
 });
 it.each(['valid', 'preview-drift', 'production-drift', 'binding-drift', 'expired'])('binds existing predeploy anchors to the owner window: %s', fault => {

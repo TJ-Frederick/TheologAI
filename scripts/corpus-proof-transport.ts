@@ -168,7 +168,7 @@ export class CorpusProofTransport {
   private async captureCandidate(): Promise<void> {
     if(!this.corpus)return;
     const started=Date.now();let failedAccess=false;
-    const api=createCorpusApi(this.options.role,async()=>this.options.token,this.options.fetch??fetch,event=>{this.event(event);const e=event as any;if(e.kind==='corpus-control-http'&&(e.httpStatus===401||e.httpStatus===403))failedAccess=true;});
+    const api=createCorpusApi(this.options.role,async()=>{if(this.options.boundPreviewAuthorization){const context=this.options.boundPreviewAuthorization;operatorAuthority.boundPreviewForPackage(context.package,context);}return this.options.token;},this.options.fetch??fetch,event=>{this.event(event);const e=event as any;if(e.kind==='corpus-control-http'&&(e.httpStatus===401||e.httpStatus===403))failedAccess=true;});
     let capture:Awaited<ReturnType<typeof captureUnboundCorpusControl>>;
     try{capture=await captureUnboundCorpusControl({role:this.options.role,api,boundPreview:this.boundPreview});}
     catch(error){
