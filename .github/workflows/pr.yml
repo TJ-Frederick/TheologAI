@@ -105,6 +105,49 @@ jobs:
           classifier-result: ${{ needs.classify.result }}
           selection-mode: ${{ needs.classify.outputs.mode }}
 
+      - name: Rehearse complete original Norton source recovery without cloud credentials
+        id: original-source-rehearsal
+        if: ${{ github.event_name == 'pull_request' && needs.classify.outputs.data == 'true' }}
+        env:
+          RECOVERY_BASE: ${{ github.event.pull_request.base.sha }}
+          RECOVERY_HEAD: ${{ github.event.pull_request.head.sha }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          recovery_diff="$(mktemp "$RUNNER_TEMP/norton-recovery-diff.XXXXXX")"
+          git diff --name-only "$RECOVERY_BASE" "$RECOVERY_HEAD" -- \
+            release/norton-aquinas-recovery .github/scripts/reconstruct-norton-source.ts \
+            .github/scripts/rehearse-norton-source.ts .github/scripts/validate-existing-norton-preview.ts \
+            .github/scripts/verify-existing-norton-handoff.ts .github/workflows/pr.yml > "$recovery_diff"
+          if ! test -s "$recovery_diff"; then
+            printf 'selected=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf 'selected=true\n' >> "$GITHUB_OUTPUT"
+          mkdir "$RUNNER_TEMP/norton-recovery-rehearsal"
+          mkdir "$RUNNER_TEMP/norton-recovery-rehearsal/source"
+          # The capacity job's output has a second ANALYZE/change-counter update;
+          # it cannot recover the exact original bytes using statistics pages only.
+          npx --no-install tsx scripts/build-database.ts --output "$RUNNER_TEMP/norton-recovery-rehearsal/source/source.db"
+          npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/norton-recovery-rehearsal/auditor-bundle"
+          THEOLOGAI_NORTON_RECOVERY_DATABASE="$RUNNER_TEMP/norton-recovery-rehearsal/source/source.db" \
+          THEOLOGAI_NORTON_RECOVERY_BUNDLE="$RUNNER_TEMP/norton-recovery-rehearsal/auditor-bundle" \
+            npx --no-install vitest run test/unit/scripts/nortonSourceRecovery.test.ts
+          git worktree add --detach "$RUNNER_TEMP/norton-recovery-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
+          npx --no-install tsx .github/scripts/rehearse-norton-source.ts \
+            "$RUNNER_TEMP/norton-recovery-rehearsal" "$RUNNER_TEMP/norton-recovery-cc14" \
+            "$RUNNER_TEMP/norton-recovery-rehearsal/auditor-bundle" | tee "$RUNNER_TEMP/norton-original-source-rehearsal.json"
+          test -s "$RUNNER_TEMP/norton-original-source-rehearsal.json"
+      - name: Retain original source recovery rehearsal result
+        if: ${{ steps['original-source-rehearsal'].outputs.selected == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: norton-original-source-rehearsal-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/norton-original-source-rehearsal.json
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false
+
   worker-runtime:
     name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '' || inputs.preview_restore_json != '' || inputs.preview_validate_existing_json != '') && 'Operator metadata / Worker Runtime & D1' || 'Worker Runtime & D1' }}
     needs: classify
@@ -1336,7 +1379,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit
       - run: npm rebuild better-sqlite3 --ignore-scripts=false
       - name: Download exact retained native inputs
-        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-scoped-response-diagnostic-approval.v2' }}
+        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: '13454129353'
@@ -1346,7 +1389,7 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
       - name: Download the exact prior quota-stop evidence
-        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-scoped-response-diagnostic-approval.v2' }}
+        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: '13453494842'
@@ -1356,10 +1399,15 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
       - name: Stage pinned historical inputs without renewing proof age
-        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-scoped-response-diagnostic-approval.v2' }}
+        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         run: |
           npx --no-install tsx .github/scripts/retained-norton-inputs.ts \
             "$RUNNER_TEMP/retained-norton-inputs" "$RUNNER_TEMP/retained-norton-stop" "$RUNNER_TEMP/existing-preview"
+      - name: Build the exact original source recovery input without cloud credentials
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-existing-preview-validation-approval.v2' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/existing-preview/source"
+          npx --no-install tsx scripts/build-database.ts --output "$RUNNER_TEMP/existing-preview/source/source.db"
       - name: Verify immutable candidate inputs and compile-equivalent auditor runtime
         id: existing-inputs
         env:
@@ -1383,11 +1431,20 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           overwrite: false
+      - name: Reserve the new full acceptance operation in native artifact history
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-existing-preview-validation-approval.v2' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: norton-full-acceptance-ledger-${{ steps['existing-inputs'].outputs.operation_id }}
+          path: ${{ runner.temp }}/continuation-request.json
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: existing-preview-inputs-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/existing-preview/
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: error
           overwrite: false
 

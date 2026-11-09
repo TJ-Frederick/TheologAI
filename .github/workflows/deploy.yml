@@ -407,7 +407,7 @@ jobs:
           name: corpus-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/corpus-source/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
           overwrite: false
 
       - name: Build Worker without cloud credentials
@@ -423,7 +423,7 @@ jobs:
           name: worker-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/worker-bundle/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
           overwrite: false
 
   operator-authorization:

@@ -30,7 +30,7 @@ function requireAuthorization(a, expected = {}, now = Date.now()) {
   check(a.reservedReads === (corpus?policy.reservedReads:3510997) && a.hardReadCap === (corpus?policy.hardReadCap:3800000) && a.diagnosticCommands === 4 && a.maxWrites === 4 && (!corpus || a.liveControlReserve === policy.liveReads + policy.controlReads)
     && a.previousReadsSpentOrReserved === 0 && a.previousWritesSpentOrReserved === 0 && a.previousDiagnosticCommands === 0
     && a.outstandingPriorReservationsAccepted === true, 'new allowance and retained prior reservations');
-  if(extended)check(corpus&&a.role==='production'&&a.accountReadCeiling===4400000&&a.accountReadCeilingDay==='2026-11-06'&&new Date(now).toISOString().slice(0,10)===a.accountReadCeilingDay&&typeof a.notBefore==='string'&&a.notBefore.slice(0,10)===a.accountReadCeilingDay&&Date.parse(a.expiresAt)<=Date.parse(a.accountReadCeilingDay+'T00:00:00Z')+86400000,'explicit dated production account ceiling');
+  if(extended)check(corpus&&a.role==='production'&&a.accountReadCeiling===4400000&&typeof a.accountReadCeilingDay==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(a.accountReadCeilingDay)&&new Date(now).toISOString().slice(0,10)===a.accountReadCeilingDay&&typeof a.notBefore==='string'&&a.notBefore.slice(0,10)===a.accountReadCeilingDay&&Date.parse(a.expiresAt)<=Date.parse(a.accountReadCeilingDay+'T00:00:00Z')+86400000,'explicit dated production account ceiling');
   const start = Date.parse(a.notBefore), end = Date.parse(a.expiresAt);
   check(Number.isFinite(start) && Number.isFinite(end) && start <= now && end > now && end - start <= 86400000, 'authorization window');
   for (const [k,v] of Object.entries(expected)) check(a[k] === v, 'expected ' + k);

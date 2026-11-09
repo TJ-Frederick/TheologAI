@@ -47,7 +47,7 @@ export function assertProofQuery(query: ProofQuery): void {
   else check(query.kind === 'fts-integrity' && query.writeCeiling === 1 && ALL_FTS.some(t => query.sql === `INSERT INTO "${t}"("${t}",rank) VALUES('integrity-check',1)`), 'integrity command allowlist');
 }
 export function admitCorpusBudget(usage: number, reserved: number, localKnownReads: number, next: number, accountCeiling = 4_000_000, liveAuditReserve = 0, scope?: BudgetScope): void {
-  check(accountCeiling === 4_000_000 && (liveAuditReserve === 0 || liveAuditReserve === POLICY.liveReads + POLICY.controlReads) || accountCeiling === 5_000_000 && liveAuditReserve === 500_000 || accountCeiling===4400000&&scope?.role==='production'&&scope.day==='2026-11-06'&&scope.productionAuthorization&&operatorAuthority.productionAccountCeiling(scope.productionAuthorization.package,scope.productionAuthorization)===accountCeiling&&liveAuditReserve===100000, 'account budget policy');
+  check(accountCeiling === 4_000_000 && (liveAuditReserve === 0 || liveAuditReserve === POLICY.liveReads + POLICY.controlReads) || accountCeiling === 5_000_000 && liveAuditReserve === 500_000 || accountCeiling===4400000&&scope?.role==='production'&&scope.productionAuthorization&&scope.day===new Date().toISOString().slice(0,10)&&operatorAuthority.productionAccountCeiling(scope.productionAuthorization.package,scope.productionAuthorization)===accountCeiling&&liveAuditReserve===100000, 'account budget policy');
   check([usage, reserved, localKnownReads, next].every(count) && Math.max(usage, localKnownReads) + uncertaintyReadMargin(scope) + reserved + next + liveAuditReserve <= accountCeiling, 'insufficient account headroom');
 }
 

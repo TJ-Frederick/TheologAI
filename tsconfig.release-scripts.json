@@ -33,6 +33,8 @@
     ".github/scripts/validate-existing-norton-preview.ts",
     ".github/scripts/prepare-norton-production.ts",
     ".github/scripts/retained-norton-inputs.ts",
-    ".github/scripts/norton-scoped-response-diagnostic.ts"
+    ".github/scripts/norton-scoped-response-diagnostic.ts",
+    ".github/scripts/reconstruct-norton-source.ts",
+    ".github/scripts/rehearse-norton-source.ts"
   ]
 }
