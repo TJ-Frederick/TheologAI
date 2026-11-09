@@ -19,7 +19,7 @@
     "scripts/build-database.ts": "353b847ea4293944d897d79ea5f933ab0bf3b17f",
     "scripts/check-remote-d1-readiness.ts": "dfffac20e684ad916519c12357761e76f8f0f8b9",
     "scripts/corpus-execution-config.ts": "4ee19a8caf9a2e05bd52ebd82f72c74e79da8c9a",
-    "scripts/corpus-proof-transport.ts": "792721670b283dc0946082f598389b605377b86c",
+    "scripts/corpus-proof-transport.ts": "c7cd69c09d92d4fefeb935df13b121b697cc0f7e",
     "scripts/corpus-release-api.ts": "a46a930b583f9ad7235f52eb1e09fbc662f0c183",
     "scripts/corpus-release-control.ts": "442c74a1e24791fd26e76c38353dd958644668aa",
     "scripts/corpus-release-data.ts": "3904a9af9a0c768345fe22461e8c1c9620b50116",
