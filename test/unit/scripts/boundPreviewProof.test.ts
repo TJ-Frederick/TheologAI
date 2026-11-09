@@ -36,7 +36,7 @@ it('keeps cumulative task allowance separate from the 4M daily admission ceiling
   expect(() => admitCorpusBudget(140000, 3560000, 140000, 0, 4000000, 100000, { role: 'preview', day: '2026-11-09', historicalExceptions: false })).not.toThrow();
   expect(() => admitCorpusBudget(140001, 3560000, 140001, 0, 4000000, 100000, { role: 'preview', day: '2026-11-09', historicalExceptions: false })).toThrow();
 });
-it.each(['valid', 'unbound-mode', 'wrong-version', 'wrong-deployment', 'wrong-binding', 'production-drift', 'second-scan-drift', 'additional-worker', 'expired'])('checks complete bound inventory and controls: %s', async fault => {
+it.each(['valid', 'unbound-mode', 'wrong-version', 'wrong-deployment', 'wrong-binding', 'production-drift', 'second-scan-drift', 'post-inventory-race', 'additional-worker', 'expired'])('checks complete bound inventory and controls: %s', async fault => {
   const directory = mkdtempSync(join(tmpdir(), 'bound-preview-proof-'));
   let time = now, scans = 0, sql = 0;
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => time);
@@ -51,7 +51,7 @@ it.each(['valid', 'unbound-mode', 'wrong-version', 'wrong-deployment', 'wrong-bi
       if (path.includes('/theologai-preview/')) {
         if (path.endsWith('/settings') && fault === 'wrong-binding') v.result.bindings[0].id = boundPreview.productionDatabaseId;
         if (path.endsWith('/deployments') && (fault === 'wrong-deployment' || fault === 'second-scan-drift' && scans > 1)) v.result.deployments[0].id = boundPreview.productionDeploymentId;
-        if (path.endsWith('/deployments') && fault === 'wrong-version') v.result.deployments[0].versions[0].version_id = boundPreview.productionVersionId;
+        if (path.endsWith('/deployments') && (fault === 'wrong-version' || fault === 'post-inventory-race' && scans === 2 && new URL(String(input)).searchParams.get('per_page') === '1')) v.result.deployments[0].versions[0].version_id = boundPreview.productionVersionId;
       }
       if (path.includes('/theologai/deployments') && fault === 'production-drift') v.result.deployments[0].id = boundPreview.previewDeploymentId;
       return Response.json(v);
@@ -65,4 +65,16 @@ it.each(['valid', 'unbound-mode', 'wrong-version', 'wrong-deployment', 'wrong-bi
     } else await expect(transport.start()).rejects.toThrow();
     expect(sql).toBe(0);
   } finally { clock.mockRestore(); rmSync(directory, { recursive: true, force: true }); }
+});
+it.each(['valid', 'preview-drift', 'production-drift', 'binding-drift', 'expired'])('binds existing predeploy anchors to the owner window: %s', fault => {
+  const p = approval();
+  const preview = { worker: 'theologai-preview', predecessorDeploymentId: boundPreview.previewDeploymentId, predecessorVersionId: boundPreview.previewVersionId,
+    predecessorD1: { databaseId: boundPreview.databaseId }, candidateD1: { databaseId: boundPreview.databaseId }, d1Changed: false };
+  const production = { worker: 'theologai', deploymentId: boundPreview.productionDeploymentId, workerVersionId: boundPreview.productionVersionId,
+    d1: { databaseId: boundPreview.productionDatabaseId }, configuredD1: { databaseId: boundPreview.productionDatabaseId } };
+  if (fault === 'preview-drift') preview.predecessorDeploymentId = boundPreview.productionDeploymentId;
+  if (fault === 'production-drift') production.workerVersionId = boundPreview.previewVersionId;
+  if (fault === 'binding-drift') preview.predecessorD1.databaseId = boundPreview.productionDatabaseId;
+  const invoke = () => authority.requireBoundPreviewAnchors(p, preview, production, fault === 'expired' ? now + 7200001 : now);
+  if (fault === 'valid') expect(invoke).not.toThrow(); else expect(invoke).toThrow();
 });

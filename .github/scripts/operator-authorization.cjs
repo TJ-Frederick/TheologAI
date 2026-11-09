@@ -68,6 +68,17 @@ function boundPreviewForPackage(p,context,now=Date.now()) {
   requireCumulativeTask(a.cumulativeTask);
   return requireBoundPreview(a.boundPreview);
 }
+function requireBoundPreviewAnchors(p,preview,production,now=Date.now()) {
+  const a=requirePackage(p,{},now).authorization;
+  if(!a.boundPreview)return;
+  const pins=boundPreviewForPackage(p,{sourceCommit:a.sourceCommit,sourceTree:a.sourceTree,runId:a.targetRunId},now);
+  check(preview?.worker==='theologai-preview' && preview.predecessorDeploymentId===pins.previewDeploymentId
+    && preview.predecessorVersionId===pins.previewVersionId && preview.predecessorD1?.databaseId===pins.databaseId
+    && preview.candidateD1?.databaseId===pins.databaseId && preview.d1Changed===false,'bound preview predecessor drift');
+  check(production?.worker==='theologai' && production.deploymentId===pins.productionDeploymentId
+    && production.workerVersionId===pins.productionVersionId && production.d1?.databaseId===pins.productionDatabaseId
+    && production.configuredD1?.databaseId===pins.productionDatabaseId,'bound production control drift');
+}
 function requirePackage(p, expected = {}, now = Date.now()) {
   check(p && Object.keys(p).sort().join(',') === 'authorization,provenance', 'package shape');
   requireAuthorization(p.authorization, expected, now);
@@ -178,4 +189,4 @@ async function requireLiveSource({github,authorization:a}) {
   check(commit.tree.sha===a.sourceTree && (a.role!=='production' || commit.parents?.[0]?.sha===a.baseCommit),'live source tree and base');
 }
 function productionAccountCeiling(p,context,now=Date.now()){const a=requirePackage(p,{role:'production',releasePolicy:policy.policy,sourceCommit:context.sourceCommit,sourceTree:context.sourceTree,targetRunId:context.runId,targetRunAttempt:1},now).authorization;check(a.accountReadCeiling===4400000&&a.accountReadCeilingDay===new Date(now).toISOString().slice(0,10),'approved production ceiling context');return a.accountReadCeiling;}
-module.exports={boundPreviewForPackage,requireBoundPreview,requireCumulativeTask,productionAccountCeiling,requireAuthorization,requirePackage,requireProvenance,findAuthorization,waitForAuthorization,uploadAuthorization,requireLiveCandidate,requireLiveSource,requireLedgerMarker,readArchive,readArchiveFile,hash};
+module.exports={requireBoundPreviewAnchors,boundPreviewForPackage,requireBoundPreview,requireCumulativeTask,productionAccountCeiling,requireAuthorization,requirePackage,requireProvenance,findAuthorization,waitForAuthorization,uploadAuthorization,requireLiveCandidate,requireLiveSource,requireLedgerMarker,readArchive,readArchiveFile,hash};

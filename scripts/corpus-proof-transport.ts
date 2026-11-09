@@ -159,6 +159,7 @@ export class CorpusProofTransport {
       const version = row(await this.rest(path + '/versions/' + versions[0]!.version_id)); check(version.id === versions[0]!.version_id, 'version identity');
       const active = list(row(version.resources).bindings).filter(b => b.type === 'd1');
       check(active.length === 1 && (active[0]!.id ?? active[0]!.database_id) === databaseId && active[0]!.name === 'THEOLOGAI_DB', 'active D1 binding');
+      if(this.boundPreview)check(deployment.id===(role==='preview'?this.boundPreview.previewDeploymentId:this.boundPreview.productionDeploymentId) && version.id===(role==='preview'?this.boundPreview.previewVersionId:this.boundPreview.productionVersionId),'owner-pinned bound assignment changed');
       result.push({role,deploymentId:deployment.id,versionId:version.id,databaseId});
     }
     if (this.candidateWitness) result.push(this.candidateWitness as any);
@@ -178,7 +179,7 @@ export class CorpusProofTransport {
     const witness={kind:this.boundPreview?'bound-preview-corpus' as const:'unbound-corpus' as const,databaseId:capture.databaseId,inventorySha256:capture.inventorySha256};
     if(this.candidateWitness) check(JSON.stringify(witness)===JSON.stringify(this.candidateWitness),'candidate inventory changed');
     this.candidateWitness=witness; this.inventoryObservedAt=Date.parse(capture.capturedAt);
-    this.event({kind:'complete-unbound-inventory',capture});
+    this.event({kind:this.boundPreview?'complete-bound-preview-inventory':'complete-unbound-inventory',capture});
   }
   async start(): Promise<void> {
     await this.captureCandidate(); this.controls = await this.snapshot(); await this.usage(); this.baselineUsage = Math.max(this.latestUsage,this.options.knownRowsRead??0);

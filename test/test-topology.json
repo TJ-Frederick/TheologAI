@@ -10,9 +10,9 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 311,
-    "activeVitest": 232,
-    "support": 24,
+    "totalTestTypeScript": 314,
+    "activeVitest": 234,
+    "support": 25,
     "manual": 4,
     "legacyOrphan": 50,
     "conformance": 1
@@ -128,6 +128,7 @@
       "test/unit/scripts/auditDependencies.test.ts",
       "test/unit/scripts/augustinePuseyStrictPackage.test.ts",
       "test/unit/scripts/biblicalLanguageSources.test.ts",
+      "test/unit/scripts/boundPreviewProof.test.ts",
       "test/unit/scripts/buildUbsParallelPassages.test.ts",
       "test/unit/scripts/captureBoundedCommand.test.ts",
       "test/unit/scripts/ccelCoordinatorOperator.test.ts",
@@ -237,6 +238,7 @@
       "test/unit/services/historical/HistoricalHierarchyService.test.ts",
       "test/unit/services/historical/LocalPrimarySourceSearchProvider.test.ts",
       "test/unit/services/historical/PrimarySourceSearchService.test.ts",
+      "test/unit/services/historical/snippetLowercaseDifferential.test.ts",
       "test/unit/services/languages/HebrewSemanticEvidenceService.test.ts",
       "test/unit/services/languages/MorphologyService.test.ts",
       "test/unit/services/languages/OriginalLanguageStudyService.test.ts",
@@ -262,6 +264,7 @@
       "test/fixtures/mcpCompositionRoot.ts",
       "test/fixtures/ubsParallelCorpus.ts",
       "test/helpers/applicationReleaseSource.ts",
+      "test/helpers/boundPreviewFixture.ts",
       "test/helpers/ccelRetiredContractGuards.ts",
       "test/helpers/cloudflareWorkersShim.ts",
       "test/helpers/corpusControlFixture.ts",

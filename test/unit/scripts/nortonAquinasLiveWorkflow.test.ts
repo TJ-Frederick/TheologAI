@@ -175,6 +175,8 @@ it('rejects a changed runtime, data, fixture or lock even if an auditor claims e
  const git=(...args:string[])=>execFileSync('git',['-c','core.hooksPath=/dev/null',...args],{cwd:repo,stdio:'pipe'});
  try{
   execFileSync('git',['-c','core.hooksPath=/dev/null','clone','--shared','--quiet',process.cwd(),repo],{stdio:'pipe'});mkdirSync(bundle);writeFileSync(join(bundle,'worker.js'),'not the authenticated Worker');
+  expect(()=>requireRuntimeEquivalence(repo,bundle)).toThrow('unreviewed candidate/auditor difference');
+  git('checkout','--detach','7fe92b0c0398c09b0f07c27e98a39b42194bac49');
   expect(()=>requireRuntimeEquivalence(repo,bundle)).toThrow('compiled candidate runtime differs');
   for(const file of ['src/worker.ts','data/data-manifest.json','test/fixtures/historical-core-preview-audit.json','package-lock.json']){
    appendFileSync(join(repo,file),'\n');git('add',file);git('-c','user.name=Local Fixture','-c','user.email=fixture@example.test','-c','commit.gpgsign=false','commit','-qm','Local-only equivalence rejection fixture');

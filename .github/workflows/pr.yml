@@ -132,13 +132,14 @@ jobs:
           git worktree add --detach "$RUNNER_TEMP/norton-recovery-runtime" 7fe92b0c0398c09b0f07c27e98a39b42194bac49
           ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/norton-recovery-runtime/node_modules"
           (cd "$RUNNER_TEMP/norton-recovery-runtime" && npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/norton-recovery-rehearsal/auditor-bundle")
-          (cd "$RUNNER_TEMP/norton-recovery-runtime" && THEOLOGAI_NORTON_RECOVERY_DATABASE="$RUNNER_TEMP/norton-recovery-rehearsal/source/source.db" \
+          THEOLOGAI_NORTON_RECOVERY_ROOT="$RUNNER_TEMP/norton-recovery-runtime" \
+          THEOLOGAI_NORTON_RECOVERY_DATABASE="$RUNNER_TEMP/norton-recovery-rehearsal/source/source.db" \
           THEOLOGAI_NORTON_RECOVERY_BUNDLE="$RUNNER_TEMP/norton-recovery-rehearsal/auditor-bundle" \
-            npx --no-install vitest run test/unit/scripts/nortonSourceRecovery.test.ts)
+            npx --no-install vitest run test/unit/scripts/nortonSourceRecovery.test.ts
           git worktree add --detach "$RUNNER_TEMP/norton-recovery-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
-          (cd "$RUNNER_TEMP/norton-recovery-runtime" && npx --no-install tsx .github/scripts/rehearse-norton-source.ts \
+          THEOLOGAI_NORTON_RECOVERY_ROOT="$RUNNER_TEMP/norton-recovery-runtime" npx --no-install tsx .github/scripts/rehearse-norton-source.ts \
             "$RUNNER_TEMP/norton-recovery-rehearsal" "$RUNNER_TEMP/norton-recovery-cc14" \
-            "$RUNNER_TEMP/norton-recovery-rehearsal/auditor-bundle") | tee "$RUNNER_TEMP/norton-original-source-rehearsal.json"
+            "$RUNNER_TEMP/norton-recovery-rehearsal/auditor-bundle" | tee "$RUNNER_TEMP/norton-original-source-rehearsal.json"
           test -s "$RUNNER_TEMP/norton-original-source-rehearsal.json"
           cp "$RUNNER_TEMP/norton-original-source-rehearsal.json" "$RUNNER_TEMP/norton-recovery-rehearsal/original-source-rehearsal.json"
       - name: Retain original source recovery rehearsal result
@@ -670,6 +671,11 @@ jobs:
             if (failures.length > 0) {
               core.setFailed(`Preview authorization revoked: ${failures.join('; ')}.`);
             }
+            const fs=require('node:fs'),authority=require('./.github/scripts/operator-authorization.cjs');
+            const read=name=>JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/'+name,'utf8'));
+            const p=authority.requirePackage(read('operator-authorization.json'),{role:'preview',sourceCommit:context.payload.pull_request.head.sha,targetRunId:String(context.runId),targetRunAttempt:1});
+            authority.requireBoundPreviewAnchors(p,read('preview-worker-predecessor-anchor.json'),read('production-control-before.json'));
+
 
       - name: Synchronize preview ESV secret for initial activation only
         if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && steps.release-operation.outputs.bound_preview != 'true' }}

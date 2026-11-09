@@ -17,5 +17,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const [directory, candidateRoot, bundle, ...extra] = process.argv.slice(2);
     if (!directory || !candidateRoot || !bundle || extra.length)
         throw Error('Original source rehearsal requires exactly three directories');
-    process.stdout.write(JSON.stringify(rehearseOriginalNortonSource(process.cwd(), directory, candidateRoot, bundle), null, 2) + '\n');
+    process.stdout.write(JSON.stringify(rehearseOriginalNortonSource(process.env.THEOLOGAI_NORTON_RECOVERY_ROOT ?? process.cwd(), directory, candidateRoot, bundle), null, 2) + '\n');
 }

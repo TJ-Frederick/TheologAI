@@ -86,8 +86,7 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
         writeFileSync(join(work,'github.json'),JSON.stringify(metadata));mkdirSync(join(work,'bin'));
         writeFileSync(join(work,'bin/gh'),`#!${process.execPath}\nconst fs=require('node:fs');const path=process.argv[3];if(path.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(work,'authorization.zip'))}));else{const data=JSON.parse(fs.readFileSync(${JSON.stringify(join(work,'github.json'))},'utf8'));if(!data[path])process.exit(1);process.stdout.write(JSON.stringify(data[path]));}`,{mode:0o755});
         const network=join(work,'network.jsonl'),log=join(work,'transport.jsonl'),preload=join(work,'transport.mjs');
-        writeFileSync(preload,`import {boundPreview,cumulativeTask} from '../../helpers/boundPreviewFixture.js';
-import Database from ${JSON.stringify(resolve('node_modules/better-sqlite3/lib/index.js'))};import{appendFileSync}from'node:fs';
+        writeFileSync(preload,`import Database from ${JSON.stringify(resolve('node_modules/better-sqlite3/lib/index.js'))};import{appendFileSync}from'node:fs';
           import{corpusTransportFixture}from ${JSON.stringify(resolve('test/helpers/corpusTransportFixture.ts'))};
           const N=Date;const now=Number(process.env.FIXTURE_NOW);globalThis.Date=class extends N{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}};const timeout=globalThis.setTimeout;globalThis.setTimeout=(fn,ms,...args)=>timeout(fn,ms<1000?0:ms,...args);
           const db=new Database(${JSON.stringify(target)});globalThis.fetch=corpusTransportFixture({role:${JSON.stringify(role)},boundPreview:${phase==='bound-preview'},record:()=>appendFileSync(${JSON.stringify(network)},'request\\n'),query:(sql,token)=>{
