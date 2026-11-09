@@ -4,6 +4,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import Database from 'better-sqlite3';
 import {Client} from '@modelcontextprotocol/client';
+import {createHash} from 'node:crypto';
 vi.mock('../../helpers/mcpTransportContract.js',()=>({
  captureMcpTransportSnapshot:async(client:any)=>{await Promise.all([client.listTools(),client.listPrompts(),client.listResources(),client.listResourceTemplates()]);return{server:{version:'3.6.0-preview'}};},
  assertMcpTransportContract:async()=>{},fingerprintMcpTransportSnapshot:async()=>({tools:'fixed'})
@@ -30,6 +31,7 @@ function fixture(mode:string){
   const waitForClose=()=>new Promise<Response>((_resolve,reject)=>{const fail=()=>{row.aborted=true;reject(init.signal.reason??new DOMException('Aborted','AbortError'));};if(init.signal.aborted)fail();else init.signal.addEventListener('abort',fail,{once:true});});
   if(init.method==='GET'){if(mode==='background-primary-503')return waitForClose();row.status=405;return new Response(null,{status:405});}
   if(rpc.method==='notifications/cancelled')return waitForClose();
+  if(mode==='initialized-jsonrpc-error'&&rpc.method==='notifications/initialized'){row.status=503;return Response.json({jsonrpc:'2.0',id:null,error:{code:-32603,message:'SECRET_ERROR'}},{status:503});}
   if(mode==='initialize-503'&&rpc.method==='initialize'||mode==='initialized-503'&&rpc.method==='notifications/initialized'){row.status=503;return new Response('SECRET_RESPONSE',{status:503});}
   if(rpc.method==='notifications/initialized'){row.status=202;return new Response(null,{status:202});}
   if(mode.startsWith('contract-')&&['tools/list','prompts/list'].includes(rpc.method)){if(mode==='contract-protocol'&&rpc.method==='tools/list'){row.status=200;return new Response('SECRET_INVALID_JSON',{headers:{'content-type':'application/json'}});}row.status=202;return new Response(null,{status:202});}
@@ -54,7 +56,7 @@ it.each([['ack-202',202],['uncorrelated-200',200]])('keeps the real SDK timeout 
  const f=fixture(mode as string),report=await f.run();expect(report.failure).toMatchObject({category:'timeout',reason:'sdk_request_timeout',probeId:'search:calvin-institutes',httpMethod:'POST',rpcMethod:'tools/call',lastHttpStatus:status,sdkErrorCode:'RequestTimeout',secondaryHttpFailure:{rpcMethod:'notifications/cancelled',category:'aborted',status:null}});
  const primary=f.trace.find(r=>r.rpc==='tools/call'&&r.status===status&&r.id===report.failure?.requestId);expect(primary).toBeDefined();expect(f.trace.filter(r=>r.rpc==='notifications/cancelled')).toHaveLength(1);expect(f.trace.at(-1)?.aborted).toBe(true);expect(JSON.stringify(report)).not.toContain('SECRET_');
 });
-it.each(['primary-503','background-primary-503'])('keeps%s primary response independently of a background GET close abort',async mode=>{const f=fixture(mode),report=await f.run();expect(report.failure).toMatchObject({category:'http_status',rpcMethod:'tools/call',lastHttpStatus:503,httpEvidence:{cfRay:'0123456789abcdef-LHR'}});if(mode==='background-primary-503')expect(report.failure?.secondaryHttpFailure).toMatchObject({httpMethod:'GET',category:'aborted'});});
+it.each(['primary-503','background-primary-503'])('keeps%s primary response independently of a background GET close abort',async mode=>{const f=fixture(mode),report=await f.run();expect(report.failure).toMatchObject({category:'http_status',rpcMethod:'tools/call',lastHttpStatus:503,httpEvidence:{cfRay:'0123456789abcdef-LHR'},httpErrorResponse:{outcome:'complete',complete:true,digestScope:'body',envelope:'non_json',sha256:createHash('sha256').update('SECRET_RESPONSE').digest('hex')}});if(mode==='background-primary-503')expect(report.failure?.secondaryHttpFailure).toMatchObject({httpMethod:'GET',category:'aborted'});});
 it('recognizes a real zero-valued RPC ID',async()=>{const f=fixture('initialize-503'),report=await f.run();expect(report.failure).toMatchObject({category:'http_status',httpMethod:'POST',rpcMethod:'initialize',requestId:0,lastHttpStatus:503});});
 it('preserves a failure of the awaited initialized notification',async()=>{const f=fixture('initialized-503'),report=await f.run();expect(report.failure).toMatchObject({category:'http_status',rpcMethod:'notifications/initialized',requestId:null,lastHttpStatus:503});});
 it('preserves required client cleanup errors',async()=>{const f=fixture('cleanup-only'),report=await f.run();expect(report.failure).toMatchObject({category:'cleanup',reason:'client_close',cleanupFailed:true});});
@@ -67,3 +69,5 @@ it('captures the original body deadline and read error before close aborts other
 it('freezes pending primary body metrics before cleanup changes the reader state',async()=>{const f=fixture('body-close'),report=await f.run();expect(report.failure).toMatchObject({reason:'sdk_request_timeout',lastHttpStatus:200,responseBody:{bytes:0,eof:false,readError:false,deadlineFired:false,headersMs:expect.any(Number),firstByteMs:null,finishedMs:null}});expect(JSON.stringify(report)).not.toContain('SECRET_');});
 
 it('stops the explicit diagnostic prefix after the successful target without reading its next body',async()=>{const f=fixture('prefix-success'),report=await f.run('search:calvin-institutes');expect(report.failure).toMatchObject({category:'diagnostic_boundary',reason:'fixed_prefix_boundary',probeId:'search:calvin-institutes',lastCompletedProbe:'search:calvin-institutes',rpcMethod:'tools/call',responseBody:{eof:true,readError:false,bytes:expect.any(Number)}});const id=report.failure!.requestId as number;expect(f.trace.filter(r=>r.rpc==='tools/call'&&r.id===id)).toHaveLength(1);expect(f.trace.some(r=>r.id!==null&&r.id>id)).toBe(false);expect(report.failure!.responseBody!.bytes).toBeGreaterThan(0);});
+
+it('does not match a null provider id to an awaited notification with no RPC identity',async()=>{const f=fixture('initialized-jsonrpc-error'),report=await f.run();expect(report.failure).toMatchObject({category:'http_status',lastHttpStatus:503,requestId:null,httpErrorResponse:{envelope:'jsonrpc_error',codes:[-32603],rpcIdMatches:null}});expect(JSON.stringify(report)).not.toContain('SECRET_');});

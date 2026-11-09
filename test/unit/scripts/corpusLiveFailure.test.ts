@@ -48,6 +48,14 @@ const transport=(async(_input:any,init:any)=>{
  if(state.fault==='protocol-then-network'&&n===state.at+1)throw Error('SECRET_LATE_NETWORK');
  if(state.fault==='network-then-status'&&n===state.at+1)return new Response('SECRET_LATE_STATUS',{status:503});
  if(n===state.at){
+  if(state.fault==='error-jsonrpc')return Response.json({jsonrpc:'2.0',id:JSON.parse(init.body).id,error:{code:-32603,message:'SECRET_PROVIDER_MESSAGE',data:{token:'SECRET_TOKEN'}}},{status:503});
+  if(state.fault==='error-api')return Response.json({errors:[{code:1102,message:'SECRET_PROVIDER_MESSAGE'}],url:'https://SECRET_URL',headers:{authorization:'SECRET_TOKEN'}},{status:503});
+  if(state.fault==='error-code-string')return Response.json({error:{code:'SECRET_TOKEN',message:'SECRET_PROVIDER_MESSAGE'}},{status:503});
+  if(state.fault==='error-prefix')return new Response('SECRET_'.repeat(2000),{status:503});
+  if(state.fault==='error-byte-limit')return new Response('SECRET_'.repeat(50000),{status:503});
+  if(state.fault==='error-locked'){const r=new Response('SECRET_LOCKED_BODY',{status:503});r.body!.getReader();return r;}
+  if(state.fault==='error-read')return new Response(new ReadableStream({start(c){c.error(Error('SECRET_READ'));}}),{status:503});
+  if(state.fault==='error-stall')return new Response(new ReadableStream({start(){}}),{status:503});
   if(state.fault==='network'||state.fault==='network-and-cleanup'||state.fault==='network-then-status')throw Error('SECRET_NETWORK');
   if(state.fault==='timeout')return new Promise((_resolve,reject)=>init.signal.addEventListener('abort',()=>reject(Error('SECRET_TIMEOUT'))));
   if(state.fault==='status'||state.fault==='status-malicious')return new Response('SECRET_STATUS',{status:503,headers:state.fault==='status'?{'cf-ray':'0123456789abcdef-LHR','server':'cloudflare','content-type':'text/html; charset=utf-8','retry-after':'12','set-cookie':'SECRET_COOKIE'}:{'cf-ray':'SECRET_RAY','server':'SECRET_SERVER','content-type':'text/SECRET_TYPE','retry-after':'999999','x-secret':'SECRET_HEADER'}});
@@ -93,4 +101,12 @@ describe('actual corpus auditor exception-path report',()=>{
 
  it.each([['protocol-then-network','protocol',200],['network-then-status','network',null]])('keeps the first concurrent operation and cause when%s completes during cleanup',async(fault,category,status)=>{state.parallel=true;state.fault=fault as string;state.at=3;const result=await run();expect(result.failure).toMatchObject({category,reason:category,probeId:'contract:tools-list',lastHttpStatus:status,completedChecks:0,httpExchanges:6});expect(result.failure?.httpObservationProbe).toBe(status===null?null:'contract:tools-list');expect(state.requests).toBe(6);expect(state.closes).toBe(1);expect(JSON.stringify(result)).not.toContain('SECRET_');});
 
+});
+
+describe('bounded error evidence preserves the original5xx failure',()=>{
+ const run=()=>auditCorpusRelease({role:'preview',endpoint:'https://preview-mcp.theologai.xyz/mcp',serverVersion:'3.6.0-preview',databasePath:path,root,fetch:transport});
+ it.each([['error-jsonrpc','jsonrpc_error',[-32603]],['error-api','api_errors',[1102]],['error-code-string','json_error',[]]])('retains only closed%s metadata and a body hash',async(fault,envelope,codes)=>{state.fault=fault as string;const r=await run();expect(r.failure).toMatchObject({category:'http_status',lastHttpStatus:503,httpErrorResponse:{outcome:'complete',complete:true,digestScope:'body',envelope,codes}});expect(state.requests).toBe(1);if(fault==='error-jsonrpc')expect(r.failure!.httpErrorResponse!.sha256).toBe((await import('node:crypto')).createHash('sha256').update(JSON.stringify({jsonrpc:'2.0',id:r.failure!.requestId,error:{code:-32603,message:'SECRET_PROVIDER_MESSAGE',data:{token:'SECRET_TOKEN'}}})).digest('hex'));expect(JSON.stringify(r)).not.toContain('SECRET_');if(fault==='error-jsonrpc')expect(r.failure!.httpErrorResponse!.rpcIdMatches).toBe(true);});
+ it.each([['error-prefix','prefix_limit'],['error-byte-limit','byte_limit']])('bounds%s without relabeling503 as a size failure',async(fault,outcome)=>{state.fault=fault;const r=await run();expect(r.failure).toMatchObject({category:'http_status',lastHttpStatus:503,httpErrorResponse:{outcome,capturedBytes:8192,complete:false,digestScope:'prefix',envelope:null,codes:[]}});expect(r.failure!.httpErrorResponse!.sha256).toBe((await import('node:crypto')).createHash('sha256').update('SECRET_'.repeat(fault==='error-prefix'?2000:50000).slice(0,8192)).digest('hex'));expect(JSON.stringify(r)).not.toContain('SECRET_');expect(state.requests).toBe(1);});
+ it.each(['error-read','error-locked'])('keeps503 when%s prevents reading its error stream',async fault=>{state.fault=fault;const r=await run();expect(r.failure).toMatchObject({category:'http_status',lastHttpStatus:503,httpErrorResponse:{outcome:'read_error',complete:false,digestScope:'prefix'}});expect(JSON.stringify(r)).not.toContain('SECRET_');});
+ it('stops an error-body reader that ignores abort after1second without another fetch',async()=>{vi.useFakeTimers();state.fault='error-stall';const pending=run();await vi.advanceTimersByTimeAsync(1001);const r=await pending;expect(r.failure).toMatchObject({category:'http_status',lastHttpStatus:503,httpErrorResponse:{outcome:'timeout',complete:false,capturedBytes:0,digestScope:'prefix'}});expect(state.requests).toBe(1);});
 });

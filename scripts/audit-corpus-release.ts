@@ -25,6 +25,97 @@ function httpEvidence(response:Response){
  const media=response.headers.get('content-type')?.split(';',1)[0].trim().toLowerCase();
  return {cfRay:ray&&/^[a-f0-9]{16}(?:-[A-Z]{3})?$/.test(ray)?ray:null,cloudflareServer:response.headers.get('server')?.toLowerCase()==='cloudflare',contentType:['application/json','text/html','text/plain','text/event-stream'].includes(media??'')?media:null,retryAfterSeconds:retry&&/^\d{1,5}$/.test(retry)&&Number(retry)<=86400?Number(retry):null};
 }
+type HttpErrorEvidence = {
+    outcome: 'complete' | 'prefix_limit' | 'byte_limit' | 'timeout' | 'aborted' | 'read_error';
+    observedBytes: number;
+    capturedBytes: number;
+    complete: boolean;
+    sha256: string;
+    digestScope: 'body' | 'prefix';
+    envelope: 'empty' | 'jsonrpc_error' | 'jsonrpc_result' | 'api_errors' | 'json_error' | 'other_json' | 'non_json' | null;
+    codes: number[];
+    rpcIdMatches: boolean | null;
+};
+
+/** Same-response evidence only. Provider prose and extra fields never leave this function. */
+async function readHttpErrorEvidence(
+    response: Response,
+    signal: AbortSignal,
+    requestId: string | number | null,
+    onChunk: (bytes: number, eof: boolean) => boolean,
+): Promise<HttpErrorEvidence> {
+    const captured: Uint8Array[] = [];
+    let capturedBytes = 0, observedBytes = 0, complete = false;
+    let outcome: HttpErrorEvidence['outcome'] = 'complete';
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let abort = () => {};
+    let stoppedAs: 'timeout' | 'aborted' | undefined;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    try {
+        reader = response.body?.getReader();
+        if (!reader) complete = true;
+        else if (signal.aborted) outcome = 'aborted';
+        else {
+            const stopped = new Promise<never>((_resolve, reject) => {
+                abort = () => { stoppedAs = 'aborted'; reject(new Error('Evidence read stopped')); };
+                signal.addEventListener('abort', abort, { once: true });
+                timeout = setTimeout(() => { stoppedAs = 'timeout'; reject(new Error('Evidence read stopped')); }, 1000);
+            });
+            while (capturedBytes < 8192) {
+                const part = await Promise.race([reader.read(), stopped]);
+                if (part.done) { complete = true; onChunk(0, true); break; }
+                observedBytes += part.value.byteLength;
+                // Copy the prefix; do not retain a large incoming chunk's backing buffer.
+                const prefix = new Uint8Array(part.value.subarray(0, 8192 - capturedBytes));
+                captured.push(prefix);
+                capturedBytes += prefix.byteLength;
+                if (!onChunk(part.value.byteLength, false)) { outcome = 'byte_limit'; break; }
+                if (capturedBytes === 8192) { outcome = 'prefix_limit'; break; }
+            }
+        }
+    } catch {
+        outcome = stoppedAs ?? 'read_error';
+    } finally {
+        clearTimeout(timeout);
+        signal.removeEventListener('abort', abort);
+        try { reader?.cancel().catch(() => {}); reader?.releaseLock(); } catch {}
+    }
+
+    const sample = Buffer.concat(captured);
+    const codes: number[] = [];
+    let envelope: HttpErrorEvidence['envelope'] = null;
+    let rpcIdMatches: boolean | null = null;
+    const code = (value: unknown) => {
+        if (typeof value === 'number' && Number.isSafeInteger(value)
+            && Math.abs(value) <= 999999 && codes.length < 8 && !codes.includes(value)) codes.push(value);
+    };
+    // A prefix may split UTF-8 or JSON. Classify only a complete bounded body.
+    if (complete) {
+        if (!sample.length) envelope = 'empty';
+        else try {
+            const value = JSON.parse(sample.toString('utf8'));
+            if (!value || typeof value !== 'object' || Array.isArray(value)) envelope = 'other_json';
+            else if (value.jsonrpc === '2.0' && value.error && typeof value.error === 'object') {
+                envelope = 'jsonrpc_error';
+                code(value.error.code);
+                rpcIdMatches = requestId === null ? null : value.id === requestId;
+            } else if (value.jsonrpc === '2.0' && Object.hasOwn(value, 'result')) {
+                envelope = 'jsonrpc_result';
+                rpcIdMatches = requestId === null ? null : value.id === requestId;
+            } else if (Array.isArray(value.errors)) {
+                envelope = 'api_errors';
+                for (const error of value.errors.slice(0, 8)) code(error?.code);
+            } else if (value.error !== undefined) {
+                envelope = 'json_error';
+                code(value.error?.code);
+                code(value.code);
+            } else envelope = 'other_json';
+        } catch { envelope = 'non_json'; }
+    }
+    return { outcome, observedBytes, capturedBytes, complete, sha256: sha(sample),
+        digestScope: complete ? 'body' : 'prefix', envelope, codes, rpcIdMatches };
+}
+
 export async function auditCorpusRelease(options: {
     role: 'preview' | 'production';
     endpoint: string;
@@ -52,7 +143,7 @@ export async function auditCorpusRelease(options: {
     // EOF records an actual reader EOF; a null body has finishedMs with eof=false.
     // Timings share the existing HTTP deadline start, including admission spacing.
     type ResponseBodyObservation={bytes:number;eof:boolean;readError:boolean;deadlineFired:boolean;headersMs:number|null;firstByteMs:number|null;finishedMs:number|null};
-    type HttpObservation={era:string;probeId:string;httpMethod:string;rpcMethod:string|null;requestId:string|number|null;status:number|null;evidence:ReturnType<typeof httpEvidence>|null;responseBody:ResponseBodyObservation};
+    type HttpObservation={era:string;probeId:string;httpMethod:string;rpcMethod:string|null;requestId:string|number|null;status:number|null;evidence:ReturnType<typeof httpEvidence>|null;httpErrorResponse?:HttpErrorEvidence;responseBody:ResponseBodyObservation};
     type RequestFailure=HttpObservation&{category:FailureCategory;reason:string;sdkErrorCode?:string|null};
     let failedRequest:RequestFailure|undefined,secondaryHttpFailure:RequestFailure|undefined;
     let originatingFailure:(RequestFailure&{sdkErrorCode:string|null;stage:FailureStage})|undefined;
@@ -119,7 +210,13 @@ export async function auditCorpusRelease(options: {
                         if(options.fetch===fetch){const delay=Math.max(0,nextNetworkStart-Date.now());if(delay)await new Promise(r=>setTimeout(r,delay));nextNetworkStart=Date.now()+650;}
                         let response:Response;try{response = await fetchImpl(input, { ...init, headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`}, redirect: 'error', signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal });}catch{throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'network');}
                         observation.responseBody.headersMs=Date.now()-requestStarted;requestStatus=response.status;requestEvidence=httpEvidence(response);observation.status=requestStatus;observation.evidence=requestEvidence;if(awaited){if(requestProbe.startsWith('contract:'))contractResponses.set(requestProbe,{status:requestStatus,evidence:requestEvidence});lastHttpStatus=requestStatus;lastHttpEvidence=requestEvidence;httpObservationProbe=requestProbe;}
-                        if(response.redirected||response.status>=500){throw new AuditFault('http_status');}
+                        if(response.redirected)throw new AuditFault('http_status');
+                        if(response.status>=500){
+                            const signal=init?.signal?AbortSignal.any([init.signal,controller.signal]):controller.signal;
+                            observation.httpErrorResponse=await readHttpErrorEvidence(response,signal,requestId,(bytes,eof)=>{if(bytes&&observation.responseBody.firstByteMs===null)observation.responseBody.firstByteMs=Date.now()-requestStarted;observation.responseBody.bytes+=bytes;aggregateBytes+=bytes;observation.responseBody.eof=eof;return observation.responseBody.bytes<=256*1024&&aggregateBytes<=16*1024*1024;});
+                            observation.responseBody.readError=observation.httpErrorResponse.outcome==='read_error';
+                            throw new AuditFault('http_status');
+                        }
                         if (!response.body)
                             return response;
                         const reader = response.body.getReader(), chunks: Uint8Array[] = [];
@@ -254,6 +351,6 @@ export async function auditCorpusRelease(options: {
     finally {
         try{db.close();}catch{cleanupFailed=true;if(!failure){failure='cleanup';failureReason='database_close';current='database-close';stage='cleanup';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;}}
     }
-    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,reason:failureReason,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.some(c=>c.passed)?trustedId([...checks].reverse().find(c=>c.passed)!.id):null,lastCompletedEra:[...checks].reverse().find(c=>c.passed)?.era??null,completedChecks:checks.filter(c=>c.passed).length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,httpObservationProbe:httpObservationProbe?trustedId(httpObservationProbe):null,httpEvidence:lastHttpEvidence,aggregateResponseBytes:aggregateBytes,cleanupFailed,httpMethod:originatingFailure?.httpMethod??null,rpcMethod:originatingFailure?.rpcMethod??null,requestId:originatingFailure?.requestId??null,sdkErrorCode:originatingFailure?.sdkErrorCode??null,responseBody:originatingFailure?.responseBody??null,secondaryHttpFailure:secondaryHttpFailure?{...secondaryHttpFailure,probeId:trustedId(secondaryHttpFailure.probeId)}:null}}:{}) };
+    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,reason:failureReason,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.some(c=>c.passed)?trustedId([...checks].reverse().find(c=>c.passed)!.id):null,lastCompletedEra:[...checks].reverse().find(c=>c.passed)?.era??null,completedChecks:checks.filter(c=>c.passed).length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,httpObservationProbe:httpObservationProbe?trustedId(httpObservationProbe):null,httpEvidence:lastHttpEvidence,aggregateResponseBytes:aggregateBytes,cleanupFailed,httpMethod:originatingFailure?.httpMethod??null,rpcMethod:originatingFailure?.rpcMethod??null,requestId:originatingFailure?.requestId??null,sdkErrorCode:originatingFailure?.sdkErrorCode??null,responseBody:originatingFailure?.responseBody??null,httpErrorResponse:originatingFailure?.httpErrorResponse??null,secondaryHttpFailure:secondaryHttpFailure?{...secondaryHttpFailure,probeId:trustedId(secondaryHttpFailure.probeId)}:null}}:{}) };
     function sameFingerprints() { check(hash(fingerprints[0]) === hash(fingerprints[1]), 'dual_era_contract_mismatch'); }
 }
