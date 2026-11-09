@@ -31,7 +31,7 @@ it('preserves Unicode expansion, contextual sigma, NFC, boundaries and earliest 
     expect(boundedMatchContext(content, 'grace İΣ', 'all_terms', maximum)).toBe(baseline(content, 'grace İΣ', 'all_terms', maximum));
   }
 });
-it('preserves corpus acceptance snippets with the real repository and full provider', async () => {
+it.runIf(!!process.env.THEOLOGAI_TEST_DATABASE_PATH)('preserves corpus acceptance snippets with the real repository and full provider', async () => {
   const db = new Database(process.env.THEOLOGAI_TEST_DATABASE_PATH ?? 'data/theologai.db', { readonly: true, fileMustExist: true });
   try {
     const repository = new HistoricalDocumentRepository(db);
