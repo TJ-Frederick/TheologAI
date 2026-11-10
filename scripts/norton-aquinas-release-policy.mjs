@@ -54,6 +54,7 @@ const ACTIVATION_PATHS=Object.freeze([
   "src/adapters/d1/D1HistoricalHierarchyRepository.ts",
   "src/adapters/data/HistoricalHierarchyRepository.ts",
   "src/formatters/historicalHierarchyFormatter.ts",
+  "src/kernel/editionProvenanceFoundation.ts",
   "src/kernel/historicalHierarchyResource.ts",
   "src/kernel/repositories.ts",
   "src/mcp/prompts.ts",

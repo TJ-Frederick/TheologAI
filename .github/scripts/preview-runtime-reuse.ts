@@ -38,6 +38,19 @@ export const VALIDATE=Object.freeze({schema:'norton-preview-runtime-validation-a
  requestArtifact:13792094624,ledgerArtifact:13793920217,requestDigest:'sha256:69c65f284691be4c3568ea42139e0d6907a0799e13921dec7633543ff89579ec',requestSha256:'fc44174275b7d100439eab8055ec0f4c2db014ce064c19b84be139463f93d004',
  priorReads:7960000,finalReads:8060000,cumulativeCeiling:8260000,nov10ReadFloor:3471182});
 const validating=(a:{schemaVersion:string})=>a.schemaVersion===VALIDATE.schema;
+// The deployment purpose uses the existing owner handoff and shared preview lock.
+export const SEARCH_DEPLOYMENT = Object.freeze({
+ confirmation: 'DEPLOY ONE REVIEWED CLASSIC SEARCH FIX TO PREVIEW',
+ priorReads: 8060000,
+ cumulativeCeiling: 8360000,
+ nov10ReadFloor: 3730566,
+ path: 'src/kernel/editionProvenanceFoundation.ts',
+ blob: 'd8819bfdbb49141831751551368a3e9c1522b306',
+ workerSha256: '882f7501271ed77097ad3b6967d0708dbbdbab9b03af85cff2476bb188132a84',
+});
+function deploysSearchFix(a: ReuseApproval): boolean {
+ return a.schemaVersion === REUSE.schema && a.confirmation === SEARCH_DEPLOYMENT.confirmation;
+}
 const STOP_FILES:Record<string,string>={'corpus-live.json':'53523e9b48f2dc012ed68a707bb0de2cb68abd8e1e96fb6dc3205d854ea16239','edge.json':'c2c6a01d700d5bd04d2cd3534f5fca74d7c10179404ce77c68d64afd55074b76','predecessor.json':'94fe998f2c621442f91d8e51dae0b16ca36b4f25b22d174b34f3d2a531938d49','runtime-reuse.events.jsonl':'150348ba06f7a92b07082ad5b8aa265363fc65dc47ffbaf8de9e6ab87ee509ce','upload-only.json':'36bbe9b5226699f090473169828aeb4ed4012cc4e6e152797e743bfa51604235'};
 const sha=(v:string|Buffer)=>createHash('sha256').update(v).digest('hex');
 const hash=(v:unknown)=>sha(JSON.stringify(v));
@@ -51,12 +64,12 @@ const git=(root:string,...args:string[])=>execFileSync('git',args,{cwd:root,enco
 type Source={commit:string;tree:string};
 export type ReuseApproval={schemaVersion:string;operationId:string;sourceCommit:string;sourceTree:string;targetRunId:string;targetRunAttempt:1;headBranch:string;notBefore:string;expiresAt:string;confirmation:string;
  historicalProofSha256:string;historicalExpiry:string;acceptHistoricalContinuityRisk:true;uninterruptedDataCustody:true;maxReads:100000;maxWrites:0;maxDeployments:0|1;
- previousReadsHeld:7860000|7960000;finalReadsHeld:7960000|8060000;uncertaintyMargin:200000;cumulativeReadCeiling:8160000|8260000;actualPriorDiagnosticWrites:11;heldDiagnosticWrites:12;
+ previousReadsHeld:7860000|7960000|8060000;finalReadsHeld:7960000|8060000|8160000;uncertaintyMargin:200000;cumulativeReadCeiling:8160000|8260000|8360000;actualPriorDiagnosticWrites:11;heldDiagnosticWrites:12;
  dailyUsageDay:string;knownDailyReadFloor:number;unreportedInFlightReadReserve:number;knownDailyCandidateWrites:number};
 export function requireReuseApproval(a:ReuseApproval,source:Source,now=Date.now()):ReuseApproval{
  const keys='acceptHistoricalContinuityRisk,actualPriorDiagnosticWrites,confirmation,cumulativeReadCeiling,dailyUsageDay,expiresAt,finalReadsHeld,headBranch,heldDiagnosticWrites,historicalExpiry,historicalProofSha256,knownDailyCandidateWrites,knownDailyReadFloor,maxDeployments,maxReads,maxWrites,notBefore,operationId,previousReadsHeld,schemaVersion,sourceCommit,sourceTree,targetRunAttempt,targetRunId,uncertaintyMargin,uninterruptedDataCustody,unreportedInFlightReadReserve';
  check(a&&Object.keys(a).sort().join(',')===keys,'closed owner approval');
- const validation=validating(a),budget=validation?VALIDATE:REUSE;
+ const validation=validating(a),budget=validation?VALIDATE:deploysSearchFix(a)?SEARCH_DEPLOYMENT:REUSE;
  check((validation||a.schemaVersion===REUSE.schema)&&a.confirmation===budget.confirmation&&(validation?/^operation-runtime-validation-[a-z0-9-]{8,80}$/:/^operation-runtime-reuse-[a-z0-9-]{8,80}$/).test(a.operationId),'single preview deployment purpose');
  check(/^[a-f0-9]{40}$/.test(a.sourceCommit)&&/^[a-f0-9]{40}$/.test(a.sourceTree)&&a.sourceCommit===source.commit&&a.sourceTree===source.tree,'exact source');
  check(/^[1-9][0-9]{0,15}$/.test(a.targetRunId)&&a.targetRunAttempt===1&&/^[a-zA-Z0-9_./-]{1,200}$/.test(a.headBranch),'exact PR execution target');
@@ -68,10 +81,13 @@ export function requireReuseApproval(a:ReuseApproval,source:Source,now=Date.now(
  return a;
 }
 const RELEASE_SCRIPT_CHANGES=new Set(['audit-corpus-release.ts','audit-primary-source-edge-stabilization.ts','corpus-proof-transport.ts','corpus-release-control.ts','dual-era-preview-release-receipt.ts','norton-aquinas-live.ts','norton-aquinas-preparation.ts','norton-aquinas-release-policy.mjs','operator-corpus-proof.ts']);
-export function requireReuseSource(root:string,validation=false):Source{
+export function requireReuseSource(root:string,validation=false,searchFix=false):Source{
  const source={commit:git(root,'rev-parse','HEAD'),tree:git(root,'rev-parse','HEAD^{tree}')};
  const classification=classifyApplicationRelease(root);check(classification.sourceCommit===source.commit&&classification.sourceTree===source.tree,'clean classified source');
- check(git(root,'diff','--name-only',EXISTING.sourceCommit,'HEAD','--','src','data','migrations')===REUSE.provider&&git(root,'rev-parse','HEAD:'+REUSE.provider)===REUSE.providerBlob,'only reviewed two-call runtime delta');
+ if (searchFix) {
+  check(git(root, 'diff', '--name-only', VALIDATE.sourceCommit, 'HEAD', '--', 'src', 'data', 'migrations') === SEARCH_DEPLOYMENT.path
+   && git(root, 'rev-parse', 'HEAD:' + SEARCH_DEPLOYMENT.path) === SEARCH_DEPLOYMENT.blob, 'only reviewed classic search runtime delta');
+ } else check(git(root,'diff','--name-only',EXISTING.sourceCommit,'HEAD','--','src','data','migrations')===REUSE.provider&&git(root,'rev-parse','HEAD:'+REUSE.provider)===REUSE.providerBlob,'only reviewed two-call runtime delta');
  if(validation)check(git(root,'diff','--name-only',VALIDATE.sourceCommit,'HEAD','--','src','data','migrations','package.json','package-lock.json','wrangler.toml','wrangler.ccel-coordinator.toml','.github/release-toolchain','.nvmrc')==='','tooling-only delta from deployed optimized source');
  const scripts=git(root,'diff','--name-only',EXISTING.sourceCommit,'HEAD','--','scripts').split('\n').filter(Boolean);
  check(scripts.every(path=>RELEASE_SCRIPT_CHANGES.has(path.slice(8))),'unchanged corpus construction and FTS definitions');
@@ -165,11 +181,12 @@ function originalEvidence(directory:string,candidateRoot:string){
  return verifyHistoricalCandidate(directory,candidateRoot);
 }
 export function prepareReuse(root:string,directory:string,candidateRoot:string,bundle:string,a:ReuseApproval){
- const source=requireReuseSource(root,validating(a));requireReuseApproval(a,source);
+ const source=requireReuseSource(root,validating(a),deploysSearchFix(a));requireReuseApproval(a,source);
  const capture=verifyRecoveredNortonInputs(root,directory),rehearsal=verifyRehearsalInputWitness(directory,{commit:REUSE.originalInputSource,tree:REUSE.originalInputTree}),historical=originalEvidence(directory,candidateRoot);
  const custody=json(join(directory,'recovery-original-equivalence.json')).admission.retainedInputs;
  verifyRetainedInputEvidence(directory,custody,NATIVE_ARTIFACTS,EXISTING.run,EXISTING.sourceCommit,Date.parse(SOURCE_RECOVERY.capturedAt));
  const manifestBytes=file(join(bundle,'release-manifest.json')),manifestSha256=sha(manifestBytes),manifest=verifyManifest(root,bundle,'preview',manifestSha256);
+ if(deploysSearchFix(a))check(manifest.files['worker.js']===SEARCH_DEPLOYMENT.workerSha256,'exact reviewed compiled search fix');
  if(validating(a))check(manifest.files['worker.js']===VALIDATE.workerSha256,'byte-identical deployed optimized runtime');
  check(manifest.files['worker.js']!==EXISTING.workerSha256,'new compiled runtime separate from historical runtime');
  const temporary=mkdtempSync(join(tmpdir(),'reuse-corpus-plan-'));
@@ -184,14 +201,16 @@ export function prepareReuse(root:string,directory:string,candidateRoot:string,b
  writeFileSync(join(directory,'runtime-reuse-inputs.json'),JSON.stringify(record,null,2)+'\n',{flag:'wx',mode:0o600});return record;
 }
 export function verifyReuseInputs(root:string,directory:string,candidateRoot:string,a:ReuseApproval){
- const source=requireReuseSource(root,validating(a));requireReuseApproval(a,source);
+ const source=requireReuseSource(root,validating(a),deploysSearchFix(a));requireReuseApproval(a,source);
  const input=json(join(directory,'runtime-reuse-inputs.json')),historical=originalEvidence(directory,candidateRoot);
  if(validating(a))check(hash(input.validationPredecessor)===hash(verifyValidationPredecessor(directory))&&input.workerSha256===VALIDATE.workerSha256,'verified deployed runtime predecessor');
  check(input.schemaVersion==='norton-preview-runtime-reuse-inputs.v1'&&hash(input.source)===hash(source)&&input.originalProofSha256===EXISTING.proofSha256&&input.originalProofCompletedAt===EXISTING.proofCompletedAt&&input.historicalExpiry===REUSE.expiresAt&&input.sourceDatabaseSha256===EXISTING.databaseSha256&&input.freshProof===false,'historical complete-proof input pins');
  check(hash(input.candidatePlan.classification)===hash(classifyApplicationRelease(root))&&input.candidatePlan.sourceSha256===EXISTING.databaseSha256&&hash(input.candidatePlan.expected)===hash(historical.plan.expected)&&hash(input.candidatePlan.expected.digests)===hash(historical.envelope.receipt.proof.tables),'current source-bound complete expected plan');
  check(hash(input.sourceRecovery)===hash(verifyRecoveredNortonInputs(root,directory))&&hash(input.rehearsal)===hash(verifyRehearsalInputWitness(directory,{commit:REUSE.originalInputSource,tree:REUSE.originalInputTree}))&&input.originalNativeInputArtifact===REUSE.originalInputArtifact,'original reconstruction provenance');
  const custody=json(join(directory,'recovery-original-equivalence.json')).admission.retainedInputs;verifyRetainedInputEvidence(directory,custody,NATIVE_ARTIFACTS,EXISTING.run,EXISTING.sourceCommit,Date.parse(SOURCE_RECOVERY.capturedAt));
- const manifest=verifyManifest(root,join(directory,'candidate-bundle'),'preview',input.manifestSha256);check(input.workerSha256===manifest.files['worker.js']&&input.workerSha256!==EXISTING.workerSha256,'new source-bound runtime');
+ const manifest=verifyManifest(root,join(directory,'candidate-bundle'),'preview',input.manifestSha256);
+ if(deploysSearchFix(a))check(manifest.files['worker.js']===SEARCH_DEPLOYMENT.workerSha256,'exact reviewed compiled search fix');
+ check(input.workerSha256===manifest.files['worker.js']&&input.workerSha256!==EXISTING.workerSha256,'new source-bound runtime');
  return{source,input,historical};
 }
 export function admitReuseDaily(a:ReuseApproval,usage:any,baseline:number,completion=false,now=Date.now()){
@@ -263,7 +282,10 @@ export async function executeReuse(input:Execution){
  const assignments=(rows:Assignment[],after=false)=>{
   const production=rows[0]!,preview=rows[1]!;
   check(production.role==='production'&&production.deploymentId===EXISTING.productionDeployment&&production.versionId===EXISTING.productionWorker,'production assignment unchanged');
-  check(preview.role==='preview'&&preview.deploymentId===(validation?VALIDATE.deployment:after?newIdentity?.deploymentId:EXISTING.deployment)&&preview.versionId===(validation?VALIDATE.worker:after?newIdentity?.deployedVersionId:EXISTING.worker),'expected preview assignment');
+  const predecessor=validation||deploysSearchFix(a)?VALIDATE:EXISTING;
+  const expectedDeployment=after&&!validation?newIdentity?.deploymentId:predecessor.deployment;
+  const expectedWorker=after&&!validation?newIdentity?.deployedVersionId:predecessor.worker;
+  check(preview.role==='preview'&&preview.deploymentId===expectedDeployment&&preview.versionId===expectedWorker,'expected preview assignment');
  };
  const observe=async(completion=false)=>{const usage=await captureCorpusUsage({role:'preview',api});baseline=Math.max(baseline,admitReuseDaily(a,usage,baseline,completion,now()));usageAt=Date.parse(usage.capturedAt);record({kind:'daily-usage',completion,usage,effectiveBaseline:baseline,watermarkUnavailable:true});return usage;};
  const db=new Database(join(input.directory,'source/source.db'),{readonly:true,fileMustExist:true});
@@ -282,7 +304,7 @@ export async function executeReuse(input:Execution){
  try{
   const owner=await input.revalidate();guard();
   record({kind:'role-reserved',priorReadsHeld:a.previousReadsHeld,newReadsReserved:REUSE.newReads,finalReadsHeld:a.finalReadsHeld,margin:REUSE.margin,cumulativeCeiling:a.cumulativeReadCeiling,newIntegrityWrites:0,actualPriorWrites:11,heldWrites:12,freshProof:false});
-  stage='initial_assignment';const before=await snapshot();assignments(before);check(before[1]!.versionSha256===(validation?VALIDATE.versionSha256:input.historical.cutover.observedActiveVersionViewSha256),'original immutable preview version witness');if(validation)check(before[0]!.versionSha256===VALIDATE.productionVersionSha256,'retained immutable production witness');
+  stage='initial_assignment';const before=await snapshot();assignments(before);check(before[1]!.versionSha256===((validation||deploysSearchFix(a))?VALIDATE.versionSha256:input.historical.cutover.observedActiveVersionViewSha256),'original immutable preview version witness');if(validation||deploysSearchFix(a))check(before[0]!.versionSha256===VALIDATE.productionVersionSha256,'retained immutable production witness');
   const initialUsage=await observe();stage='continuity_before';await continuity('before');
   let deployed=before;
   if(!validation){
@@ -334,8 +356,9 @@ export async function readReuseMarkerZip(route:string,token:string,net:typeof fe
 async function main(){
  const [mode,request,directory,candidateRoot,last,...extra]=process.argv.slice(2);
  check((mode==='prepare'||mode==='execute')&&request&&directory&&candidateRoot&&last&&!extra.length,'exact runtime-reuse arguments');
- const root=process.cwd(),source=requireReuseSource(root),a=requireReuseApproval(json(request),source),env=process.env;
- requireReuseSource(root,validating(a));
+ const root=process.cwd(),requestApproval:ReuseApproval=json(request),env=process.env;
+ const source=requireReuseSource(root,validating(requestApproval),deploysSearchFix(requestApproval));
+ const a=requireReuseApproval(requestApproval,source);
  check(env.GITHUB_TOKEN,'existing GitHub metadata credential');let githubCalls=0,githubBytes=0;
  const github:Github=async(route,binary=false)=>{
   requireReuseApproval(a,source);check(++githubCalls<=REUSE.githubLogicalCalls&&route.startsWith('/')&&!route.includes('..'),'bounded GitHub metadata');

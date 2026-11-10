@@ -44,6 +44,7 @@
     "src/adapters/d1/D1HistoricalHierarchyRepository.ts": "3584349e1518a6ae1f3472766b0004266ad617ff",
     "src/adapters/data/HistoricalHierarchyRepository.ts": "cea36190d6852a47b16f210317b8428fd2df8e83",
     "src/formatters/historicalHierarchyFormatter.ts": "a23b3e86c69d600b30fbbbce311dd188d715f0fc",
+    "src/kernel/editionProvenanceFoundation.ts": "d8819bfdbb49141831751551368a3e9c1522b306",
     "src/kernel/historicalHierarchyResource.ts": "4e001a671d9361ae7281e5887c87906b4bee9974",
     "src/kernel/repositories.ts": "11a8bbc59f7029cf818f3bbe153cc77c88812145",
     "src/mcp/prompts.ts": "c81bdd6b4e859be2f82bca67a7c36b57a4af7bff",

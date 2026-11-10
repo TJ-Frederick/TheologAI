@@ -7,7 +7,7 @@ import {createRequire} from 'node:module';
 import {tmpdir} from 'node:os';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {parse} from 'yaml';
-import {REUSE,VALIDATE,requireReuseApproval,admitReuseDaily,admitReuse,requireValidationNative,findReuseHandoff,admitReusePr,executeReuse,readReuseMarkerZip,safeReuseFailure,type ReuseApproval} from '../../../.github/scripts/preview-runtime-reuse.js';
+import {REUSE,VALIDATE,SEARCH_DEPLOYMENT,requireReuseApproval,admitReuseDaily,admitReuse,requireValidationNative,findReuseHandoff,admitReusePr,executeReuse,readReuseMarkerZip,safeReuseFailure,type ReuseApproval} from '../../../.github/scripts/preview-runtime-reuse.js';
 import {EXISTING,CONTINUITY_QUERIES,requirePreviewApproval} from '../../../.github/scripts/validate-existing-norton-preview.js';
 import {CATALOG_SQL,LEDGER_SQL} from '../../../scripts/corpus-source-proof.js';
 const hooks=vi.hoisted(()=>({edge:vi.fn(),audit:vi.fn()}));
@@ -65,7 +65,8 @@ function executionFixture(fault=''){
  const root=mkdtempSync(join(tmpdir(),'preview-runtime-reuse-'));roots.push(root);mkdirSync(join(root,'source'));mkdirSync(join(root,'out'));
  const db=new Database(join(root,'source/source.db'));db.exec("CREATE TABLE theologai_metadata(key TEXT,value TEXT);INSERT INTO theologai_metadata VALUES('corpus','fixture');CREATE TABLE historical_corpus_seal(seal_id INTEGER PRIMARY KEY,value TEXT);INSERT INTO historical_corpus_seal VALUES(1,'sealed');CREATE TABLE d1_migrations(id INTEGER PRIMARY KEY,name TEXT,applied_at TEXT);INSERT INTO d1_migrations VALUES(1,'0001','2026-11-05 00:00:00')");
  const expected={catalogSha256:hash(db.prepare(CATALOG_SQL).all()),ledgerSha256:hash(db.prepare(LEDGER_SQL).all())};db.close();
- const old=EXISTING.worker,newVersion='11111111-1111-4111-8111-111111111111',newDeployment='22222222-2222-4222-8222-222222222222';let deployed=false,commands=0,sql=0,ownerCalls=0;const requests:string[]=[];
+ const predecessor=fault==='changed-search-version'?VALIDATE:EXISTING;
+ const old=predecessor.worker,newVersion='11111111-1111-4111-8111-111111111111',newDeployment='22222222-2222-4222-8222-222222222222';let deployed=false,commands=0,sql=0,ownerCalls=0;const requests:string[]=[];
  const version=(id:string,production=false)=>({id,resources:{bindings:[{type:'d1',name:'THEOLOGAI_DB',id:production?EXISTING.productionDatabase:deployed&&fault==='wrong-d1'?EXISTING.productionDatabase:EXISTING.database,database_id:production?EXISTING.productionDatabase:deployed&&fault==='wrong-d1'?EXISTING.productionDatabase:EXISTING.database}]}});
  const beforeView=version(old),a=approval();
  const net=(async(url:any,init:any={})=>{const p=new URL(String(url));requests.push(p.pathname);const result=(value:unknown)=>Response.json({success:true,errors:[],result:value});
@@ -74,7 +75,7 @@ function executionFixture(fault=''){
   const production=p.pathname.includes('/scripts/theologai/'),binding=production?EXISTING.productionDatabase:EXISTING.database;
   if(p.pathname.endsWith('/settings'))return result({bindings:[{type:'d1',name:'THEOLOGAI_DB',id:binding,database_id:binding}]});
   if(p.pathname.endsWith('/versions'))return result({items:[{id:old,number:10,metadata:{created_on:'2026-11-05T00:00:00Z'}},...(deployed?[{id:newVersion,number:11,metadata:{created_on:'2026-11-10T18:01:00Z'},annotations:{'workers/triggered_by':'version_upload'}}]:[])]});
-  if(p.pathname.endsWith('/deployments'))return result({deployments:[{id:production?EXISTING.productionDeployment:deployed?newDeployment:EXISTING.deployment,created_on:'2026-11-10T18:01:00Z',versions:[{version_id:production?(deployed&&fault==='production-drift'?newVersion:EXISTING.productionWorker):deployed?(fault==='wrong-assignment'?old:newVersion):old,percentage:100}]}]});
+  if(p.pathname.endsWith('/deployments'))return result({deployments:[{id:production?EXISTING.productionDeployment:deployed?newDeployment:predecessor.deployment,created_on:'2026-11-10T18:01:00Z',versions:[{version_id:production?(deployed&&fault==='production-drift'?newVersion:EXISTING.productionWorker):deployed?(fault==='wrong-assignment'?old:newVersion):old,percentage:100}]}]});
   if(p.pathname.includes('/versions/'))return result(version(p.pathname.split('/').at(-1)!,production));if(p.href==='https://preview-mcp.theologai.xyz/mcp')return Response.json({});throw Error('Unexpected route');
  })as typeof fetch;
  return {root,a,requests,get commands(){return commands;},get sql(){return sql;},run:(revalidate?:()=>Promise<unknown>)=>executeReuse({approval:a,source,inputs:{sourceDatabaseSha256:EXISTING.databaseSha256,originalProofSha256:EXISTING.proofSha256,freshProof:false,workerSha256:'f'.repeat(64),manifestSha256:'e'.repeat(64)},historical:{envelope:{receipt:{proof:expected}},cutover:{observedActiveVersionViewSha256:sha(JSON.stringify(beforeView,null,2)+'\n')}}as any,directory:root,output:join(root,'out'),token:'synthetic-token',fetch:net,
@@ -158,3 +159,47 @@ it('admits the actual retained prior native request/ledger and all four validati
 });
 it('refuses a callable mutation in validation mode before any provider dispatch',async()=>{const f=executionFixture(),net=vi.fn(),mutate=vi.fn();await expect(executeReuse({approval:validationApproval(),source,inputs:{},historical:{}as any,directory:f.root,output:join(f.root,'out'),token:'synthetic-token',fetch:net,revalidate:async()=>{},deploy:mutate})).rejects.toThrow('validation has no mutation capability');expect(net).not.toHaveBeenCalled();expect(mutate).not.toHaveBeenCalled();});
 it('keeps validation CLI return before rendering or constructing a deployment command',()=>{const text=readFileSync('.github/scripts/preview-runtime-reuse.ts','utf8'),branch=text.indexOf('if(validating(a)){await executeReuse('),render=text.indexOf('await renderDeploymentConfig(',branch),invoke=text.indexOf('const invoke=promisify(execFile)',branch);expect(branch).toBeGreaterThan(0);expect(text.slice(branch,render)).toContain(');return;}');expect(render).toBeLessThan(invoke);expect(text.slice(branch,render)).not.toContain('deploy:');});
+
+it('requires the full prior reservation and fresh daily capacity for the classic search deployment', () => {
+ const a: ReuseApproval = {
+  ...approval(),
+  confirmation: SEARCH_DEPLOYMENT.confirmation,
+  previousReadsHeld: 8060000,
+  finalReadsHeld: 8160000,
+  cumulativeReadCeiling: 8360000,
+  knownDailyReadFloor: 3730566,
+ };
+ expect(() => requireReuseApproval(a, source)).toThrow('dated known and unreported daily usage');
+ vi.setSystemTime(new Date('2026-11-11T01:00:00Z'));
+ Object.assign(a, {
+  dailyUsageDay: '2026-11-11', knownDailyReadFloor: 0, knownDailyCandidateWrites: 0,
+  notBefore: '2026-11-11T00:59:00Z', expiresAt: '2026-11-11T02:00:00Z',
+ });
+ expect(requireReuseApproval(a, source)).toEqual(a);
+ expect(() => requireReuseApproval({...a, previousReadsHeld: 7960000}, source)).toThrow('retained cumulative accounting');
+ expect(() => requireReuseApproval({...a, confirmation: REUSE.confirmation}, source)).toThrow('retained cumulative accounting');
+ expect(() => requireReuseApproval({...a, maxDeployments: 0}, source)).toThrow('retained cumulative accounting');
+ const u = {...usage(3700001, 0), windowStart: '2026-11-11T00:00:00.000Z'};
+ expect(() => admitReuseDaily(a, u, 0)).toThrow('daily full-role headroom');
+});
+
+it.each([
+ ['stale-search-assignment', 'expected preview assignment'],
+ ['changed-search-version', 'original immutable preview version witness'],
+])('stops the search deployment before any SQL or mutation on %s', async (fault, reason) => {
+ const f = executionFixture(fault);
+ vi.setSystemTime(new Date('2026-11-11T01:00:00Z'));
+ Object.assign(f.a, {
+  confirmation: SEARCH_DEPLOYMENT.confirmation, previousReadsHeld: 8060000,
+  finalReadsHeld: 8160000, cumulativeReadCeiling: 8360000,
+  dailyUsageDay: '2026-11-11', knownDailyReadFloor: 0, knownDailyCandidateWrites: 0,
+  notBefore: '2026-11-11T00:59:00Z', expiresAt: '2026-11-11T02:00:00Z',
+ });
+ await expect(drain(f.run())).rejects.toThrow('no retry');
+ expect(f.events().at(-1)).toMatchObject({
+  kind: 'STOP', stage: 'initial_assignment', reason: 'Preview runtime reuse refused: ' + reason,
+  mutationCommands: 0, retainWholeNewReadReservation: 100000,
+ });
+ expect(f.sql).toBe(0);
+ expect(f.commands).toBe(0);
+});
