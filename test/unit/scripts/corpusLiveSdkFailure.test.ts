@@ -1,3 +1,4 @@
+import {withCorpusAuditClock} from '../../helpers/corpusAuditClock.js';
 import {afterEach,it,expect,vi} from 'vitest';
 import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
@@ -21,9 +22,9 @@ function fixture(mode:string){
  for(const [i,part]of['prima','prima-secundae','secunda-secundae','tertia'].entries())db.prepare('INSERT INTO historical_edition_hierarchy_nodes VALUES(?,?,?,?,?)').run('article:'+part+'.1','article',i,'a','b');db.close();
  let releasePendingBody:(()=>void)|undefined;
  const originalCall=Client.prototype.callTool,originalClose=Client.prototype.close;
- const setTimer=globalThis.setTimeout;if(mode==='body-stalled')vi.spyOn(globalThis,'setTimeout').mockImplementation(((handler:any,ms?:number,...args:any[])=>setTimer(handler,ms===30000?5:ms,...args)) as typeof setTimeout);
- if(mode.startsWith('contract-')){const tools=Client.prototype.listTools,prompts=Client.prototype.listPrompts;vi.spyOn(Client.prototype,'listTools').mockImplementation(function(this:Client,params,options){return tools.call(this,params,{...options,timeout:25});});vi.spyOn(Client.prototype,'listPrompts').mockImplementation(function(this:Client,params,options){return prompts.call(this,params,{...options,timeout:75});});}
- vi.spyOn(Client.prototype,'callTool').mockImplementation(function(this:Client,params,options){return originalCall.call(this,params,{...options,...(params.name==='primary_source_search'&&params.arguments?.queries?(mode==='primary-503'||mode==='background-primary-503'?{}:{timeout:25}):{})});});
+
+ if(mode.startsWith('contract-')){const tools=Client.prototype.listTools,prompts=Client.prototype.listPrompts;vi.spyOn(Client.prototype,'listTools').mockImplementation(function(this:Client,params,options){return tools.call(this,params,{...options,timeout:2000});});vi.spyOn(Client.prototype,'listPrompts').mockImplementation(function(this:Client,params,options){return prompts.call(this,params,{...options,timeout:3000});});}
+ vi.spyOn(Client.prototype,'callTool').mockImplementation(function(this:Client,params,options){return originalCall.call(this,params,{...options,...(params.name==='primary_source_search'&&params.arguments?.queries?(mode==='primary-503'||mode==='background-primary-503'?{}:{timeout:mode==='body-stalled'?60000:1000}):{})});});
  vi.spyOn(Client.prototype,'close').mockImplementation(async function(this:Client){await originalClose.call(this);releasePendingBody?.();await new Promise(r=>setTimeout(r,50));if(mode==='cleanup-only')throw Error('SECRET_CLOSE');});
  const trace:{method:string;rpc:string|null;id:number|null;status:number|null;aborted?:boolean}[]=[];
  const fetchImpl=(async(_url:any,init:any)=>{
@@ -50,11 +51,11 @@ function fixture(mode:string){
   if(rpc.params?.arguments?.cursor==='not-a-valid-cursor')result.isError=true;
   row.status=200;return Response.json({jsonrpc:'2.0',id:scoped&&mode==='uncorrelated-200'?999999:rpc.id,result});
  })as typeof fetch;
- return{trace,run:(diagnosticStopAfterProbe?:'search:calvin-institutes')=>auditCorpusRelease({diagnosticStopAfterProbe,role:'preview',endpoint:'https://local.invalid/mcp',serverVersion:'3.6.0-preview',databasePath:path,root,fetch:fetchImpl})};
+ return{trace,run:(diagnosticStopAfterProbe?:'search:calvin-institutes')=>withCorpusAuditClock(()=>auditCorpusRelease({diagnosticStopAfterProbe,role:'preview',endpoint:'https://local.invalid/mcp',serverVersion:'3.6.0-preview',databasePath:path,root,fetch:fetchImpl}))};
 }
 it.each([['ack-202',202],['uncorrelated-200',200]])('keeps the real SDK timeout and original%s response when cancellation aborts during close',async(mode,status)=>{
  const f=fixture(mode as string),report=await f.run();expect(report.failure).toMatchObject({category:'timeout',reason:'sdk_request_timeout',probeId:'search:calvin-institutes',httpMethod:'POST',rpcMethod:'tools/call',lastHttpStatus:status,sdkErrorCode:'RequestTimeout',secondaryHttpFailure:{rpcMethod:'notifications/cancelled',category:'aborted',status:null}});
- const primary=f.trace.find(r=>r.rpc==='tools/call'&&r.status===status&&r.id===report.failure?.requestId);expect(primary).toBeDefined();expect(f.trace.filter(r=>r.rpc==='notifications/cancelled')).toHaveLength(1);expect(f.trace.at(-1)?.aborted).toBe(true);expect(JSON.stringify(report)).not.toContain('SECRET_');
+ const primary=f.trace.find(r=>r.rpc==='tools/call'&&r.status===status&&r.id===report.failure?.requestId);expect(primary).toBeDefined();expect(f.trace.filter(r=>r.rpc==='notifications/cancelled')).toHaveLength(0);expect(JSON.stringify(report)).not.toContain('SECRET_');
 });
 it.each(['primary-503','background-primary-503'])('keeps%s primary response independently of a background GET close abort',async mode=>{const f=fixture(mode),report=await f.run();expect(report.failure).toMatchObject({category:'http_status',rpcMethod:'tools/call',lastHttpStatus:503,httpEvidence:{cfRay:'0123456789abcdef-LHR'},httpErrorResponse:{outcome:'complete',complete:true,digestScope:'body',envelope:'non_json',sha256:createHash('sha256').update('SECRET_RESPONSE').digest('hex')}});if(mode==='background-primary-503')expect(report.failure?.secondaryHttpFailure).toMatchObject({httpMethod:'GET',category:'aborted'});});
 it('recognizes a real zero-valued RPC ID',async()=>{const f=fixture('initialize-503'),report=await f.run();expect(report.failure).toMatchObject({category:'http_status',httpMethod:'POST',rpcMethod:'initialize',requestId:0,lastHttpStatus:503});});

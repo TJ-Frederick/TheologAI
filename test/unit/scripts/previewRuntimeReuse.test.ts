@@ -7,12 +7,12 @@ import {createRequire} from 'node:module';
 import {tmpdir} from 'node:os';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {parse} from 'yaml';
-import {REUSE,requireReuseApproval,admitReuseDaily,admitReuse,findReuseHandoff,admitReusePr,executeReuse,readReuseMarkerZip,safeReuseFailure,type ReuseApproval} from '../../../.github/scripts/preview-runtime-reuse.js';
+import {REUSE,VALIDATE,requireReuseApproval,admitReuseDaily,admitReuse,requireValidationNative,findReuseHandoff,admitReusePr,executeReuse,readReuseMarkerZip,safeReuseFailure,type ReuseApproval} from '../../../.github/scripts/preview-runtime-reuse.js';
 import {EXISTING,CONTINUITY_QUERIES,requirePreviewApproval} from '../../../.github/scripts/validate-existing-norton-preview.js';
 import {CATALOG_SQL,LEDGER_SQL} from '../../../scripts/corpus-source-proof.js';
 const hooks=vi.hoisted(()=>({edge:vi.fn(),audit:vi.fn()}));
 vi.mock('../../../scripts/audit-primary-source-edge-stabilization.js',()=>({runPrimarySourceEdgeStabilization:hooks.edge}));
-vi.mock('../../../scripts/audit-corpus-release.js',()=>({auditCorpusRelease:hooks.audit}));
+vi.mock('../../../scripts/audit-corpus-release.js',async original=>({...await original<any>(),auditCorpusRelease:hooks.audit}));
 const START=Date.parse('2026-11-10T18:00:00Z'),source={commit:'a'.repeat(40),tree:'b'.repeat(40)},sha=(v:string|Buffer)=>createHash('sha256').update(v).digest('hex'),hash=(v:unknown)=>sha(JSON.stringify(v));
 const roots:string[]=[];
 beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(START);hooks.edge.mockReset().mockResolvedValue({passed:true});hooks.audit.mockReset().mockResolvedValue({checks:Array.from({length:370},()=>({passed:true})),protocols:['2025-11-25','2026-07-28']});});
@@ -30,8 +30,8 @@ it('preserves daily and cumulative accounting independently, including known rea
  vi.setSystemTime(Date.parse('2026-11-11T01:00:00Z'));a.dailyUsageDay='2026-11-11';a.notBefore='2026-11-11T00:59:59Z';a.expiresAt='2026-11-11T02:00:00Z';a.knownDailyReadFloor=0;a.knownDailyCandidateWrites=0;
  const u=usage(0,0);u.windowStart='2026-11-11T00:00:00.000Z';expect(admitReuseDaily(a,u,0)).toBe(0);expect(a.previousReadsHeld).toBe(7860000);expect(a.cumulativeReadCeiling).toBe(8160000);
 });
-function githubFixture(fault=''){
- const a=approval(),env={GITHUB_REPOSITORY:EXISTING.repository,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_RUN_ATTEMPT:fault==='attempt'?'2':'1',GITHUB_ACTOR_ID:String(EXISTING.owner),GITHUB_RUN_ID:'123',GITHUB_REF:'refs/heads/codex/reuse'},calls:string[]=[];
+function githubFixture(fault='',a=approval()){
+ const env={GITHUB_REPOSITORY:EXISTING.repository,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_RUN_ATTEMPT:fault==='attempt'?'2':'1',GITHUB_ACTOR_ID:String(EXISTING.owner),GITHUB_RUN_ID:'123',GITHUB_REF:'refs/heads/codex/reuse'},calls:string[]=[];
  const github=async(path:string)=>{calls.push(path);
   if(path==='/actions/runs/777')return{id:777,event:'pull_request',path:'.github/workflows/pr.yml',head_sha:source.commit,run_attempt:1,pull_requests:[{number:176,head:{sha:source.commit},base:{sha:EXISTING.base}}]};
   if(path==='/actions/runs/123')return{id:123,created_at:'2026-11-10T18:00:00Z',actor:{id:fault==='owner'?1:EXISTING.owner},triggering_actor:{id:EXISTING.owner},run_attempt:1,event:'workflow_dispatch',path:'.github/workflows/pr.yml',head_sha:source.commit,head_branch:'codex/reuse'};
@@ -98,11 +98,11 @@ it('retains the original370audit failure report and refuses acceptance',async()=
 it('does not expose arbitrary external errors as controlled refusal details',()=>{expect(safeReuseFailure(new Error('synthetic-secret-token'))).not.toContain('synthetic-secret-token');try{requireReuseApproval({...approval(),sourceTree:'c'.repeat(40)},source);}catch(error){expect(safeReuseFailure(error)).toBe('Preview runtime reuse refused: exact source');}});
 it('routes reuse through the existing protected PR lock and skips only its other mutation branches',()=>{
  const {jobs}=parse(readFileSync('.github/workflows/pr.yml','utf8')),job=jobs['operator-corpus-proof'];expect(job.environment.name).toBe('preview');expect(job.concurrency.group).toBe('theologai-shared-preview-mutation');expect(job.concurrency['cancel-in-progress']).toBe(false);
- const step=job.steps.find((s:any)=>s.name==='Deploy and audit one new preview runtime with historical complete-proof custody');expect(step.run).toContain('preview-runtime-reuse.ts execute');expect(step.if).toContain("mode == 'runtime-reuse'");expect(job.steps.find((s:any)=>s.id==='complete-proof').if).toContain("mode != 'runtime-reuse'");expect(jobs['preview-deploy'].if).toContain("mode != 'runtime-reuse'");expect(jobs['validate-existing-preview'].if).toContain("operation_kind != 'runtime-reuse'");
+ const step=job.steps.find((s:any)=>s.name==='Validate the closed preview runtime purpose');expect(step.run).toContain('preview-runtime-reuse.ts execute');expect(step.if).toContain("mode == 'runtime-reuse'");expect(job.steps.find((s:any)=>s.id==='complete-proof').if).toContain("mode != 'runtime-reuse'");expect(jobs['preview-deploy'].if).toContain("mode != 'runtime-reuse'");expect(jobs['validate-existing-preview'].if).toContain("operation_kind != 'runtime-reuse'");
  expect(jobs['existing-preview-source'].environment).toBeUndefined();expect(JSON.stringify(jobs['existing-preview-source'])).not.toContain('secrets.CLOUDFLARE');expect(jobs['release-eligibility'].needs).toContain('operator-corpus-proof');expect(jobs['release-eligibility'].steps.at(-1).env.CI_PREVIEW_RESULT).toContain("mode == 'runtime-reuse'");expect(job.steps.find((s:any)=>s.name==='Retain preview runtime reuse evidence after success or stop').with.name).toBe('preview-runtime-reuse-${{ github.run_id }}-attempt-${{ github.run_attempt }}');
 });
-function handoffFixture(fault=''){
- const f=githubFixture(),root=mkdtempSync(join(tmpdir(),'reuse-handoff-'));roots.push(root);writeFileSync(join(root,'runtime-reuse-request.json'),JSON.stringify(f.a));execFileSync('zip',['-q','request.zip','runtime-reuse-request.json'],{cwd:root});const bytes=readFileSync(join(root,'request.zip')),digest='sha256:'+sha(bytes),request={id:999,name:'norton-preview-runtime-reuse-request-777-attempt-1',expired:false,expires_at:'2026-11-11T18:00:00Z',digest,workflow_run:{id:123,head_sha:source.commit}};
+function handoffFixture(fault='',a=approval()){
+ const f=githubFixture('',a),root=mkdtempSync(join(tmpdir(),'reuse-handoff-'));roots.push(root);writeFileSync(join(root,'runtime-reuse-request.json'),JSON.stringify(f.a));execFileSync('zip',['-q','request.zip','runtime-reuse-request.json'],{cwd:root});const bytes=readFileSync(join(root,'request.zip')),digest='sha256:'+sha(bytes),request={id:999,name:'norton-preview-runtime-reuse-request-777-attempt-1',expired:false,expires_at:'2026-11-11T18:00:00Z',digest,workflow_run:{id:123,head_sha:source.commit}};
  const env={GITHUB_REPOSITORY:EXISTING.repository,GITHUB_EVENT_NAME:'pull_request',GITHUB_RUN_ATTEMPT:'1',GITHUB_RUN_ID:'777',GITHUB_REF:'refs/pull/176/merge'};
  const github=async(path:string,binary?:boolean):Promise<any>=>{
   if(path.startsWith('/actions/artifacts?name=norton-preview-runtime-reuse-request-'))return{total_count:fault==='duplicate'?2:1,artifacts:fault==='duplicate'?[request,request]:[request]};
@@ -135,3 +135,26 @@ it('runs the existing CJS source verifier through its actual TypeScript reuse ad
 });
 
 it('keeps a present unfinished producer distinct from absent owner authority',async()=>{const f=handoffFixture('pending');expect(await findReuseHandoff(source,f.github,f.env)).toEqual({mode:'runtime-reuse-pending'});await expect(admitReusePr(f.a,source,f.github,f.env)).rejects.toThrow('exact admitted PR runtime reuse purpose');});
+it('separates zero-deployment validation purpose and cumulative accounting from the one-deployment approval',()=>{
+ const a={...approval(),schemaVersion:VALIDATE.schema,operationId:'operation-runtime-validation-fixture-0001',confirmation:VALIDATE.confirmation,maxDeployments:0 as const,previousReadsHeld:7960000 as const,finalReadsHeld:8060000 as const,cumulativeReadCeiling:8260000 as const,knownDailyReadFloor:3471182};expect(requireReuseApproval(a,source)).toEqual(a);expect(admitReuseDaily(a,usage(0),0)).toBe(3471182);
+ for(const change of [{maxDeployments:1},{previousReadsHeld:7860000},{finalReadsHeld:7960000},{cumulativeReadCeiling:8160000},{knownDailyReadFloor:3471181}])expect(()=>requireReuseApproval({...a,...change} as ReuseApproval,source)).toThrow(change.knownDailyReadFloor?'dated known and unreported daily usage':'retained cumulative accounting');
+});
+function validationApproval():ReuseApproval{return{...approval(),schemaVersion:VALIDATE.schema,operationId:'operation-runtime-validation-fixture-0001',confirmation:VALIDATE.confirmation,maxDeployments:0,previousReadsHeld:7960000,finalReadsHeld:8060000,cumulativeReadCeiling:8260000,knownDailyReadFloor:3471182};}
+function priorNativeFixture(fault=''){
+ const request=readFileSync('test/fixtures/runtime-validation/prior-owner-request.zip');
+ return async(path:string,binary?:boolean):Promise<any>=>{
+  if(path==='/actions/runs/'+VALIDATE.failedRun)return{id:VALIDATE.failedRun,run_attempt:1,event:'pull_request',path:'.github/workflows/pr.yml',status:'completed',conclusion:fault==='false-success'?'success':'failure',head_sha:VALIDATE.sourceCommit,pull_requests:[{number:176}]};
+  if(path==='/actions/runs/'+VALIDATE.producerRun)return{id:VALIDATE.producerRun,run_attempt:1,event:'workflow_dispatch',path:'.github/workflows/pr.yml',status:'completed',conclusion:'success',head_sha:VALIDATE.sourceCommit,actor:{id:fault==='foreign-owner'?2:EXISTING.owner},triggering_actor:{id:EXISTING.owner}};
+  if(path.includes('/jobs?'))return{total_count:1,jobs:[{name:path.includes(String(VALIDATE.failedRun))?'Preview operator corpus verification':'Verify deployed Norton candidate and distinct auditor (no cloud credentials)',status:'completed',conclusion:path.includes(String(VALIDATE.failedRun))?'failure':'success'}]};
+  if(binary){expect(path.endsWith('/zip')).toBe(true);return request;}
+  const id=Number(path.split('/').at(-1));const metadata:Record<number,[string,string,number]>={[VALIDATE.stopArtifact]:['preview-runtime-reuse-'+VALIDATE.failedRun+'-attempt-1',VALIDATE.stopDigest,VALIDATE.failedRun],[VALIDATE.inputArtifact]:['existing-preview-inputs-'+VALIDATE.producerRun+'-attempt-1',VALIDATE.inputDigest,VALIDATE.producerRun],[VALIDATE.requestArtifact]:['norton-preview-runtime-reuse-request-'+VALIDATE.failedRun+'-attempt-1',VALIDATE.requestDigest,VALIDATE.producerRun],[VALIDATE.ledgerArtifact]:['norton-preview-runtime-reuse-ledger-operation-runtime-reuse-20261110-ed80dc5-once',VALIDATE.requestDigest,VALIDATE.producerRun]};const[name,digest,run]=metadata[id]!;return{id,name,digest:fault==='wrong-artifact'?'sha256:'+'f'.repeat(64):digest,expired:false,expires_at:'2026-11-17T18:00:00Z',workflow_run:{id:run,head_sha:VALIDATE.sourceCommit}};
+ };
+}
+it.each(['false-success','foreign-owner','wrong-artifact'])('rejects prior native%s without provider access',async fault=>{await expect(requireValidationNative(priorNativeFixture(fault))).rejects.toThrow(fault==='false-success'?'authenticated prior failed PR run':fault==='foreign-owner'?'authenticated prior owner preparation':'pinned prior native artifact');});
+it('admits the actual retained prior native request/ledger and all four validation handoffs within78 logical/88 HTTP calls',async()=>{
+ const a=validationApproval(),g=handoffFixture('',a),prior=priorNativeFixture();let logical=0,http=0;
+ const github=async(path:string,binary?:boolean)=>{expect(++logical).toBeLessThanOrEqual(REUSE.githubLogicalCalls);const old=path.includes(String(VALIDATE.failedRun))||path.includes(String(VALIDATE.producerRun))||[VALIDATE.stopArtifact,VALIDATE.inputArtifact,VALIDATE.requestArtifact,VALIDATE.ledgerArtifact].some(id=>path.includes(String(id)));const get=old?prior:g.github;if(!binary){http++;return get(path);}const bytes=await get(path,true);let hop=0;return readReuseMarkerZip(path,'synthetic-token',(async()=>{http++;return ++hop===1?new Response(null,{status:302,headers:{location:'https://productionresultssa2.blob.core.windows.net/marker'}}):new Response(bytes);})as typeof fetch);};
+ const initial=await admitReusePr(a,source,github,g.env);await requireValidationNative(github);for(let i=0;i<3;i++)expect(await admitReusePr(a,source,github,g.env,initial)).toEqual(initial);expect(logical).toBe(78);expect(http).toBe(88);
+});
+it('refuses a callable mutation in validation mode before any provider dispatch',async()=>{const f=executionFixture(),net=vi.fn(),mutate=vi.fn();await expect(executeReuse({approval:validationApproval(),source,inputs:{},historical:{}as any,directory:f.root,output:join(f.root,'out'),token:'synthetic-token',fetch:net,revalidate:async()=>{},deploy:mutate})).rejects.toThrow('validation has no mutation capability');expect(net).not.toHaveBeenCalled();expect(mutate).not.toHaveBeenCalled();});
+it('keeps validation CLI return before rendering or constructing a deployment command',()=>{const text=readFileSync('.github/scripts/preview-runtime-reuse.ts','utf8'),branch=text.indexOf('if(validating(a)){await executeReuse('),render=text.indexOf('await renderDeploymentConfig(',branch),invoke=text.indexOf('const invoke=promisify(execFile)',branch);expect(branch).toBeGreaterThan(0);expect(text.slice(branch,render)).toContain(');return;}');expect(render).toBeLessThan(invoke);expect(text.slice(branch,render)).not.toContain('deploy:');});

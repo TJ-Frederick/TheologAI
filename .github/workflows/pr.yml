@@ -1247,7 +1247,7 @@ jobs:
           path: ${{ runner.temp }}/existing-preview
           merge-multiple: true
           digest-mismatch: error
-      - name: Deploy and audit one new preview runtime with historical complete-proof custody
+      - name: Validate the closed preview runtime purpose
         if: ${{ needs.operator-proof-source.outputs.mode == 'runtime-reuse' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -1455,7 +1455,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit
       - run: npm rebuild better-sqlite3 --ignore-scripts=false
       - name: Download exact retained native inputs
-        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3","norton-preview-runtime-reuse-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3","norton-preview-runtime-reuse-approval.v1","norton-preview-runtime-validation-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: '13454129353'
@@ -1465,7 +1465,7 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
       - name: Download the exact prior quota-stop evidence
-        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3","norton-preview-runtime-reuse-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3","norton-preview-runtime-reuse-approval.v1","norton-preview-runtime-validation-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: '13453494842'
@@ -1475,12 +1475,12 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
       - name: Stage pinned historical inputs without renewing proof age
-        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3","norton-preview-runtime-reuse-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3","norton-preview-runtime-reuse-approval.v1","norton-preview-runtime-validation-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         run: |
           npx --no-install tsx .github/scripts/retained-norton-inputs.ts \
             "$RUNNER_TEMP/retained-norton-inputs" "$RUNNER_TEMP/retained-norton-stop" "$RUNNER_TEMP/existing-preview"
       - name: Download the owner-pinned successful Ubuntu source inputs
-        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-preview-runtime-reuse-approval.v1' && contains(fromJSON('["norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ !contains(fromJSON('["norton-preview-runtime-reuse-approval.v1","norton-preview-runtime-validation-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) && contains(fromJSON('["norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: ${{ fromJSON(inputs.preview_validate_existing_json).rehearsalArtifactId }}
@@ -1499,15 +1499,44 @@ jobs:
           path: ${{ runner.temp }}/existing-preview
           merge-multiple: true
           digest-mismatch: error
+      - name: Download pinned owner-prepared deployed runtime inputs
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-preview-runtime-validation-approval.v1' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: '13792728683'
+          run-id: '42878959338'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/existing-preview
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Download pinned failed validation evidence
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-preview-runtime-validation-approval.v1' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: '13793153724'
+          run-id: '42878819164'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/existing-preview/prior-runtime-stop
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Preserve immutable prior request and deployed bundle before new preparation
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-preview-runtime-validation-approval.v1' }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/existing-preview/prior-runtime-inputs"
+          mv "$RUNNER_TEMP/existing-preview/candidate-bundle" "$RUNNER_TEMP/existing-preview/prior-runtime-bundle"
+          for name in runtime-reuse-inputs.json runtime-reuse-request.json runtime-reuse-admission.json; do
+            mv "$RUNNER_TEMP/existing-preview/$name" "$RUNNER_TEMP/existing-preview/prior-runtime-inputs/$name"
+          done
       - name: Compile the separate source-bound optimized preview runtime
-        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-preview-runtime-reuse-approval.v1' }}
+        if: ${{ contains(fromJSON('["norton-preview-runtime-reuse-approval.v1","norton-preview-runtime-validation-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         env:
           WRANGLER_SEND_METRICS: 'false'
         run: |
           npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/existing-preview/candidate-bundle"
           node scripts/worker-release-artifact.mjs create preview "$RUNNER_TEMP/existing-preview/candidate-bundle"
       - name: Compile the auditor when no verified Ubuntu input pack is selected
-        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-preview-runtime-reuse-approval.v1' && !contains(fromJSON('["norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ !contains(fromJSON('["norton-preview-runtime-reuse-approval.v1","norton-preview-runtime-validation-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) && !contains(fromJSON('["norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         env:
           WRANGLER_SEND_METRICS: 'false'
         run: |
@@ -1523,7 +1552,7 @@ jobs:
           printf '%s\n' "$APPROVAL_JSON" > "$RUNNER_TEMP/continuation-request.json"
           mkdir -p "$RUNNER_TEMP/existing-preview"
           git worktree add --detach "$RUNNER_TEMP/candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
-          if node -e 'process.exit(JSON.parse(process.env.APPROVAL_JSON).schemaVersion === "norton-preview-runtime-reuse-approval.v1" ? 0 : 1)'; then
+          if node -e 'process.exit(["norton-preview-runtime-reuse-approval.v1","norton-preview-runtime-validation-approval.v1"].includes(JSON.parse(process.env.APPROVAL_JSON).schemaVersion) ? 0 : 1)'; then
             cp "$RUNNER_TEMP/continuation-request.json" "$RUNNER_TEMP/runtime-reuse-request.json"
             npx --no-install tsx .github/scripts/preview-runtime-reuse.ts prepare \
               "$RUNNER_TEMP/runtime-reuse-request.json" "$RUNNER_TEMP/existing-preview" \

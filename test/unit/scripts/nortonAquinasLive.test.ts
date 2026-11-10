@@ -1,3 +1,4 @@
+import {withCorpusAuditClock} from '../../helpers/corpusAuditClock.js';
 import { existsSync } from 'node:fs';
 import { it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -15,7 +16,7 @@ for (const role of ['preview', 'production'] as const)
         }[] = [];
         try {
             await native.load('data/theologai.db');
-            const receipt = await auditCorpusRelease({ role, endpoint: 'https://local.test/mcp', serverVersion: role === 'preview' ? '3.6.0-preview' : '3.6.0', databasePath: 'data/theologai.db', root: process.cwd(), fetch: corpusMcp(native, role === 'preview', (sql, reads) => queries.push({ sql, reads })) });
+            const receipt = await withCorpusAuditClock(()=>auditCorpusRelease({ role, endpoint: 'https://local.test/mcp', serverVersion: role === 'preview' ? '3.6.0-preview' : '3.6.0', databasePath: 'data/theologai.db', root: process.cwd(), fetch: corpusMcp(native, role === 'preview', (sql, reads) => queries.push({ sql, reads })) }));
             expect(Object.hasOwn(receipt,'failure')).toBe(false);
             expect(receipt.checks).toHaveLength(370);
             const reads = queries.reduce((n, r) => n + r.reads, 0);

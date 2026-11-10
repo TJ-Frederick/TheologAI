@@ -116,6 +116,27 @@ async function readHttpErrorEvidence(
         digestScope: complete ? 'body' : 'prefix', envelope, codes, rpcIdMatches };
 }
 
+export type CorpusRequestPacer=(signal:AbortSignal,guard:()=>void,dispatch:()=>Promise<Response>)=>Promise<Response>;
+/** Serialize admission, not response bodies. Start spacing is measured after actual dispatch. */
+export function createCorpusRequestPacer():CorpusRequestPacer{
+ let nextStart=0,queue=Promise.resolve();
+ return(signal,guard,dispatch)=>{
+  const admission=queue.then(async()=>{
+   const inspect=()=>{guard();signal.throwIfAborted();};inspect();
+   while(Date.now()<nextStart){
+    await new Promise<void>((resolve,reject)=>{
+     const finish=()=>{signal.removeEventListener('abort',abort);resolve();};
+     const timer=setTimeout(finish,nextStart-Date.now());
+     const abort=()=>{clearTimeout(timer);signal.removeEventListener('abort',abort);reject(signal.reason);};
+     signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
+    });inspect();
+   }
+   inspect();const response=dispatch();nextStart=Date.now()+650;return{response};
+  });
+  queue=admission.then(()=>{},()=>{});return admission.then(({response})=>response);
+ };
+}
+
 export async function auditCorpusRelease(options: {
     role: 'preview' | 'production';
     endpoint: string;
@@ -124,13 +145,14 @@ export async function auditCorpusRelease(options: {
     root: string;
     fetch: typeof fetch;
     guard?:()=>void;
+    pace?:CorpusRequestPacer;
     diagnosticStopAfterProbe?:'search:calvin-institutes';
 }) {
     const root = options.root;
     const parsed = new URL(options.endpoint);
     check(parsed.protocol === 'https:' && !parsed.username && !parsed.password && !parsed.search && !parsed.hash, 'unsafe_endpoint');
     const started = Date.now();
-    let nextNetworkStart=0;
+    const pace=options.pace??createCorpusRequestPacer();
     let aggregateBytes = 0;
     const checks: {
         role: string;
@@ -139,6 +161,7 @@ export async function auditCorpusRelease(options: {
         passed: boolean;
         responseSha256: string;
     }[] = [], summaries: unknown[] = [], fingerprints: unknown[] = [];
+    let halted=false,terminalEvidence:Promise<void>|undefined;
     let current = 'initialize', role = '', era = '';
     // EOF records an actual reader EOF; a null body has finishedMs with eof=false.
     // Timings share the existing HTTP deadline start, including admission spacing.
@@ -201,20 +224,26 @@ export async function auditCorpusRelease(options: {
                     if(awaited)requestObservations.set(requestProbe,observation);
                     try{
                     try{options.guard?.();}catch{throw new AuditFault('guard');}
-                    check(++exchanges <= 200 && Date.now() - started <= 600000, 'live_http_time_budget');
-                    totalExchanges++;eraExchanges=exchanges;
+                    check(exchanges < 200 && Date.now() - started <= 600000, 'live_http_time_budget');
                     const url = String(input instanceof Request ? input.url : input);
                     check(url === options.endpoint, 'unexpected_endpoint');
                     const requestStarted=Date.now();const controller = new AbortController(), timer = setTimeout(() => {observation.responseBody.deadlineFired=true;controller.abort();}, 30000);
                     try {
-                        if(options.fetch===fetch){const delay=Math.max(0,nextNetworkStart-Date.now());if(delay)await new Promise(r=>setTimeout(r,delay));nextNetworkStart=Date.now()+650;}
-                        let response:Response;try{response = await fetchImpl(input, { ...init, headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`}, redirect: 'error', signal: init?.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal });}catch{throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'network');}
+                        const signal=init?.signal?AbortSignal.any([init.signal,controller.signal]):controller.signal;
+                        const dispatchGuard=()=>{check(exchanges<200,'live_http_time_budget');if(halted)throw new AuditFault('aborted','transport_stopped');try{options.guard?.();}catch{throw new AuditFault('guard');}check(Date.now()-started<=600000,'live_http_time_budget');if(controller.signal.aborted)throw new AuditFault('timeout');if(init?.signal?.aborted)throw new AuditFault('aborted');};
+                        let response:Response;
+                        try{response=await pace(signal,dispatchGuard,()=>{dispatchGuard();exchanges++;totalExchanges++;eraExchanges=exchanges;return fetchImpl(input,{...init,headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`},redirect:'error',signal});});}catch(error){if(error instanceof AuditFault)throw error;throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'network');}
                         observation.responseBody.headersMs=Date.now()-requestStarted;requestStatus=response.status;requestEvidence=httpEvidence(response);observation.status=requestStatus;observation.evidence=requestEvidence;if(awaited){if(requestProbe.startsWith('contract:'))contractResponses.set(requestProbe,{status:requestStatus,evidence:requestEvidence});lastHttpStatus=requestStatus;lastHttpEvidence=requestEvidence;httpObservationProbe=requestProbe;}
-                        if(response.redirected)throw new AuditFault('http_status');
-                        if(response.status>=500){
+                        if(response.redirected){halted=true;throw new AuditFault('http_status');}
+                        if(response.status===429||response.status>=500){
+                            halted=true;
+                            const known:RequestFailure={...observation,status:requestStatus,evidence:requestEvidence,category:'http_status',reason:'http_status',sdkErrorCode:null};if(awaited)failedRequest??=known;else secondaryHttpFailure??=known;
+                            let settle!:()=>void;const evidenceDone=new Promise<void>(resolve=>{settle=resolve;});terminalEvidence??=evidenceDone;
+                            try{
                             const signal=init?.signal?AbortSignal.any([init.signal,controller.signal]):controller.signal;
                             observation.httpErrorResponse=await readHttpErrorEvidence(response,signal,requestId,(bytes,eof)=>{if(bytes&&observation.responseBody.firstByteMs===null)observation.responseBody.firstByteMs=Date.now()-requestStarted;observation.responseBody.bytes+=bytes;aggregateBytes+=bytes;observation.responseBody.eof=eof;return observation.responseBody.bytes<=256*1024&&aggregateBytes<=16*1024*1024;});
-                            observation.responseBody.readError=observation.httpErrorResponse.outcome==='read_error';
+                            observation.responseBody.readError=observation.httpErrorResponse.outcome==='read_error';known.httpErrorResponse=observation.httpErrorResponse;
+                            }finally{settle();}
                             throw new AuditFault('http_status');
                         }
                         if (!response.body)
@@ -238,7 +267,7 @@ export async function auditCorpusRelease(options: {
                     finally {
                         observation.responseBody.finishedMs=Date.now()-requestStarted;clearTimeout(timer);
                     }
-                    }catch(error){const failure={...observation,status:requestStatus,evidence:requestEvidence,sdkErrorCode:null,category:error instanceof AuditFault?error.category:'protocol' as const,reason:error instanceof AuditFault?error.reason:'protocol'};if(awaited)failedRequest??=failure;else secondaryHttpFailure??=failure;throw error;}
+                    }catch(error){if(awaited||!(error instanceof AuditFault&&error.category==='aborted'))halted=true;const failure={...observation,status:requestStatus,evidence:requestEvidence,sdkErrorCode:null,category:error instanceof AuditFault?error.category:'protocol' as const,reason:error instanceof AuditFault?error.reason:'protocol'};if(awaited)failedRequest??=failure;else secondaryHttpFailure??=failure;throw error;}
                 };
                 const client = new Client({ name: 'local-corpus-feasibility', version: '1' }, versionNegotiationFor(protocol));
                 async function contractOperation<T>(id:string,action:()=>Promise<T>):Promise<T>{
@@ -330,7 +359,7 @@ export async function auditCorpusRelease(options: {
                     summaries.push({ role, era, httpExchanges: exchanges, checks: checks.filter(x => x.role === role && x.era === era).length });
                 }
                 catch(error){
-                    eraFailed=true;
+                    eraFailed=true;halted=true;await terminalEvidence;
                     const sdkErrorCode=failedRequest?(failedRequest.sdkErrorCode??null):sdkErrorCodeFor(error);
                     const category=failedRequest?.category??(error instanceof AuditFault?error.category:sdkErrorCode==='RequestTimeout'?'timeout':lastHttpStatus!==null&&lastHttpStatus>=400?'http_status':categoryForStage(stage));
                     const observed=requestObservations.get(failedRequest?.probeId??current);

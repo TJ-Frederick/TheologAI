@@ -1,5 +1,29 @@
 # Norton/Aquinas successor candidate
 
+## Active local pacing follow-up — November 10
+
+The authorized preview attempt deployed the optimized ed80 runtime, then stopped
+at HTTP 429 after 211/370 hosted checks. Its whole 100,000-read reservation remains
+held. The complete proof remains the historical November 5 proof; partial hosted
+acceptance does not complete it. Production remains paused.
+
+Tyler authorized a local pacing correction, exact protected transport replay,
+review and ordinary CI. One 650-ms dispatch cadence now covers edge registration
+and both audit protocol eras, with abort, authority and deadline checks after
+waiting. Application code, data and rate limits remain unchanged. A closed
+validation-only purpose targets the already deployed optimized Worker and has no
+render/deploy capability. It authenticates the retained failed-run and prior
+owner-prepared artifacts, preserves all eight continuity SELECTs and 370 checks,
+and returns a preview-only, zero-mutation receipt with separate verifier and
+deployed-source identities.
+
+Any new live validation requires new explicit approval. Its proposed envelope is
+100,000 additional reads / zero new writes / zero deployments, preserving
+7,960,000 prior holds and the 200,000 margin (8,260,000 cumulative ceiling).
+The November 10 effective daily floor is at least 3,471,182 reads with four known
+candidate writes. A later UTC day resets daily counters only. Historical proof
+expiry remains 2026-11-12T02:45:14.748Z; stay Free and stop on failure.
+
 ## Active preview exception — November 10
 
 Tyler approved one preview deployment using the original November 5 COMPLETE
