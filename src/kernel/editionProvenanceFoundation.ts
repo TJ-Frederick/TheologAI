@@ -705,7 +705,8 @@ function safeTextAt(
   const allowedFormatCharacters = allowLineBreaks
     ? new Set<string>(EDITION_PROVENANCE_ALLOWED_CONTENT_FORMAT_CHARACTERS)
     : new Set<string>();
-  if ([...value].some(character => /\p{Cf}/u.test(character) && !allowedFormatCharacters.has(character))) {
+  // Skip the per-character allowlist scan when the text has no format characters.
+  if (/\p{Cf}/u.test(value) && [...value].some(character => /\p{Cf}/u.test(character) && !allowedFormatCharacters.has(character))) {
     fail(path, allowLineBreaks
       ? 'contains an unapproved invisible format character; corpus text permits only ZWNJ and ZWJ'
       : 'contains an invisible format character; single-line metadata permits none');
