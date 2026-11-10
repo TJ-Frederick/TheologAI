@@ -137,12 +137,18 @@ async function requireLedgerMarker({github,package:p,now=Date.now()}) {
   const {data:bytes}=await github.rest.actions.downloadArtifact({...repo,artifact_id:marker.id,archive_format:'zip'});
   check(JSON.stringify(readArchive(Buffer.from(bytes),marker.digest))===JSON.stringify(p.authorization),'ledger marker content');
 }
-async function waitForAuthorization({github,expected,revalidate,core,environment=process.env,now=Date.now,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),wait=environment.OPERATOR_WAIT_AUTHORIZATION==='true'}) {
+async function waitForAuthorization({github,expected,revalidate,core,runtimeReuse,expectedPurpose,environment=process.env,now=Date.now,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),wait=environment.OPERATOR_WAIT_AUTHORIZATION==='true'}) {
   const end = now() + (wait ? 3600000 : 0);
   if (core?.summary) await core.summary.addHeading('Explicit operator authorization required').addRaw(JSON.stringify(expected)).write();
   do {
     await revalidate();
     const p = await findAuthorization({github,expected,now:now()});
+    const other=runtimeReuse?await runtimeReuse():null;
+    check(!other||['runtime-reuse','runtime-reuse-pending'].includes(other.mode),'closed runtime reuse purpose');
+    check(!expectedPurpose||['full-proof','runtime-reuse'].includes(expectedPurpose),'closed expected purpose');
+    check(!(p&&expectedPurpose==='runtime-reuse')&&!(other&&expectedPurpose==='full-proof'),'expected operator purpose');
+    check(!(p&&other),'conflicting operator purposes');
+    if(other&&other.mode==='runtime-reuse'){await revalidate();return other;}
     if (p) {
       await revalidate(); requirePackage(p,expected,now());
       const text = JSON.stringify(p,null,2)+'\n';

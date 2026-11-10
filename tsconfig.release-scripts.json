@@ -35,6 +35,7 @@
     ".github/scripts/retained-norton-inputs.ts",
     ".github/scripts/norton-scoped-response-diagnostic.ts",
     ".github/scripts/reconstruct-norton-source.ts",
-    ".github/scripts/rehearse-norton-source.ts"
+    ".github/scripts/rehearse-norton-source.ts",
+    ".github/scripts/preview-runtime-reuse.ts"
   ]
 }

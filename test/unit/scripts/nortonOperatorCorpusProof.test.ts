@@ -375,6 +375,16 @@ describe('explicit successor operation authorization',()=>{
       f.state.submitted=false;await expect(authority.waitForAuthorization({github:f.github,expected:f.expected,revalidate,core:{setOutput:outputs},environment:{RUNNER_TEMP:directory},now:()=>now,wait:true,pause:async()=>{now+=15000;f.pr.head.sha='f'.repeat(40);}})).rejects.toThrow('live preview');
     }finally{rmSync(directory,{recursive:true,force:true});}
   });
+  it.each(['absent','pending','invalid','conflicting','expected-mismatch'])('keeps explicit runtime reuse selector closed: %s',async fault=>{
+    const f=setup(),directory=mkdtempSync(join(tmpdir(),'operator-purpose-'));let now=f.now,attempts=0;
+    const pending={mode:'runtime-reuse-pending'},reuse={mode:'runtime-reuse'},output=vi.fn();
+    if(fault==='pending'||fault==='invalid')f.state.submitted=false;
+    const runtimeReuse=async()=>{attempts++;if(fault==='absent')return null;if(fault==='invalid')throw Error('invalid reuse request');if(fault==='pending')return attempts===1?pending:reuse;return fault==='conflicting'?pending:reuse;};
+    try{
+      const work=authority.waitForAuthorization({github:f.github,expected:f.expected,revalidate:async()=>{},core:{setOutput:output},environment:{RUNNER_TEMP:directory},now:()=>now,wait:true,pause:async()=>{now+=15000;},runtimeReuse,expectedPurpose:fault==='expected-mismatch'?'full-proof':undefined});
+      if(fault==='absent'){expect(await work).toEqual(f.p);expect(existsSync(join(directory,'operator-authorization.json'))).toBe(true);}else if(fault==='pending'){expect(await work).toEqual(reuse);expect(attempts).toBe(2);expect(existsSync(join(directory,'operator-authorization.json'))).toBe(false);}else await expect(work).rejects.toThrow(fault==='invalid'?'invalid reuse request':fault==='conflicting'?'conflicting operator purposes':'expected operator purpose');
+    }finally{rmSync(directory,{recursive:true,force:true});}
+  });
   it('times out without cloud I/O or admission when no owner authority arrives',async()=>{
     const f=setup();f.state.submitted=false;let now=f.now;const output=vi.fn();
     await expect(authority.waitForAuthorization({github:f.github,expected:f.expected,revalidate:async()=>{},core:{setOutput:output},environment:{},now:()=>now,wait:true,pause:async()=>{now+=3600000;}})).rejects.toThrow('admission window');expect(output).not.toHaveBeenCalled();

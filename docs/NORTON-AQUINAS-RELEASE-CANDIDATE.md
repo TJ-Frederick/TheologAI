@@ -1,5 +1,24 @@
 # Norton/Aquinas successor candidate
 
+## Active preview exception — November 10
+
+Tyler approved one preview deployment using the original November 5 COMPLETE
+corpus proof, unchanged source/corpus equality, explicit historical continuity
+risk acceptance, and fresh acceptance of the optimized runtime. This closed
+exception permits 100,000 additional reads, zero new integrity writes, and one
+deployment; cumulative held reads become 7,960,000 with the unchanged 200,000
+margin (8,160,000 ceiling). Eleven actual / twelve held diagnostic writes remain.
+Stay on Free and stop on any failure. Proof authority still expires at
+2026-11-12T02:45:14.748Z; the partial November 10 proof cannot complete it.
+Production remains paused and this receipt cannot authorize production.
+
+The owner dispatch prepares inputs without cloud credentials. Its exact native
+request and prepared artifact bind one existing PR #176 run/attempt/head/tree;
+the existing `deploy-preview` PR route executes under the unchanged preview
+environment and shared mutation lock. The authenticated reuse purpose skips the
+full-proof and ordinary deployment branches only for this one operation.
+The dated full-proof procedure and evidence below remain the default and history.
+
 ## Active local optimization — November 9
 
 The two scan-local lowercase calls are optimized with per-code-point indexing

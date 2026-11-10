@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 314,
-    "activeVitest": 234,
+    "totalTestTypeScript": 315,
+    "activeVitest": 235,
     "support": 25,
     "manual": 4,
     "legacyOrphan": 50,
@@ -201,6 +201,7 @@
       "test/unit/scripts/prepareProductionD1Candidate.test.ts",
       "test/unit/scripts/previewFtsDiagnostic.test.ts",
       "test/unit/scripts/previewReleaseReconciliation.test.ts",
+      "test/unit/scripts/previewRuntimeReuse.test.ts",
       "test/unit/scripts/primarySourceEdgeStabilization.test.ts",
       "test/unit/scripts/productionReleaseGuards.test.ts",
       "test/unit/scripts/productionRollbackRehearsal.test.ts",

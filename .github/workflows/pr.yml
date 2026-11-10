@@ -241,7 +241,7 @@ jobs:
 
   release-eligibility:
     name: Release Eligibility
-    needs: [classify, validation-complete, preview-deploy]
+    needs: [classify, validation-complete, preview-deploy, operator-proof-source, operator-corpus-proof]
     if: ${{ always() && github.event_name == 'pull_request' && needs.classify.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -258,7 +258,7 @@ jobs:
           CI_EXPECTED_HEAD: ${{ github.sha }}
           CI_PR_HEAD: ${{ github.event.pull_request.head.sha }}
           CI_VALIDATION_RESULT: ${{ needs.validation-complete.result }}
-          CI_PREVIEW_RESULT: ${{ needs.preview-deploy.result }}
+          CI_PREVIEW_RESULT: ${{ needs.operator-proof-source.outputs.mode == 'runtime-reuse' && needs.operator-corpus-proof.result || needs.preview-deploy.result }}
         run: node scripts/pr-release-eligibility.mjs
 
   build-worker:
@@ -330,7 +330,7 @@ jobs:
     needs: [validation-complete, build-worker, operator-proof-source, operator-corpus-proof]
     if: >-
       !cancelled() && needs.validation-complete.result == 'success' && needs.build-worker.result == 'success' &&
-      needs.operator-corpus-proof.result == 'success' &&
+      needs.operator-corpus-proof.result == 'success' && needs.operator-proof-source.outputs.mode != 'runtime-reuse' &&
       (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
       github.event.pull_request.state == 'open' &&
       github.event.pull_request.draft == false &&
@@ -1094,15 +1094,23 @@ jobs:
       tree: ${{ steps.source.outputs.tree }}
       base: ${{ steps.source.outputs.base }}
       authorization_sha256: ${{ steps.source.outputs.authorization_sha256 }}
+      mode: ${{ steps.source.outputs.mode }}
+      reuse_handoff_sha256: ${{ steps.source.outputs.reuse_handoff_sha256 }}
+      reuse_input_artifact_id: ${{ steps.source.outputs.reuse_input_artifact_id }}
+      reuse_input_artifact_digest: ${{ steps.source.outputs.reuse_input_artifact_digest }}
+      reuse_producer_run_id: ${{ steps.source.outputs.reuse_producer_run_id }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+      - uses: ./.github/actions/release-toolchain
       - name: Verify normal CI and live operator-proof authorization
         id: source
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUNTIME_REUSE_ENABLED: 'true'
           OPERATOR_WAIT_AUTHORIZATION: 'true'
           OPERATOR_SOURCE_RUN_ID: ${{ github.run_id }}
           OPERATOR_SOURCE_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
@@ -1133,16 +1141,6 @@ jobs:
           ref: ${{ needs.operator-proof-source.outputs.source }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Verify normal CI and live operator-proof authorization
-        id: source
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          OPERATOR_EXPECTED_AUTHORIZATION_SHA256: ${{ needs.operator-proof-source.outputs.authorization_sha256 }}
-          OPERATOR_SOURCE_RUN_ID: ${{ github.run_id }}
-          OPERATOR_SOURCE_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
-        with:
-          script: |
-            await require('./.github/scripts/verify-operator-proof-source.cjs')({github, context, core});
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.operator-proof-source.outputs.base }}
@@ -1187,7 +1185,22 @@ jobs:
       - if: steps.release-toolchain-source.outputs.source == 'introduction'
         uses: ./.github/actions/release-toolchain
 
+      - name: Verify normal CI and live operator-proof authorization
+        id: source
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUNTIME_REUSE_ENABLED: 'true'
+          RUNTIME_REUSE_EXPECTED_PURPOSE: ${{ needs.operator-proof-source.outputs.mode }}
+          RUNTIME_REUSE_EXPECTED_HANDOFF_SHA256: ${{ needs.operator-proof-source.outputs.reuse_handoff_sha256 }}
+          OPERATOR_EXPECTED_AUTHORIZATION_SHA256: ${{ needs.operator-proof-source.outputs.authorization_sha256 }}
+          OPERATOR_SOURCE_RUN_ID: ${{ github.run_id }}
+          OPERATOR_SOURCE_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+        with:
+          script: |
+            await require('./.github/scripts/verify-operator-proof-source.cjs')({github, context, core});
       - name: Download exact complete corpus proof source
+        if: ${{ needs.operator-proof-source.outputs.mode != 'runtime-reuse' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: corpus-preview-${{ github.run_id }}-attempt-${{ github.run_attempt }}
@@ -1195,6 +1208,7 @@ jobs:
           merge-multiple: false
           digest-mismatch: error
       - name: Accept complete operator proof through the preview gate
+        if: ${{ needs.operator-proof-source.outputs.mode != 'runtime-reuse' }}
         id: complete-proof
         uses: ./.github/actions/operator-corpus-proof
         with:
@@ -1206,7 +1220,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Retain proof verified by this protected preview job
-        if: always()
+        if: ${{ always() && needs.operator-proof-source.outputs.mode != 'runtime-reuse' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: preview-operator-verified-${{ github.run_id }}-attempt-${{ github.run_attempt }}
@@ -1222,6 +1236,40 @@ jobs:
             ${{ runner.temp }}/preview-operator-readiness.json.controls.jsonl
           retention-days: 7
           if-no-files-found: error
+
+      - name: Download exact owner-prepared runtime reuse inputs
+        if: ${{ needs.operator-proof-source.outputs.mode == 'runtime-reuse' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.operator-proof-source.outputs.reuse_input_artifact_id }}
+          run-id: ${{ needs.operator-proof-source.outputs.reuse_producer_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/existing-preview
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Deploy and audit one new preview runtime with historical complete-proof custody
+        if: ${{ needs.operator-proof-source.outputs.mode == 'runtime-reuse' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUNTIME_REUSE_INPUT_ARTIFACT_ID: ${{ needs.operator-proof-source.outputs.reuse_input_artifact_id }}
+          RUNTIME_REUSE_INPUT_ARTIFACT_DIGEST: ${{ needs.operator-proof-source.outputs.reuse_input_artifact_digest }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
+          npx --no-install tsx .github/scripts/preview-runtime-reuse.ts execute \
+            "$RUNNER_TEMP/existing-preview/runtime-reuse-request.json" "$RUNNER_TEMP/existing-preview" \
+            "$RUNNER_TEMP/candidate-cc14" "$RUNNER_TEMP/continuation-results"
+      - name: Retain preview runtime reuse evidence after success or stop
+        if: ${{ always() && needs.operator-proof-source.outputs.mode == 'runtime-reuse' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: preview-runtime-reuse-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/continuation-results/
+          retention-days: 7
+          if-no-files-found: warn
+          overwrite: false
 
   operator-proof-upload:
     name: Retain operator corpus proof (no cloud credentials)
@@ -1385,6 +1433,7 @@ jobs:
     outputs:
       operation_kind: ${{ steps['existing-inputs'].outputs.operation_kind }}
       operation_id: ${{ steps['existing-inputs'].outputs.operation_id }}
+      target_run_id: ${{ steps['existing-inputs'].outputs.target_run_id }}
     name: Verify deployed Norton candidate and distinct auditor (no cloud credentials)
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_validate_existing_json != '' && inputs.preview_restore_json == '' && inputs.operator_authorization_json == '' && inputs.operator_proof_json == '' && github.actor_id == '40179660' && github.run_attempt == 1 }}
     runs-on: ubuntu-latest
@@ -1406,7 +1455,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit
       - run: npm rebuild better-sqlite3 --ignore-scripts=false
       - name: Download exact retained native inputs
-        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3","norton-preview-runtime-reuse-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: '13454129353'
@@ -1416,7 +1465,7 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
       - name: Download the exact prior quota-stop evidence
-        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3","norton-preview-runtime-reuse-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: '13453494842'
@@ -1426,12 +1475,12 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
       - name: Stage pinned historical inputs without renewing proof age
-        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ !contains(fromJSON('["norton-scoped-response-diagnostic-approval.v2","norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3","norton-preview-runtime-reuse-approval.v1"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         run: |
           npx --no-install tsx .github/scripts/retained-norton-inputs.ts \
             "$RUNNER_TEMP/retained-norton-inputs" "$RUNNER_TEMP/retained-norton-stop" "$RUNNER_TEMP/existing-preview"
       - name: Download the owner-pinned successful Ubuntu source inputs
-        if: ${{ contains(fromJSON('["norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-preview-runtime-reuse-approval.v1' && contains(fromJSON('["norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           artifact-ids: ${{ fromJSON(inputs.preview_validate_existing_json).rehearsalArtifactId }}
@@ -1440,14 +1489,31 @@ jobs:
           path: ${{ runner.temp }}/existing-preview
           merge-multiple: true
           digest-mismatch: error
+      - name: Download pinned complete historical corpus inputs for one runtime reuse
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-preview-runtime-reuse-approval.v1' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: '13694476684'
+          run-id: '42660304971'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/existing-preview
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Compile the separate source-bound optimized preview runtime
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-preview-runtime-reuse-approval.v1' }}
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/existing-preview/candidate-bundle"
+          node scripts/worker-release-artifact.mjs create preview "$RUNNER_TEMP/existing-preview/candidate-bundle"
       - name: Compile the auditor when no verified Ubuntu input pack is selected
-        if: ${{ !contains(fromJSON('["norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
+        if: ${{ fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-preview-runtime-reuse-approval.v1' && !contains(fromJSON('["norton-existing-preview-validation-approval.v2","norton-existing-preview-validation-approval.v3"]'), fromJSON(inputs.preview_validate_existing_json).schemaVersion) }}
         env:
           WRANGLER_SEND_METRICS: 'false'
         run: |
           mkdir -p "$RUNNER_TEMP/existing-preview"
           npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/existing-preview/auditor-bundle"
-      - name: Verify immutable candidate inputs and compile-equivalent auditor runtime
+      - name: Verify immutable original inputs and the selected runtime
         id: existing-inputs
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -1457,9 +1523,16 @@ jobs:
           printf '%s\n' "$APPROVAL_JSON" > "$RUNNER_TEMP/continuation-request.json"
           mkdir -p "$RUNNER_TEMP/existing-preview"
           git worktree add --detach "$RUNNER_TEMP/candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
-          npx --no-install tsx .github/scripts/validate-existing-norton-preview.ts prepare \
-            "$RUNNER_TEMP/continuation-request.json" "$RUNNER_TEMP/existing-preview" \
-            "$RUNNER_TEMP/candidate-cc14" "$RUNNER_TEMP/existing-preview/auditor-bundle"
+          if node -e 'process.exit(JSON.parse(process.env.APPROVAL_JSON).schemaVersion === "norton-preview-runtime-reuse-approval.v1" ? 0 : 1)'; then
+            cp "$RUNNER_TEMP/continuation-request.json" "$RUNNER_TEMP/runtime-reuse-request.json"
+            npx --no-install tsx .github/scripts/preview-runtime-reuse.ts prepare \
+              "$RUNNER_TEMP/runtime-reuse-request.json" "$RUNNER_TEMP/existing-preview" \
+              "$RUNNER_TEMP/candidate-cc14" "$RUNNER_TEMP/existing-preview/candidate-bundle"
+          else
+            npx --no-install tsx .github/scripts/validate-existing-norton-preview.ts prepare \
+              "$RUNNER_TEMP/continuation-request.json" "$RUNNER_TEMP/existing-preview" \
+              "$RUNNER_TEMP/candidate-cc14" "$RUNNER_TEMP/existing-preview/auditor-bundle"
+          fi
       - name: Reserve the fixed diagnostic operation in native artifact history
         if: ${{ steps['existing-inputs'].outputs.operation_kind == 'diagnostic' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1478,6 +1551,24 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           overwrite: false
+      - name: Reserve one preview runtime reuse operation without renewing historical proof
+        if: ${{ steps['existing-inputs'].outputs.operation_kind == 'runtime-reuse' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: norton-preview-runtime-reuse-ledger-${{ steps['existing-inputs'].outputs.operation_id }}
+          path: ${{ runner.temp }}/runtime-reuse-request.json
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false
+      - name: Retain owner request for the exact protected PR run
+        if: ${{ steps['existing-inputs'].outputs.operation_kind == 'runtime-reuse' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: norton-preview-runtime-reuse-request-${{ steps['existing-inputs'].outputs.target_run_id }}-attempt-1
+          path: ${{ runner.temp }}/runtime-reuse-request.json
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: existing-preview-inputs-${{ github.run_id }}-attempt-${{ github.run_attempt }}
@@ -1489,7 +1580,7 @@ jobs:
   validate-existing-preview:
     name: ${{ needs['existing-preview-source'].outputs.operation_kind == 'prefix-diagnostic' && 'Diagnose Norton SDK prefix (read-only)' || needs['existing-preview-source'].outputs.operation_kind == 'diagnostic' && 'Diagnose fixed Norton scoped response (read-only)' || 'Validate already deployed Norton preview (read-only)' }}
     needs: existing-preview-source
-    if: ${{ github.event_name == 'workflow_dispatch' && needs.existing-preview-source.result == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && needs.existing-preview-source.result == 'success' && needs['existing-preview-source'].outputs.operation_kind != 'runtime-reuse' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
