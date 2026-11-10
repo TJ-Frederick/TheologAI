@@ -283,7 +283,7 @@ describe('operator writes and protected read proof composition',()=>{
   it('archives the complete receipt at the flat downstream path while preserving operator evidence',()=>{
     const workflow=readFileSync(resolve('.github/workflows/pr.yml'),'utf8');const block=workflow.split('name: Retain proof verified by this protected preview job')[1]!.split('  operator-proof-upload:')[0]!;
     const paths=block.split('path: |')[1]!.split('retention-days:')[0]!.trim().split('\n').map(p=>p.trim().replace('${{ runner.temp }}/',''));
-    expect(paths).toContain('operator-proof-envelope.json');expect(paths).toContain('operator-proof/operator-proof-envelope.json');expect(block).toContain('if: always()');
+    expect(paths).toContain('operator-proof-envelope.json');expect(paths).toContain('operator-proof/operator-proof-envelope.json');expect(block).toContain("if: ${{ always() && needs.operator-proof-source.outputs.mode != 'runtime-reuse' }}");
     // upload-artifact preserves paths from the common RUNNER_TEMP ancestor.
     const directory=mkdtempSync(join(tmpdir(),'proof-artifact-layout-'));try{for(const path of paths){mkdirSync(join(directory,path,'..'),{recursive:true});writeFileSync(join(directory,path),path==='operator-proof-envelope.json'?'complete':'operator');}
       const zip=join(directory,'artifact.zip');execFileSync(process.platform==='darwin'?'/opt/homebrew/bin/python3':'python3',['-c',"import sys,zipfile,pathlib; root=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2],'w'); [z.write(root/p,p) for p in sys.argv[3:]]",directory,zip,...paths]);
