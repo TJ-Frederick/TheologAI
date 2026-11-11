@@ -16,8 +16,9 @@ export async function runCorpusLive(input:{role:'preview'|'production';sourceDir
  const classification=classifyApplicationRelease(process.cwd());
  const planText=readFileSync(join(input.sourceDirectory,'plan.json'));check(sha(planText)===input.planSha256,'source plan hash');
  const plan=JSON.parse(planText.toString()),challenge=requireOperatorChallenge(json(input.challengeFile));
- check(JSON.stringify(plan.classification)===JSON.stringify(classification)&&challenge.releasePolicy===POLICY.policy&&challenge.liveControlReserve===100000&&challenge.role===input.role&&challenge.sourceCommit===classification.sourceCommit&&challenge.sourceTree===classification.sourceTree&&challenge.sourcePlanSha256===input.planSha256,'source policy/role');
+ check(JSON.stringify(plan.classification)===JSON.stringify(classification)&&challenge.releasePolicy===POLICY.policy&&challenge.liveControlReserve===POLICY.liveControlReserve(input.role)&&challenge.role===input.role&&challenge.sourceCommit===classification.sourceCommit&&challenge.sourceTree===classification.sourceTree&&challenge.sourcePlanSha256===input.planSha256,'source policy/role');
  check(sha(readFileSync(join(input.sourceDirectory,'source.db')))===plan.sourceSha256,'source database hash');
+ const liveReads=POLICY.liveControlReserve(input.role)-POLICY.controlReads;
  const accountReadCeiling=challenge.accountReadCeiling??4000000;
  if(challenge.accountReadCeiling)check(input.role==='production'&&process.env.GITHUB_RUN_ID===challenge.runId&&process.env.GITHUB_RUN_ATTEMPT==='1'&&process.env.GITHUB_EVENT_NAME==='workflow_dispatch'&&process.env.GITHUB_REF==='refs/heads/main','current protected production budget context');
  const receipt=json(input.receiptFile);verifyFreshCorpusReceipt(receipt,{role:input.role,sourceCommit:classification.sourceCommit,sourceTree:classification.sourceTree,sourcePlanSha256:input.planSha256,tables:plan.expected.digests,foreignKeyWitnessSha256:plan.expected.foreignKeyWitnessSha256});
@@ -32,25 +33,27 @@ export async function runCorpusLive(input:{role:'preview'|'production';sourceDir
  const api=createCorpusApi(input.role,async()=>input.token,input.fetch,event);
  const usage=await captureCorpusUsage({role:input.role,api});
  const effective=Math.max(usage.candidate.rowsRead+usage.otherDatabases.rowsRead,challenge.admission.rowsRead+receipt.metering.rowsRead);
- check(effective+POLICY.liveReads+POLICY.controlReads+200000<=accountReadCeiling,'whole live/control reservation and uncertainty margin');
- event({kind:'live-admitted',releasePolicy:POLICY.policy,liveReads:POLICY.liveReads,controlReads:POLICY.controlReads,effectiveAccountReads:effective,uncertaintyMargin:200000,accountReadCeiling,challengeNonce:challenge.nonce});
- event({kind:'live-intent',reservedReads:POLICY.liveReads,stopOnUnknown:true});
+ check(effective+liveReads+POLICY.controlReads+200000<=accountReadCeiling,'whole live/control reservation and uncertainty margin');
+ event({kind:'live-admitted',releasePolicy:POLICY.policy,liveReads:liveReads,controlReads:POLICY.controlReads,effectiveAccountReads:effective,uncertaintyMargin:200000,accountReadCeiling,challengeNonce:challenge.nonce});
+ event({kind:'live-intent',reservedReads:liveReads,stopOnUnknown:true});
  const live=await auditCorpusRelease({role:input.role,root:process.cwd(),databasePath:join(input.sourceDirectory,'source.db'),endpoint:input.role==='preview'?'https://preview-mcp.theologai.xyz/mcp':'https://mcp.theologai.xyz/mcp',serverVersion:JSON.parse(readFileSync('package.json','utf8')).version+(input.role==='preview'?'-preview':''),fetch:input.fetch??fetch,guard:()=>{requireOperatorChallenge(challenge);}});
  if(Object.hasOwn(live,'failure')){
   const text=JSON.stringify(live,null,2)+'\n';let retained=false;
   try{check(Buffer.byteLength(text)<=512*1024,'bounded sanitized failure report');writeFileSync(output,text,{flag:'wx',mode:0o600});retained=true;}catch{}
-  try{event({kind:'live-failed',reportSha256:sha(text),reportRetained:retained,reservedReadsRetained:POLICY.liveReads,retry:false});}catch{try{process.stderr.write('Corpus live audit failed; report or journal retention unavailable. No retry.\n');}catch{}}
+  try{event({kind:'live-failed',reportSha256:sha(text),reportRetained:retained,reservedReadsRetained:liveReads,retry:false});}catch{try{process.stderr.write('Corpus live audit failed; report or journal retention unavailable. No retry.\n');}catch{}}
   check(false,'live audit failure');
  }
  const after=await observer.observeControls();check(JSON.stringify(after)===JSON.stringify(before),'live assignments changed');
  const finalUsage=await captureCorpusUsage({role:input.role,api});
  // Adaptive analytics has no ingestion watermark: a delta can include the earlier full proof.
  // Retain the whole live charge; never present a delayed counter delta as precise per-suite metering.
- const finalAccountReads=Math.max(finalUsage.candidate.rowsRead+finalUsage.otherDatabases.rowsRead,effective+POLICY.liveReads);
+ const observedAccountReads=finalUsage.candidate.rowsRead+finalUsage.otherDatabases.rowsRead;
+ if(input.role==='production')check(observedAccountReads<=effective+liveReads+POLICY.controlReads,'observed live/control allowance exceeded');
+ const finalAccountReads=Math.max(observedAccountReads,effective+liveReads);
  check(finalAccountReads+POLICY.controlReads+200000<=accountReadCeiling,'final account headroom exceeded');
  check(finalUsage.candidate.rowsWritten+finalUsage.otherDatabases.rowsWritten<=80000,'final account write ceiling exceeded');
  requireOperatorChallenge(challenge);
- event({kind:'live-complete',sha256:sha(JSON.stringify(live)),reservedReadsRetained:POLICY.liveReads,precisePerSuiteMeteringUnavailable:true,usageBefore:usage,usageObservation:finalUsage,ingestionWatermarkUnavailable:true});
+ event({kind:'live-complete',sha256:sha(JSON.stringify(live)),reservedReadsRetained:liveReads,precisePerSuiteMeteringUnavailable:true,usageBefore:usage,usageObservation:finalUsage,ingestionWatermarkUnavailable:true});
  writeFileSync(output,JSON.stringify(live,null,2)+'\n',{flag:'wx',mode:0o600});
  // Existing artifact names retain truthful, explicitly scoped case records; no old audit schema is fabricated.
  for(const [name,predicate]of [

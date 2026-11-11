@@ -47,7 +47,15 @@ export function assertProofQuery(query: ProofQuery): void {
   else check(query.kind === 'fts-integrity' && query.writeCeiling === 1 && ALL_FTS.some(t => query.sql === `INSERT INTO "${t}"("${t}",rank) VALUES('integrity-check',1)`), 'integrity command allowlist');
 }
 export function admitCorpusBudget(usage: number, reserved: number, localKnownReads: number, next: number, accountCeiling = 4_000_000, liveAuditReserve = 0, scope?: BudgetScope): void {
-  check(accountCeiling === 4_000_000 && (liveAuditReserve === 0 || liveAuditReserve === POLICY.liveReads + POLICY.controlReads) || accountCeiling === 5_000_000 && liveAuditReserve === 500_000 || accountCeiling===4400000&&scope?.role==='production'&&scope.productionAuthorization&&scope.day===new Date().toISOString().slice(0,10)&&operatorAuthority.productionAccountCeiling(scope.productionAuthorization.package,scope.productionAuthorization)===accountCeiling&&liveAuditReserve===100000, 'account budget policy');
+  if (scope?.productionAuthorization) {
+    const grant = scope.productionAuthorization;
+    check(scope.role === 'production' && scope.day === new Date().toISOString().slice(0, 10)
+      && accountCeiling === operatorAuthority.productionAccountCeiling(grant.package, grant)
+      && liveAuditReserve === POLICY.liveControlReserve('production'), 'account budget policy');
+  } else {
+    check(accountCeiling === 4_000_000 && (liveAuditReserve === 0 || liveAuditReserve === POLICY.liveControlReserve('preview'))
+      || accountCeiling === 5_000_000 && liveAuditReserve === 500_000, 'account budget policy');
+  }
   check([usage, reserved, localKnownReads, next].every(count) && Math.max(usage, localKnownReads) + uncertaintyReadMargin(scope) + reserved + next + liveAuditReserve <= accountCeiling, 'insufficient account headroom');
 }
 
@@ -89,7 +97,7 @@ export class CorpusProofTransport {
     }
     if(options.productionAuthorization)check(this.corpus&&options.role==='production','production-only account authority');
     this.accountCeiling = options.productionAuthorization?operatorAuthority.productionAccountCeiling(options.productionAuthorization.package,options.productionAuthorization):options.previewQuotaBuffer ? 5_000_000 : 4_000_000;
-    this.liveAuditReserve = options.previewQuotaBuffer ? 500_000 : this.corpus ? POLICY.liveReads + POLICY.controlReads : 0;
+    this.liveAuditReserve = options.previewQuotaBuffer ? 500_000 : this.corpus ? POLICY.liveControlReserve(options.role) : 0;
     this.budgetScope = { role: options.role, day: this.day, historicalExceptions: this.corpus ? false : options.historicalExceptions,productionAuthorization:options.productionAuthorization };
     check(this.started + 5_400_000 < Date.parse(this.day + 'T00:00:00Z') + 86_400_000, 'insufficient UTC window');
     writeFileSync(options.eventFile, '', { flag: 'wx', mode: 0o600 });
@@ -159,6 +167,10 @@ export class CorpusProofTransport {
       const version = row(await this.rest(path + '/versions/' + versions[0]!.version_id)); check(version.id === versions[0]!.version_id, 'version identity');
       const active = list(row(version.resources).bindings).filter(b => b.type === 'd1');
       check(active.length === 1 && (active[0]!.id ?? active[0]!.database_id) === databaseId && active[0]!.name === 'THEOLOGAI_DB', 'active D1 binding');
+      if (this.options.productionAuthorization && (role === 'preview' || !this.options.activated)) {
+        const expected = POLICY.predecessors[role];
+        check(deployment.id === expected.deploymentId && version.id === expected.versionId, 'production release predecessor changed');
+      }
       if(this.boundPreview)check(deployment.id===(role==='preview'?this.boundPreview.previewDeploymentId:this.boundPreview.productionDeploymentId) && version.id===(role==='preview'?this.boundPreview.previewVersionId:this.boundPreview.productionVersionId),'owner-pinned bound assignment changed');
       result.push({role,deploymentId:deployment.id,versionId:version.id,databaseId});
     }
@@ -198,7 +210,7 @@ export class CorpusProofTransport {
       && admission.sampleInterval===1 && count(admission.rowsRead) && count(admission.rowsWritten) && count(admission.readBudget)
       && admission.readBudget<=(this.corpus?POLICY.hardReadCap:3_800_000) && Date.parse(admission.observedAt)<=Date.now() && Date.now()-Date.parse(admission.observedAt)<=50_000, 'protected integrity admission');
     check((admission.accountReadCeiling??4000000)===this.accountCeiling&&(admission.accountReadCeilingDay??this.day)===this.day,'matching protected account ceiling');
-    if(this.corpus)check(admission.liveControlReserve===POLICY.liveReads+POLICY.controlReads && Date.now()-Date.parse(admission.inventoryObservedAt ?? '')<=50_000 && Date.parse(admission.inventoryObservedAt ?? '')<=Date.now(),'fresh complete inventory and live/control reserve');
+    if(this.corpus)check(admission.liveControlReserve===this.liveAuditReserve && Date.now()-Date.parse(admission.inventoryObservedAt ?? '')<=50_000 && Date.parse(admission.inventoryObservedAt ?? '')<=Date.now(),'fresh complete inventory and live/control reserve');
     check(admission.rowsWritten+4<=80_000,'insufficient account write headroom');
     admitCorpusBudget(admission.rowsRead,admission.readBudget,admission.rowsRead,0,this.accountCeiling,this.liveAuditReserve,this.budgetScope);
     if(this.corpus){

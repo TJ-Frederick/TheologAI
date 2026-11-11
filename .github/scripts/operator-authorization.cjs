@@ -28,7 +28,7 @@ function requireAuthorization(a, expected = {}, now = Date.now()) {
   check(['sourceCommit','sourceTree','baseCommit'].every(k => hex(a[k],40)) && hex(a.sourcePlanSha256,64)
     && id(a.targetRunId) && a.targetRunAttempt === 1, 'source and run');
   check(/^operation-[a-z0-9-]{8,80}$/.test(a.authorizationId || '') && a.ledgerId === a.authorizationId, 'single operation ledger');
-  check(a.reservedReads === (corpus?policy.reservedReads:3510997) && a.hardReadCap === (corpus?policy.hardReadCap:3800000) && a.diagnosticCommands === 4 && a.maxWrites === 4 && (!corpus || a.liveControlReserve === policy.liveReads + policy.controlReads)
+  check(a.reservedReads === (corpus?policy.reservedReads:3510997) && a.hardReadCap === (corpus?policy.hardReadCap:3800000) && a.diagnosticCommands === 4 && a.maxWrites === 4 && (!corpus || a.liveControlReserve === policy.liveControlReserve(a.role))
     && a.previousReadsSpentOrReserved === 0 && a.previousWritesSpentOrReserved === 0 && a.previousDiagnosticCommands === 0
     && a.outstandingPriorReservationsAccepted === true, 'new allowance and retained prior reservations');
   if(bound) {
@@ -138,7 +138,10 @@ async function requireLedgerMarker({github,package:p,now=Date.now()}) {
   check(JSON.stringify(readArchive(Buffer.from(bytes),marker.digest))===JSON.stringify(p.authorization),'ledger marker content');
 }
 async function waitForAuthorization({github,expected,revalidate,core,runtimeReuse,expectedPurpose,environment=process.env,now=Date.now,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),wait=environment.OPERATOR_WAIT_AUTHORIZATION==='true'}) {
-  const end = now() + (wait ? 3600000 : 0);
+  // Preparation and cutover occupy separate quota days in the same production run.
+  const preparationWait = wait && environment.OPERATOR_PRODUCTION_PREPARATION_WAIT === 'true';
+  if (preparationWait) check(expected.role === 'production' && expected.pullRequestNumber === 176 && expected.headBranch === 'main' && environment.GITHUB_REF === 'refs/heads/main' && environment.GITHUB_EVENT_NAME === 'workflow_dispatch' && environment.GITHUB_RUN_ATTEMPT === '1', 'production preparation wait context');
+  const end = now() + (wait ? (preparationWait ? 14400000 : 3600000) : 0);
   if (core?.summary) await core.summary.addHeading('Explicit operator authorization required').addRaw(JSON.stringify(expected)).write();
   do {
     await revalidate();
@@ -156,7 +159,7 @@ async function waitForAuthorization({github,expected,revalidate,core,runtimeReus
       core.setOutput('authorization_sha256',hash(text)); return p;
     }
     if (now() >= end) break;
-    await pause(15000);
+    await pause(preparationWait ? 60000 : 15000);
   } while (now() < end);
   throw Error('Operator authorization refused: no explicit owner authorization within admission window');
 }

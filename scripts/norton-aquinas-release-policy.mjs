@@ -100,14 +100,14 @@ export function assertReviewedActivationEntries(declaration,before,after){
 }
 export function requireProofApproval(value,expected,now=Date.now()){
  check(value&&Object.keys(value).sort().join(',')===['liveControlReserve','expectedLedgerSha256','releasePolicy','schemaVersion','role','accountId','databaseId','sourceCommit','sourceTree','expiresAt','maxReads','integrityCommands','exclusiveDataWritesDuringProof'].sort().join(','),'verification approval shape');
- check(value.liveControlReserve===POLICY.liveReads+POLICY.controlReads&&/^[a-f0-9]{64}$/.test(value.expectedLedgerSha256)&&value.releasePolicy===POLICY.policy&&value.schemaVersion==='theologai-fresh-corpus-proof-approval.v1'&&value.role===expected.role&&value.accountId===ACCOUNT&&value.databaseId===TARGETS[expected.role]?.databaseId,'verification approval target');
+ check(value.liveControlReserve===POLICY.liveControlReserve(expected.role)&&/^[a-f0-9]{64}$/.test(value.expectedLedgerSha256)&&value.releasePolicy===POLICY.policy&&value.schemaVersion==='theologai-fresh-corpus-proof-approval.v1'&&value.role===expected.role&&value.accountId===ACCOUNT&&value.databaseId===TARGETS[expected.role]?.databaseId,'verification approval target');
  check(value.sourceCommit===expected.sourceCommit&&value.sourceTree===expected.sourceTree,'verification approval source');
  const expiry=Date.parse(value.expiresAt);check(Number.isFinite(expiry)&&expiry>now&&expiry-now<=24*3600000,'verification approval expiry');
  check(value.maxReads===POLICY.hardReadCap&&value.integrityCommands===4&&value.exclusiveDataWritesDuringProof===true,'verification approval budget or write reservation');
  return value;
 }
 export function verifyFreshCorpusReceipt(value,expected,now=Date.now()){
- check(value&&value.liveControlReserve===POLICY.liveReads+POLICY.controlReads&&value.releasePolicy===POLICY.policy&&value.schemaVersion==='theologai-fresh-complete-corpus-proof.v1','fresh complete proof required; prior custody/markers unsupported');
+ check(value&&value.liveControlReserve===POLICY.liveControlReserve(expected.role)&&value.releasePolicy===POLICY.policy&&value.schemaVersion==='theologai-fresh-complete-corpus-proof.v1','fresh complete proof required; prior custody/markers unsupported');
  check(value.role===expected.role&&value.accountId===ACCOUNT&&value.databaseId===TARGETS[expected.role]?.databaseId&&value.databaseName===TARGETS[expected.role]?.databaseName,'fresh proof target');
  check(value.sourceCommit===expected.sourceCommit&&value.sourceTree===expected.sourceTree&&value.corpusIdentity===CORPUS&&value.schema===SCHEMA,'fresh proof source');
  const started=Date.parse(value.startedAt),completed=Date.parse(value.completedAt);

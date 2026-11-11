@@ -64,7 +64,7 @@ export function requireOperatorChallenge(input: unknown, now = Date.now()): Oper
   check(c.workflowPath === (preview ? '.github/workflows/pr.yml' : '.github/workflows/deploy.yml')
     && c.eventName === (preview ? 'pull_request' : 'workflow_dispatch')
     && c.ref === (preview ? `refs/pull/${authorization.pullRequestNumber}/merge` : 'refs/heads/main'), 'existing protected route');
-  check((!corpus || c.liveControlReserve===100000) && c.reservedReads===selected.reservedReads && c.hardReadCap===selected.hardReadCap && c.diagnosticCommands === 4, 'authorization budget');
+  check((!corpus || c.liveControlReserve===authorization.liveControlReserve) && c.reservedReads===selected.reservedReads && c.hardReadCap===selected.hardReadCap && c.diagnosticCommands === 4, 'authorization budget');
   const start = Date.parse(c.createdAt), end = Date.parse(c.expiresAt);
   check(Number.isFinite(start) && Number.isFinite(end) && start <= now + 30_000 && end > now && end - start === 5_400_000
     && end < Date.parse(new Date(start).toISOString().slice(0,10) + 'T00:00:00Z') + 86_400_000, 'fresh single-UTC-day window');
@@ -81,7 +81,7 @@ export function createOperatorChallenge(role: 'preview' | 'production', classifi
   const selected=policyForClassification(classification);
   requireSameReleasePolicy(selected,authorization?.authorization?.releasePolicy);
   const grant=authority.requirePackage(authorization,{},now).authorization;
-  const c = { ...(grant.accountReadCeiling?{accountReadCeiling:grant.accountReadCeiling,accountReadCeilingDay:grant.accountReadCeilingDay}:{}),...(selected.id==='norton-aquinas.v1'?{liveControlReserve:100000,releasePolicy:selected.id}:{}), schemaVersion: 'theologai-operator-corpus-challenge.v2', authorization, role,
+  const c = { ...(grant.accountReadCeiling?{accountReadCeiling:grant.accountReadCeiling,accountReadCeilingDay:grant.accountReadCeilingDay}:{}),...(selected.id==='norton-aquinas.v1'?{liveControlReserve:grant.liveControlReserve,releasePolicy:selected.id}:{}), schemaVersion: 'theologai-operator-corpus-challenge.v2', authorization, role,
     authorizationId: authority.requirePackage(authorization,{},now).authorization.authorizationId,
     repository: OPERATOR_PROOF.repository, ownerActorId: OPERATOR_PROOF.ownerActorId, sourceCommit:classification.sourceCommit,sourceTree:classification.sourceTree,
     sourcePlanSha256: planSha256, runId: env.GITHUB_RUN_ID, runAttempt: 1,
@@ -95,7 +95,7 @@ export function boundPreviewBudgetForChallenge(c:OperatorChallenge){requireOpera
 export function productionBudgetForChallenge(c:OperatorChallenge){requireOperatorChallenge(c);return c.accountReadCeiling?{package:c.authorization,sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,runId:c.runId}:undefined;}
 export function operatorApproval(c: OperatorChallenge) {
   const selected=policyForIdentity(c.releasePolicy);
-  return { ...(selected.id==='norton-aquinas.v1'?{liveControlReserve:100000,expectedLedgerSha256:c.authorization.authorization.expectedLedgerSha256,releasePolicy:selected.id}:{}), schemaVersion: 'theologai-fresh-corpus-proof-approval.v1', role: c.role, accountId: ACCOUNT,
+  return { ...(selected.id==='norton-aquinas.v1'?{liveControlReserve:c.liveControlReserve,expectedLedgerSha256:c.authorization.authorization.expectedLedgerSha256,releasePolicy:selected.id}:{}), schemaVersion: 'theologai-fresh-corpus-proof-approval.v1', role: c.role, accountId: ACCOUNT,
     databaseId: policyForIdentity(c.releasePolicy).module.TARGETS[c.role].databaseId, sourceCommit: c.sourceCommit, sourceTree: c.sourceTree,
     expiresAt: c.expiresAt, maxReads: c.hardReadCap, integrityCommands: 4, exclusiveDataWritesDuringProof: true };
 }

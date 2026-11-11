@@ -9,6 +9,10 @@ export function corpusTransportFixture(options:{role:'preview'|'production';acti
  if(options.boundPreview){versions.preview=boundPreview.previewVersionId;versions.production=boundPreview.productionVersionId;}
  const deployments={preview:'33333333-3333-4333-8333-333333333333',production:'44444444-4444-4444-8444-444444444444'};
  if(options.boundPreview){deployments.preview=boundPreview.previewDeploymentId;deployments.production=boundPreview.productionDeploymentId;}
+ if(options.role==='production'){
+  versions.preview=POLICY.predecessors.preview.versionId;deployments.preview=POLICY.predecessors.preview.deploymentId;
+  if(!options.activated){versions.production=POLICY.predecessors.production.versionId;deployments.production=POLICY.predecessors.production.deploymentId;}
+ }
  const binding=(role:'preview'|'production')=>role==='production'?(options.role==='production'&&options.activated?TARGETS.production.databaseId:POLICY.rollback.databaseId):(options.role==='preview'&&!options.activated&&!options.boundPreview?TARGETS.production.databaseId:TARGETS.preview.databaseId);
  const envelope=(result:unknown,info?:unknown)=>Response.json({success:true,errors:[],messages:[],result,...(info?{result_info:info}:{})});
  const fetchImpl=(async(input:any,init:any={})=>{

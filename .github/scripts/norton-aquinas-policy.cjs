@@ -9,6 +9,16 @@ const policy=({
   "hardReadCap": 3560000,
   "liveReads": 90000,
   "controlReads": 10000,
+  liveControlReserve(role) {
+    if (role === 'production') return 500000;
+    if (role === 'preview') return this.liveReads + this.controlReads;
+    throw new Error('Unknown corpus release role');
+  },
+  // Sole serving assignments at the end of the accepted 6c43cbc preview.
+  predecessors: Object.freeze({
+    preview: Object.freeze({deploymentId: '62da1803-b313-4dc7-94bf-80d3394957b1', versionId: '8fb1be2c-72f7-4a4e-bbd6-117adfc30410'}),
+    production: Object.freeze({deploymentId: 'f6c9a995-0940-4758-a9a9-14f1389a9ab3', versionId: 'd2e2bd87-1213-4ba5-891d-e0f9b3293cb9'}),
+  }),
   "targets": {
     "preview": {
       "databaseName": "theologai-preview-20260728-transform11-a",

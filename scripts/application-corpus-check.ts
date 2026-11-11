@@ -75,7 +75,7 @@ export async function runFreshApplicationCorpusCheck(input: { root: string; role
     await transport.start();
     const proof = await proveCompleteCorpus(source, plan.expected, query => transport.execute(query), approval.expectedLedgerSha256);
     const controls = await transport.finish();
-    const receipt = { ...(selected.id==='norton-aquinas.v1'?{liveControlReserve:100000,releasePolicy:selected.id}:{}), schemaVersion: 'theologai-fresh-complete-corpus-proof.v1', role: input.role, accountId: ACCOUNT, ...TARGETS[input.role],
+    const receipt = { ...(selected.id==='norton-aquinas.v1'?{liveControlReserve:(input.approval as {liveControlReserve:number}).liveControlReserve,releasePolicy:selected.id}:{}), schemaVersion: 'theologai-fresh-complete-corpus-proof.v1', role: input.role, accountId: ACCOUNT, ...TARGETS[input.role],
       sourceCommit: classification.sourceCommit, sourceTree: classification.sourceTree, corpusIdentity: CORPUS, schema: SCHEMA,
       startedAt, completedAt: new Date().toISOString(), sourcePlanSha256: input.planSha256, approvalSha256: sha(JSON.stringify(approval)),
       operationalAssumption: 'owner_reserves_target_data_writes_during_proof_not_an_enforced_provider_lease',

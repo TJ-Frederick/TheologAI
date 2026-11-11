@@ -42,17 +42,30 @@ export async function runNortonPreparation(input:{root:string;approval:Preparati
  mkdirSync(input.output,{mode:0o700});const plan=planPreparation(input.root,input.baselinePath,input.sourcePath);check(plan.sha256===a.preparationPlanSha256,'reviewed exact preparation plan');
  const journal=join(input.output,'preparation.events.jsonl');writeFileSync(journal,'',{flag:'wx',mode:0o600});
  const record=(value:unknown)=>appendFileSync(journal,JSON.stringify(value)+'\n',{mode:0o600,flush:true});let providerCalls=0,githubCalls=0,lastSource=-Infinity,stage='owner_source',session:PreparedCorpusSession|undefined;
- const gh=async(path:string)=>{check(++githubCalls<=128,'GitHub read budget');return JSON.parse(execFileSync('gh',['api','repos/TJ-Frederick/TheologAI'+path],{encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024,stdio:['ignore','pipe','pipe']}));};
+ // Five metadata requests per 30-second authority check, for up to 90 minutes.
+ const gh=async(path:string)=>{check(++githubCalls<=905,'GitHub read budget');return JSON.parse(execFileSync('gh',['api','repos/TJ-Frederick/TheologAI'+path],{encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024,stdio:['ignore','pipe','pipe']}));};
  let lastRun:any;
  const github={rest:{actions:{getWorkflowRun:async({run_id}:any)=>({data:lastRun=await gh('/actions/runs/'+run_id)})},pulls:{get:async()=>({data:await gh('/pulls/176')})},git:{getRef:async()=>({data:await gh('/git/ref/heads/main')}),getCommit:async({commit_sha}:any)=>({data:await gh('/git/commits/'+commit_sha)})}}};
  const live=input.liveCandidate??(async()=>{await authority.requireLiveCandidate({github,authorization:a});check(lastRun.actor?.id===40179660&&lastRun.triggering_actor?.id===40179660,'owner production dispatch');const jobs=await gh('/actions/runs/'+a.targetRunId+'/jobs?per_page=100');check(jobs.total_count<=100&&!jobs.jobs.some((j:any)=>j.name==='Test, Build & Deploy'&&j.started_at),'production must remain before protected execution');});
- const guard=async()=>{requirePreparationApproval(a,classification,now());if(now()-lastSource>=30000){await live(a);lastSource=now();}};
+ const guard=async()=>{requirePreparationApproval(a,classification,now());if(now()-lastSource>=30000){try{await live(a);}catch(cause){if(cause instanceof PreparationRefusal)throw cause;throw new PreparationRefusal('source_authority_refused');}lastSource=now();}};
  const limited=(async(url:any,init:any)=>{await guard();check(++providerCalls<=2500,'provider exchange budget');return (input.fetch??fetch)(url,init);})as typeof fetch;
  const api=createCorpusApi('production',async()=>input.token,limited,record);let cached:Awaited<ReturnType<typeof captureCorpusUsage>>|undefined;
  const usage=async()=>{if(!cached||now()-Date.parse(cached.capturedAt)>=25000)cached=await captureCorpusUsage({role:'production',api});return{windowStart:cached.windowStart,observedAt:cached.capturedAt,rowsRead:cached.candidate.rowsRead+cached.otherDatabases.rowsRead,rowsWritten:cached.candidate.rowsWritten+cached.otherDatabases.rowsWritten};};
  const baseline=new Database(input.baselinePath,{readonly:true,fileMustExist:true}),source=new Database(input.sourcePath,{readonly:true,fileMustExist:true});
  try{
   await guard();stage='unbound_before';const before=await captureUnboundCorpusControl({role:'production',api});check(now()-Date.parse(before.capturedAt)<=50000,'fresh unbound inventory');record({kind:'unbound-before',databaseId:before.databaseId,inventorySha256:before.inventorySha256,capturedAt:before.capturedAt});
+  for (const role of ['preview','production'] as const) {
+   const worker = before.inventory.workers.find(w => w.name === (role === 'preview' ? 'theologai-preview' : 'theologai'));
+   const expected = POLICY.predecessors[role];
+   const database = role === 'preview' ? POLICY.targets.preview.databaseId : POLICY.rollback.databaseId;
+   const version = worker?.versions[0];
+   check(worker?.deploymentId === expected.deploymentId && worker.versions.length === 1
+    && version?.versionId === expected.versionId && version.percentage === 100
+    && JSON.stringify(worker.configuredD1) === JSON.stringify([database])
+    && JSON.stringify(version.databases) === JSON.stringify([database]), 'serving assignment changed');
+  }
+  const startUsage=await usage();
+  check(startUsage.rowsRead + 250000 + 200000 <= 4000000 && startUsage.rowsWritten + 51459 <= 80000, 'quota admission');
   stage='preparation';session=new PreparedCorpusSession({priorReadsReserved:a.priorReadsReserved,databaseId:TARGETS.production.id,execute:createPreparationExecutor(api.authorizedFetch),usage,guard,append:async e=>record(e)},now);
   const result=await prepareAndReadBackCandidate(plan,session,baseline,source,a.originalLedgerSha256);
   stage='post_preparation_ledger';const ledger=await session.query('SELECT id,name,applied_at FROM d1_migrations ORDER BY id LIMIT 11;',32,0);const migrations=JSON.parse(readFileSync(join(input.root,'data/data-manifest.json'),'utf8')).materializations.d1.migrations;
