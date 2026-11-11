@@ -29,7 +29,7 @@ it.each(['missing-holds', 'subtract-reads', 'subtract-writes', 'ceiling-reset', 
   if (fault === 'wrong-version') p.authorization.boundPreview.previewVersionId = '1'.repeat(36);
   if (fault === 'wrong-source') context.sourceTree = 'e'.repeat(40);
   if (fault === 'expired') p.authorization.expiresAt = new Date(now - 1).toISOString();
-  if (fault === 'production') { p.authorization.role = 'production'; p.authorization.headBranch = 'main'; }
+  if (fault === 'production') { p.authorization.role = 'production'; p.authorization.headBranch = 'main'; p.authorization.liveControlReserve = 500000; }
   p.provenance.contentSha256 = createHash('sha256').update(JSON.stringify(p.authorization)).digest('hex');
   const errors = {
     'missing-holds': 'shape', 'subtract-reads': 'cumulative task previousReadsHeld',

@@ -27,10 +27,12 @@ const TOOLING_PATHS=new Set([
  'scripts/operator-corpus-proof.ts',
  'test/helpers/corpusTransportFixture.ts',
  'test/test-topology.json',
+ 'test/unit/scripts/boundPreviewProof.test.ts',
  'test/unit/scripts/nortonAquinasLiveWorkflow.test.ts',
  'test/unit/scripts/nortonOperatorCorpusProof.test.ts',
  'test/unit/scripts/nortonOperatorSuccessorFlow.test.ts',
  'test/unit/scripts/nortonProductionOperation.test.ts',
+ 'test/unit/scripts/productionReleaseGuards.test.ts',
  'test/unit/scripts/runtimePreviewHandoff.test.ts',
  'tsconfig.release-scripts.json',
 ]);

@@ -88,7 +88,7 @@ describe('production release guards', () => {
     expect(workflow).not.toContain('--expected-server-version "$server_version"');
   });
 
-  it('revalidates the exact gate artifact before dependencies, secrets, Cloudflare, or D1 and retains seven release artifacts', async () => {
+  it('revalidates the exact gate artifact before dependencies, secrets, Cloudflare, or D1 and retains the seven release artifacts plus scoped failure evidence', async () => {
     const workflow = originalGates(await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'));
     const deployStart = workflow.indexOf('  deploy:');
     const resolveContext = workflow.indexOf('Resolve production release comparison context', deployStart);
@@ -115,11 +115,17 @@ describe('production release guards', () => {
     expect(revalidationToInstall).not.toMatch(/secrets\.|wrangler|cloudflare|d1\b/i);
 
     const deployJob = workflow.slice(deployStart);
-    expect((deployJob.match(/uses: actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7\.0\.1/g) ?? [])).toHaveLength(7);
-    expect((deployJob.match(/retention-days: 30/g) ?? [])).toHaveLength(7);
+    expect((deployJob.match(/uses: actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7\.0\.1/g) ?? [])).toHaveLength(8);
+    expect((deployJob.match(/retention-days: 30/g) ?? [])).toHaveLength(8);
     const releaseUploads = [...deployJob.matchAll(/      - name: Upload [^\n]+[\s\S]*?(?=\n      - name:|$)/g)].map(match => match[0]);
     expect(releaseUploads).toHaveLength(7);
-    for (const upload of releaseUploads) {
+    const failureUpload = deployJob.split('      - name: Retain sanitized production corpus failure evidence')[1]!.split('      - name:')[0]!;
+    expect(failureUpload).toContain("steps.production-corpus-live.outcome == 'failure'");
+    expect(failureUpload).toContain("steps.production-corpus-live.outcome == 'cancelled'");
+    expect(failureUpload.match(/\$\{\{ runner\.temp \}\}\/[^\s]+/g)).toEqual([
+      '${{ runner.temp }}/corpus-live.json', '${{ runner.temp }}/corpus-live.json.events.jsonl',
+    ]);
+    for (const upload of [...releaseUploads, failureUpload]) {
       expect(upload).not.toContain('production-deployment-plan.json');
       expect(upload).not.toContain('production-deployment-plan.sha256');
       expect(upload).not.toContain('retention-days: 1\n');
