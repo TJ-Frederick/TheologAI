@@ -75,16 +75,20 @@ async function resolveRuntimePreviewHandoff({github,context,pin,now=Date.now()})
  }
  const {data:comparison}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:PINS.source+'...'+pull.head.sha});check(comparison.merge_base_commit?.sha===PINS.source&&['ahead','identical'].includes(comparison.status)&&comparison.total_commits<=100,'accepted source ancestor');
  reviewedPaths(comparison.files?.flatMap(f=>f.previous_filename?[f.filename,f.previous_filename]:[f.filename]));
- const {data:associations}=await github.rest.repos.listPullRequestsAssociatedWithCommit({...repo,commit_sha:PINS.source,per_page:100});check(associations.length<100&&associations.some(p=>p.number===PINS.pr&&p.merge_commit_sha===PINS.originalMerge&&p.merged_at&&p.head.sha===PINS.originalHead),'authoritative accepted commit PR association');
+ const {data:associations}=await github.rest.repos.listPullRequestsAssociatedWithCommit({...repo,commit_sha:PINS.source,per_page:100});const claims=associations.filter(p=>p.number===PINS.pr||p.merge_commit_sha===PINS.originalMerge);check(associations.length<100&&claims.length===1&&claims[0].number===PINS.pr&&claims[0].merge_commit_sha===PINS.originalMerge&&claims[0].merged_at&&claims[0].head.sha===PINS.originalHead&&claims[0].base.ref==='main','authoritative accepted commit PR association');
  const runs={};for(const[id,event]of[[PINS.run,'pull_request'],[PINS.producer,'workflow_dispatch']]){
   const{data:run}=await github.rest.actions.getWorkflowRun({...repo,run_id:id});check(run.id===id&&run.run_attempt===1&&run.event===event&&run.path==='.github/workflows/pr.yml'&&run.head_sha===PINS.source&&run.status==='completed'&&run.conclusion==='success'&&run.actor?.id===PINS.owner&&run.triggering_actor?.id===PINS.owner&&Date.parse(run.updated_at)<=now+300000&&Date.parse(run.updated_at)>=now-7*86400000,'successful exact native PR/owner run');runs[id]=run;
  }
- check(!runs[PINS.run].pull_requests?.length||runs[PINS.run].pull_requests.every(p=>p.number===PINS.pr&&p.head.sha===PINS.source),'inline accepted PR-run disagreement');
+ check(Array.isArray(runs[PINS.run].pull_requests)&&runs[PINS.run].pull_requests.every(p=>p.number===PINS.pr&&p.head.sha===PINS.source),'inline accepted PR-run disagreement');
  for(const[id,names]of[[PINS.run,['Select Validation','Test & Build','Fresh Checkout & Data','Node HTTP E2E','Worker Runtime & D1','Applicable MCP Conformance','Validation Complete','Build preview Worker artifact (no cloud credentials)','Verify operator proof source (no cloud credentials)','Preview operator corpus verification']],[PINS.producer,['Verify deployed Norton candidate and distinct auditor (no cloud credentials)']]]){
   const{data:jobs}=await github.rest.actions.listJobsForWorkflowRun({...repo,run_id:id,filter:'latest',per_page:100});check(jobs.total_count===jobs.jobs.length&&jobs.total_count<=100,'complete native job roster');
-  for(const listed of jobs.jobs.filter(j=>names.includes(j.name))){
-   const {data:job}=await github.rest.actions.getJobForWorkflowRun({...repo,job_id:listed.id});
-   check(job.id===listed.id&&job.run_id===id&&job.run_attempt===1&&job.head_sha===PINS.source&&job.name===listed.name&&job.status===listed.status&&job.conclusion===listed.conclusion&&JSON.stringify(job.steps)===JSON.stringify(listed.steps),'authoritative native job disagreement');
+  if(id===PINS.run){
+   const listed=jobs.jobs.find(j=>j.id===130218936324&&j.name==='Test & Build');check(listed,'exact accepted CI job in native roster');
+   const {data:job}=await github.rest.actions.getJobForWorkflowRun({...repo,job_id:130218936324});
+   check(job.id===listed.id&&job.run_id===PINS.run&&job.run_attempt===1&&job.head_sha===PINS.source&&job.name===listed.name&&job.status===listed.status&&job.conclusion===listed.conclusion&&JSON.stringify(job.steps)===JSON.stringify(listed.steps),'authoritative native job disagreement');
+   const {data:rawLog}=await github.rest.actions.downloadJobLogsForWorkflowRun({...repo,job_id:130218936324});
+   const log=typeof rawLog==='string'?rawLog:Buffer.from(rawLog).toString('utf8');check(Buffer.byteLength(log)>0&&Buffer.byteLength(log)<=2*1024*1024,'bounded protected job log');
+   const refs=[...log.matchAll(/\bCI_REF:\s*([^\s]+)/g)].map(m=>m[1]);check(refs.length>0&&refs.every(ref=>ref==='refs/pull/176/merge'),'authoritative protected job PR ref disagreement');
   }
   for(const name of names)check(jobs.jobs.filter(j=>j.name===name&&j.status==='completed'&&j.conclusion==='success').length===1,'successful exact native source/protected job');
   if(id===PINS.producer)check(jobs.jobs.every(j=>j.conclusion!=='success'||j.name===names[0]),'credential-free owner preparation only');
