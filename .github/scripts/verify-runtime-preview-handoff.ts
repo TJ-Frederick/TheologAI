@@ -89,11 +89,12 @@ export function verifyRuntimePreviewHandoff(input:{root:string;directory:string;
 }
 /** Reuse captured controls without another provider read; check authority at mutation time. */
 export function requireRuntimeProductionBoundary(input:{production:any;preview:any;challenge:unknown;sourceCommit:string;sourceTree:string;runId:string;now?:number}){
- const c=requireOperatorChallenge(input.challenge,input.now??Date.now()),p=input.production,v=input.preview;
+ const now=input.now??Date.now(),c=requireOperatorChallenge(input.challenge,now),p=input.production,v=input.preview;
+ check(Date.parse(c.expiresAt)-now>=15*60000,'activation needs full live/control time reserve');
  check(c.role==='production'&&c.releasePolicy===POLICY.policy&&c.sourceCommit===input.sourceCommit&&c.sourceTree===input.sourceTree&&c.runId===input.runId,'current production source/run authority at mutation boundary');
  check(p.schemaVersion===3&&p.worker==='theologai'&&p.predecessorVersionId===POLICY.predecessors.production.versionId&&p.predecessorDeploymentId===POLICY.predecessors.production.deploymentId&&p.predecessorD1?.binding==='THEOLOGAI_DB'&&p.predecessorD1.databaseId===POLICY.rollback.databaseId&&p.candidateD1?.binding==='THEOLOGAI_DB'&&p.candidateD1.databaseId===POLICY.targets.production.databaseId&&p.candidateD1.databaseName===POLICY.targets.production.databaseName&&p.d1Changed===true,'approved production predecessor and distinct candidate at mutation boundary');
  check(v.schemaVersion===1&&v.worker==='theologai-preview'&&v.workerVersionId===POLICY.predecessors.preview.versionId&&v.deploymentId===POLICY.predecessors.preview.deploymentId&&v.d1?.binding==='THEOLOGAI_DB'&&v.d1.databaseId===POLICY.targets.preview.databaseId&&v.configuredD1?.binding==='THEOLOGAI_DB'&&v.configuredD1.databaseId===POLICY.targets.preview.databaseId&&v.configuredD1.databaseName===POLICY.targets.preview.databaseName,'accepted preview control at mutation boundary');
- return{kind:'norton-runtime-production-mutation-boundary',sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,runId:c.runId,challengeExpiresAt:c.expiresAt,checkedAt:new Date(input.now??Date.now()).toISOString(),additionalProviderCalls:0};
+ return{kind:'norton-runtime-production-mutation-boundary',sourceCommit:c.sourceCommit,sourceTree:c.sourceTree,runId:c.runId,challengeExpiresAt:c.expiresAt,checkedAt:new Date(now).toISOString(),additionalProviderCalls:0};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){try{
  const args=process.argv.slice(2);let result;

@@ -51,6 +51,9 @@ it('checks actual current production authority and both captured assignments imm
  expect(()=>requireRuntimeProductionBoundary({...input,production:{...production,predecessorD1:{...production.predecessorD1,databaseId:POLICY.targets.production.databaseId}}})).toThrow('production predecessor');
  expect(()=>requireRuntimeProductionBoundary({...input,preview:{...preview,d1:{...preview.d1,databaseId:POLICY.targets.production.databaseId}}})).toThrow('preview control');
  expect(()=>requireRuntimeProductionBoundary({...input,runId:'124'})).toThrow('source/run authority');expect(()=>requireRuntimeProductionBoundary({...input,sourceCommit:'f'.repeat(40)})).toThrow('source/run authority');
+ const cutoff=Date.parse(challenge.expiresAt)-15*60000;
+ expect(()=>requireRuntimeProductionBoundary({...input,now:cutoff})).not.toThrow();
+ expect(()=>requireRuntimeProductionBoundary({...input,now:cutoff+1})).toThrow('full live/control time reserve');
  expect(()=>requireRuntimeProductionBoundary({...input,now:Date.parse(challenge.expiresAt)})).toThrow('window');
  }finally{vi.useRealTimers();rmSync(directory,{recursive:true,force:true});}
 });
