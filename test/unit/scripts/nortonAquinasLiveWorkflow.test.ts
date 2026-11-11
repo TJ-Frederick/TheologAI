@@ -47,7 +47,7 @@ it('refuses an observed production overage even when the account still has daily
  f.input.fetch=async(input,init)=>{
   const response=await provider(input,init);
   if(audited&&String(input).endsWith('/graphql')){
-   const body=await response.json();
+   const body=await response.json() as {data:{viewer:{accounts:{databases:{sum:{rowsRead:number}}[]}[]}}};
    body.data.viewer.accounts[0].databases[0].sum.rowsRead=3332195+100+500001;
    return Response.json(body);
   }

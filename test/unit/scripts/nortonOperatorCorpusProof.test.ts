@@ -17,7 +17,7 @@ const today=new Date();
 const start=Date.UTC(today.getUTCFullYear(),today.getUTCMonth(),today.getUTCDate()+1,0,5);
 const authority=createRequire(import.meta.url)('../../../.github/scripts/operator-authorization.cjs');
 function authorization(role='preview', now=start, identity:any={}) {
-  const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',exclusiveDataWritesDuringWindow:true,candidateWriteJobsPaused:true,releasePolicy:'norton-aquinas.v1',liveControlReserve:100000,expectedLedgerSha256:'1'.repeat(64),repository:OPERATOR_PROOF.repository,ownerActorId:40179660,
+  const a={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',exclusiveDataWritesDuringWindow:true,candidateWriteJobsPaused:true,releasePolicy:'norton-aquinas.v1',liveControlReserve:role==='production'?500000:100000,expectedLedgerSha256:'1'.repeat(64),repository:OPERATOR_PROOF.repository,ownerActorId:40179660,
     role,pullRequestNumber:172,headBranch:role==='preview'?'ci/different-successor':'main',sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40),baseCommit:'c'.repeat(40),sourcePlanSha256:'d'.repeat(64),targetRunId:'123',targetRunAttempt:1,
     authorizationId:'operation-successor-fixture',ledgerId:'operation-successor-fixture',notBefore:new Date(now-1000).toISOString(),expiresAt:new Date(now+86400000-1000).toISOString(),reservedReads:3560000,hardReadCap:3560000,diagnosticCommands:4,maxWrites:4,
     previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,outstandingPriorReservationsAccepted:true,...identity};
@@ -293,7 +293,7 @@ describe('operator writes and protected read proof composition',()=>{
 
 describe('merged correction PR production handoff',()=>{
   const bridge=createRequire(import.meta.url)('../../../.github/scripts/operator-proof-bridge.cjs');
-  function setup(){const f=fixture();const c=createOperatorChallenge('production',{releasePolicy:'norton-aquinas.v1',applicationOnly:false,sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)},'d'.repeat(64),{...f.env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/main'},start,{...f.c.admission,role:'production'},authorization('production'));
+  function setup(){const f=fixture();const c=createOperatorChallenge('production',{releasePolicy:'norton-aquinas.v1',applicationOnly:false,sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40)},'d'.repeat(64),{...f.env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/main'},start,{...f.c.admission,role:'production',liveControlReserve:500000},authorization('production'));
     const main={object:{sha:c.sourceCommit}},run={id:456,head_sha:c.sourceCommit,created_at:new Date(start+130000).toISOString(),actor:{id:40179660},triggering_actor:{id:40179660},run_attempt:1,path:'.github/workflows/pr.yml',event:'workflow_dispatch',head_branch:'main'};
     const artifact={id:789,name:bridge.artifactName(c),expired:false,expires_at:new Date(start+86400000).toISOString(),workflow_run:{head_sha:c.sourceCommit,id:456},digest:'sha256:'+'f'.repeat(64)};
     const bytes=archiveAuthorization(c.authorization),native=nativeAuthorization(c.authorization);
@@ -351,7 +351,7 @@ describe('explicit successor operation authorization',()=>{
       expect(outputs).toHaveBeenCalledWith('artifact_name','operator-authorization-123-attempt-1');
       f.state.submitted=true;await expect(authority.findAuthorization({github:f.github,expected:f.expected,now:f.now})).resolves.toEqual(f.p);
       const environment={...fixture().env,GITHUB_EVENT_NAME:role==='preview'?'pull_request':'workflow_dispatch',GITHUB_REF:role==='preview'?'refs/pull/172/merge':'refs/heads/main'};
-      const c=createOperatorChallenge(role as 'preview'|'production',{releasePolicy:'norton-aquinas.v1',applicationOnly:false,sourceCommit:f.a.sourceCommit,sourceTree:f.a.sourceTree},f.a.sourcePlanSha256,environment,start,{...fixture().c.admission,role:role as 'preview'|'production'},f.p);
+      const c=createOperatorChallenge(role as 'preview'|'production',{releasePolicy:'norton-aquinas.v1',applicationOnly:false,sourceCommit:f.a.sourceCommit,sourceTree:f.a.sourceTree},f.a.sourcePlanSha256,environment,start,{...fixture().c.admission,role:role as 'preview'|'production',liveControlReserve:role==='production'?500000:100000},f.p);
       expect(c.authorization.authorization.authorizationId).toBe(f.a.authorizationId);
     }finally{rmSync(directory,{recursive:true,force:true});}
   });
