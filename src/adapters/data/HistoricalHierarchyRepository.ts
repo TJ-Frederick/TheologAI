@@ -1,4 +1,4 @@
-/** Local SQLite access for dormant generic edition-hierarchy authority records. */
+/** Local SQLite access for edition-hierarchy authority records. */
 
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../shared/Database.js';
@@ -45,9 +45,13 @@ function parseObject(value: string, label: string): Record<string, unknown> {
 }
 
 function profile(row: Record<string, unknown>): HistoricalHierarchyProfile {
+  const availability = String(row.availability);
+  if (availability !== 'local_only_inactive' && availability !== 'local_only_active') {
+    throw new Error('Historical hierarchy availability is invalid');
+  }
   return {
     hierarchyId: String(row.hierarchyId), packId: String(row.packId), workId: String(row.workId), editionId: String(row.editionId),
-    availability: String(row.availability), hierarchySchemaVersion: String(row.hierarchySchemaVersion),
+    availability, hierarchySchemaVersion: String(row.hierarchySchemaVersion),
     levelSpec: parseObject(String(row.levelSpecJson), 'hierarchy level specification'),
     sourceManifestSha256: String(row.sourceManifestSha256), aggregateSha256: String(row.aggregateSha256),
     orderedQuestionKeysSha256: String(row.orderedQuestionKeysSha256), orderedArticleKeysSha256: String(row.orderedArticleKeysSha256),
@@ -66,7 +70,7 @@ function publication(row: Record<string, unknown>): HistoricalHierarchyPublicati
   const activationState = String(row.activationState);
   if (deliveryKind !== 'hierarchy_nodes_v1'
     || cursorContract !== 'historical-hierarchy-browse-cursor-v1'
-    || activationState !== 'dormant') throw new Error('Historical hierarchy publication contract is invalid');
+    || (activationState !== 'dormant' && activationState !== 'active')) throw new Error('Historical hierarchy publication contract is invalid');
   return {
     publicationId: String(row.publicationId), hierarchyId: String(row.hierarchyId), publicSlug: String(row.publicSlug),
     title: String(row.title), metadata: parseObject(String(row.metadataJson), 'hierarchy publication metadata') as unknown as HistoricalHierarchyPublication['metadata'],
@@ -144,7 +148,7 @@ function maxDepth(profile: HistoricalHierarchyProfile): number {
   return value;
 }
 
-/** Not wired into the server composition root; activation remains separately reviewed. */
+/** SQLite implementation for active and dormant hierarchy authority records. */
 export class HistoricalHierarchyRepository implements IHistoricalHierarchyRepository {
   constructor(private readonly db: Database.Database = getDatabase()) {}
 
@@ -164,6 +168,12 @@ export class HistoricalHierarchyRepository implements IHistoricalHierarchyReposi
     const row = this.db.prepare(`SELECT ${PUBLICATION_COLUMNS} FROM historical_hierarchy_publications WHERE public_slug = ?`)
       .get(publicSlug) as Record<string, unknown> | undefined;
     return row === undefined ? undefined : publication(row);
+  }
+
+  listActiveHierarchyPublications(): HistoricalHierarchyPublication[] {
+    return this.db.prepare(`SELECT ${PUBLICATION_COLUMNS} FROM historical_hierarchy_publications
+      WHERE activation_state = 'active' ORDER BY public_slug`).all()
+      .map(row => publication(row as Record<string, unknown>));
   }
 
   listHierarchyArtifacts(hierarchyId: string): HistoricalHierarchyArtifact[] {

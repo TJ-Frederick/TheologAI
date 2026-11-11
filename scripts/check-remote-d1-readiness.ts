@@ -33,9 +33,10 @@ import {
   type HistoricalTransform9AuthorityAuditResult,
 } from './historical-transform9-authority-audit.js';
 import {
-  normalAquinasHierarchyExclusionChecks,
+  AQUINAS_HIERARCHY_EXPECTED,
 } from './historical-hierarchy.js';
 import { REVIEWED_SOURCE_PACK_RELEASE } from './historical-source-packs.js';
+import { auditAquinasAuthority, buildAquinasAuthorityQueryPlan, type AquinasAuthorityAuditResult } from './aquinas-authority-audit.js';
 import { TRANSFORM12_STORAGE_CONTRACT } from './transform12-candidate-c-storage.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -168,9 +169,15 @@ function sqlLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-/** The normal release contract fails closed if dormant Transform-10 rows leak in. */
-function normalTransform10ExclusionReadinessChecks(): D1ReadinessCheck[] {
-  return normalAquinasHierarchyExclusionChecks().map(check => ({ ...check }));
+/** Active hierarchy structure is checked here; bounded source replay verifies every stored field. */
+function activeAquinasReadinessChecks(): D1ReadinessCheck[] {
+  const id = sqlLiteral(AQUINAS_HIERARCHY_EXPECTED.hierarchyId);
+  return [
+    { id: 'historical.aquinas.active_publication', predicate: `(SELECT COUNT(*) FROM historical_hierarchy_publications p JOIN historical_edition_hierarchies h ON h.hierarchy_id = p.hierarchy_id WHERE h.hierarchy_id = ${id} AND h.availability = 'local_only_active' AND p.activation_state = 'active' AND h.body_count = 3184 AND h.node_count = 3185) = 1` },
+    { id: 'historical.aquinas.no_legacy_projection', predicate: `(SELECT COUNT(*) FROM documents WHERE id = ${sqlLiteral(AQUINAS_HIERARCHY_EXPECTED.workId)} OR id = 'summa-theologiae') = 0` },
+    { id: 'historical.aquinas.body_lengths', predicate: `(SELECT COUNT(*) FROM historical_edition_hierarchy_bodies WHERE hierarchy_id = ${id} AND length(CAST(content AS BLOB)) != content_utf8_bytes) = 0` },
+    { id: 'historical.aquinas.fts_parity', predicate: `(SELECT COUNT(*) FROM historical_edition_hierarchy_bodies b LEFT JOIN historical_edition_hierarchy_bodies_fts f ON f.rowid = b.rowid WHERE f.rowid IS NULL OR f.hierarchy_id IS NOT b.hierarchy_id OR f.body_key IS NOT b.body_key OR f.heading IS NOT b.heading OR f.content IS NOT b.content) = 0` },
+  ];
 }
 
 /**
@@ -426,9 +433,10 @@ function buildD1ReadinessQueryContract(
       id: 'historical.transform12.actual_fts_match_sentinels',
       predicate: `(SELECT COUNT(*) FROM strongs_fts WHERE strongs_fts MATCH '"love"' AND strongs_number = 'G25') = 1
         AND (SELECT COUNT(*) FROM sections_fts WHERE sections_fts MATCH '"almighty"' AND rowid = 1962) = 1
-        AND (SELECT COUNT(*) FROM historical_edition_sections_fts WHERE historical_edition_sections_fts MATCH '"grace"') = 391
-        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies) = 0
-        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) = 0`,
+        AND (SELECT COUNT(*) FROM historical_edition_sections_fts WHERE historical_edition_sections_fts MATCH '"grace"') = 703
+        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies) = 3184
+        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts) = 3184
+        AND (SELECT COUNT(*) FROM historical_edition_hierarchy_bodies_fts WHERE historical_edition_hierarchy_bodies_fts MATCH '"God"') > 0`,
     },
     {
       id: 'historical.transform8.collision_groups',
@@ -548,7 +556,7 @@ function buildD1ReadinessQueryContract(
     ...identityChecks,
     ...historicalCatalogChecks,
     ...historicalOutputChecks,
-    ...normalTransform10ExclusionReadinessChecks(),
+    ...activeAquinasReadinessChecks(),
     ...columnChecks,
     ...countChecks,
     { id: 'schema.required_indexes', predicate: indexCheck },
@@ -689,6 +697,7 @@ export function createRemoteD1ReadinessReceipt(input: {
   env?: string;
   transform8: HistoricalTransform8AuthorityAuditResult;
   transform9: HistoricalTransform9AuthorityAuditResult;
+  aquinas: AquinasAuthorityAuditResult;
 }): RemoteD1ReadinessReceipt {
   return {
     schemaVersion: 'theologai-remote-d1-readiness-receipt.v1',
@@ -700,7 +709,7 @@ export function createRemoteD1ReadinessReceipt(input: {
       checkCount: buildD1ReadinessQueryContract(MANIFEST.expectedCounts).checks.length,
     }),
     authority: receiptComponent({
-      kind: 'historical-transform8-9-authority.v1',
+      kind: 'historical-source-authority.v2',
       transform8: {
         attestationSha256: input.transform8.attestationSha256,
         profilesSha256: input.transform8.profilesSha256,
@@ -709,6 +718,7 @@ export function createRemoteD1ReadinessReceipt(input: {
         bodyFtsSampleSha256: input.transform8.bodyFtsSampleSha256,
       },
       transform9: input.transform9.hashes,
+      aquinas: input.aquinas,
     }),
   };
 }
@@ -746,8 +756,13 @@ export function runRemoteD1ReadinessCheck(
       );
     });
     process.stderr.write(`Transform-9 D1 authority audit passed (${transform9Audit.pages.packs}/${transform9Audit.pages.works}/${transform9Audit.pages.editions}/${transform9Audit.pages.artifacts}/${transform9Audit.pages.documents}/${transform9Audit.pages.profiles}/${transform9Audit.pages.sections}/${transform9Audit.pages.projections} pages).\n`);
+    const aquinasPlan = buildAquinasAuthorityQueryPlan(ROOT);
+    const aquinas = auditAquinasAuthority(sql => {
+      const result = executeSql(sql, true);
+      return parseHistoricalTransform8D1Page(typeof result === 'string' ? result : Buffer.isBuffer(result) ? result.toString('utf8') : String(result));
+    }, aquinasPlan);
     return createRemoteD1ReadinessReceipt({
-      database: options.database, env: options.env, transform8: audit, transform9: transform9Audit,
+      database: options.database, env: options.env, transform8: audit, transform9: transform9Audit, aquinas,
     });
   } catch (primaryError) {
     process.stderr.write('Primary D1 readiness gate failed; requesting failed-check diagnostics.\n');

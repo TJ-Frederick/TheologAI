@@ -1,0 +1,108 @@
+import {it,expect} from 'vitest';
+import {captureUnboundCorpusControl} from '../../../scripts/corpus-release-control.js';
+import {TARGETS as targets,POLICY} from '../../../scripts/norton-aquinas-release-policy.mjs';
+import {corpusControlFixture,corpusPagesControlFixture} from '../../helpers/corpusControlFixture.js';
+const TARGETS={preview:{id:targets.preview.databaseId},rollback:{id:POLICY.rollback.databaseId}};
+const NOW=Date.parse('2026-10-28T12:00:00Z');
+it('covers every post-database Pages deployment with an unambiguous D1-free version witness', async () => {
+    const fixture = corpusPagesControlFixture();
+    const result = await captureUnboundCorpusControl({ role: 'preview', api: fixture.api, now: () => NOW });
+    const histories = result.inventory.pages[0]!.functionAuthority!.histories;
+    expect(histories).toHaveLength(2);
+    for (const history of histories) {
+        expect(history.coverage).toHaveLength(2);
+        expect(new Set(history.coverage.map(item => item.versionId)).size).toBe(2);
+    }
+    expect(fixture.requests.filter(path => path.includes('/corpus-pages-') && path.includes('/versions/'))).toHaveLength(8);
+});
+it.each(['old-version-d1', 'settings-d1', 'missing-interval-witness', 'overlap', 'unfinished', 'history-gap', 'second-scan-drift'])('refuses Pages authority defect %s before SQL', async (defect) => {
+    const fixture = corpusPagesControlFixture((value, path, scan) => {
+        if (defect === 'old-version-d1' && /corpus-pages-production\/versions\/33333330/.test(path))
+            value.result.resources.bindings.push({ type: 'd1', database_id: TARGETS.preview.id });
+        if (defect === 'settings-d1' && path.includes('corpus-pages-') && path.endsWith('/settings'))
+            value.result.bindings.push({ type: 'd1', database_id: TARGETS.rollback.id });
+        if (defect === 'history-gap' && path.includes('corpus-pages-') && path.includes('/versions?'))
+            value.result.items[0].number = 3;
+        if (path.startsWith('/pages/projects/corpus-site/deployments?')) {
+            if (defect === 'missing-interval-witness') {
+                value.result[0].stages[0].started_on = value.result[0].latest_stage.started_on = '2026-10-25T12:00:01Z';
+            }
+            if (defect === 'overlap') {
+                value.result[1].stages[0].started_on = value.result[1].latest_stage.started_on = '2026-10-25T12:00:00Z';
+            }
+            if (defect === 'unfinished')
+                value.result[0].latest_stage.status = 'active';
+            if (defect === 'second-scan-drift' && scan === 2)
+                value.result[0].modified_on = '2026-10-25T12:03:00Z';
+        }
+    });
+    await expect(captureUnboundCorpusControl({ role: 'preview', api: fixture.api, now: () => NOW })).rejects.toThrow('Corpus control capture refused:');
+});
+
+it('refuses any Worker binding to the candidate',async()=>{const f=corpusControlFixture();f.setBound(true);await expect(captureUnboundCorpusControl({role:'preview',api:f.api,now:()=>NOW})).rejects.toThrow('candidate_database_is_bound');});
+it.each(['failed-workers','missing-pages-pagination','short-worker-page','duplicate-worker','unknown-target'])('refuses incomplete inventory%s',async fault=>{const f=corpusControlFixture();const api={...f.api,get:async(path:string)=>{const r=await f.api.get(path),v=await r.json() as any;if(fault==='failed-workers'&&path==='/workers/scripts')v.success=false;if(fault==='missing-pages-pagination'&&path.startsWith('/pages/projects?'))delete v.result_info;if(fault==='short-worker-page'&&path==='/workers/scripts')v.result_info={page:1,per_page:100,count:1,total_count:101,total_pages:2};if(fault==='duplicate-worker'&&path==='/workers/scripts')v.result.push({...v.result[0]});if(fault==='unknown-target'&&path.startsWith('/d1/database/'))v.result.uuid=targets.production.databaseId;return Response.json(v);}};await expect(captureUnboundCorpusControl({role:'preview',api,now:()=>NOW})).rejects.toThrow();});
+it('rejects a capture exceeding its bounded freshness interval',async()=>{let n=0;const f=corpusControlFixture();await expect(captureUnboundCorpusControl({role:'preview',api:f.api,now:()=>NOW+(n++>4?121000:0)})).rejects.toThrow();});
+
+import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {vi} from 'vitest';
+import {CorpusProofTransport} from '../../../scripts/corpus-proof-transport.js';
+import { LEDGER_SQL } from '../../../scripts/corpus-source-proof.js';
+import {corpusTransportFixture} from '../../helpers/corpusTransportFixture.js';
+it.each(['pages403','wrong-assignment','failed-pages-page'])('stops the actual protected transport before SQL for %s',async fault=>{
+ const dir=mkdtempSync(join(tmpdir(),'corpus-inventory-refusal-')),file=join(dir,'events.jsonl');let time=NOW,calls=0,sql=0,verify=0;
+ const clock=vi.spyOn(Date,'now').mockImplementation(()=>time);
+ try{
+  const f=corpusTransportFixture({role:'preview',drift:fault==='wrong-assignment',advance:()=>{time+=1000;},query:()=>{sql++;throw Error('SQL forbidden');}});
+  const fetchImpl=(async(input:any,init:any)=>{
+   calls++;const url=String(input);
+   if(url.includes('/tokens/verify')){verify++;time+=1000;return new Response('',{status:403});}
+   if(url.includes('/pages/projects?')){time+=1000;if(fault==='pages403')return Response.json({success:false,errors:[{code:10000,message:'private-provider-message'}]},{status:403});if(fault==='failed-pages-page')return Response.json({success:false,errors:[{code:10000}]});}
+   return f.fetch(input,init);
+  }) as typeof fetch;
+  const transport=new CorpusProofTransport({policy:'norton-aquinas.v1',role:'preview',token:'private-token-sentinel',readBudget:3560000,eventFile:file,fetch:fetchImpl,historicalExceptions:false});
+  await expect(transport.start()).rejects.toThrow();expect(sql).toBe(0);expect(calls).toBeLessThanOrEqual(256);expect(verify).toBeLessThanOrEqual(2);
+  expect(readFileSync(file,'utf8')).not.toMatch(/private-token-sentinel|private-provider-message/);
+ }finally{clock.mockRestore();rmSync(dir,{recursive:true,force:true});}
+});
+
+it.each([['norton-aquinas.v1', 500, 3_560_000], ['application-only', 300, 3_510_997]] as const)(
+  'spaces immediate direct SQL responses for %s without changing the existing application pace',
+  async (policy, minimum, readBudget) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-04T12:00:00Z'));
+    const directory = mkdtempSync(join(tmpdir(), 'corpus-sql-spacing-'));
+    const starts: number[] = [];
+    try {
+      const fixture = corpusTransportFixture({ role: 'preview' });
+      const immediateFetch = (async (input: any, init: any = {}) => {
+        if (new URL(String(input)).pathname.endsWith('/query')) {
+          starts.push(Date.now());
+          return Response.json({ success: true, errors: [], result: [{ success: true, results: [], meta: {
+            rows_read: 1, rows_written: 0, changes: 0, total_attempts: 1, served_by_primary: true,
+          } }] });
+        }
+        return fixture.fetch(input, init);
+      }) as typeof fetch;
+      const transport = new CorpusProofTransport({
+        policy, role: 'preview', token: 'synthetic-token', readBudget,
+        eventFile: join(directory, 'events.jsonl'), fetch: immediateFetch, historicalExceptions: false,
+      });
+      const admission = transport.start();
+      await vi.runAllTimersAsync();
+      await admission;
+      for (const phase of ['before', 'after']) {
+        const result = transport.execute({ kind: 'select', label: 'ledger-' + phase, sql: LEDGER_SQL, readCeiling: 128, writeCeiling: 0 });
+        await vi.runAllTimersAsync();
+        await result;
+      }
+      expect(starts).toHaveLength(2);
+      expect(starts[1]! - starts[0]!).toBe(minimum);
+      expect(transport.metering).toMatchObject({ requests: 2, rowsRead: 2, rowsWritten: 0, integrityCommands: 0, retries: 0 });
+    } finally {
+      vi.useRealTimers();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);

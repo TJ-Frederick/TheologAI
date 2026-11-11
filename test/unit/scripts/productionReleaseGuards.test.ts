@@ -6,6 +6,14 @@ import { PRODUCTION_PROFILE as languageProfile } from '../../../scripts/audit-or
 
 const root = new URL('../../../', import.meta.url);
 
+
+const validatedPolicy="(steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1')";
+// The truth table in workflowTopology tests the common guard on the actual YAML.
+// Keep these assertions focused on the original required gates inside it.
+const originalGates=(value:string)=>value.split('\n').map(line=>{
+ const prefix='        if: ${{ '+validatedPolicy+' && (';
+ return line.startsWith(prefix)&&line.endsWith(') }}')?'        if: ${{ '+line.slice(prefix.length,-4)+' }}':line;
+}).join('\n');
 describe('production release guards', () => {
   it('keeps both post-deploy audit profiles fixed to the production custom domain and 3.6.0', () => {
     expect(languageProfile).toEqual({
@@ -30,7 +38,7 @@ describe('production release guards', () => {
   });
 
   it('requires exact checked-in candidate readiness and Worker/D1 proof before fixed audits', async () => {
-    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const workflow = originalGates(await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'));
     const mapping = workflow.indexOf('Capture checked-out candidate production D1 mapping (read-only)');
     const readiness = workflow.indexOf('Verify fresh corpus (up to 3.8M reads and four integrity commands)');
     const predecessor = workflow.indexOf('Capture production predecessor reconciliation anchor (read-only)');
@@ -38,9 +46,9 @@ describe('production release guards', () => {
     const deploy = workflow.indexOf('Deploy to Cloudflare Workers');
     const identity = workflow.indexOf('Verify exact active production Worker version (read-only)');
     const candidateCutover = workflow.indexOf('Require deployed candidate production D1 binding (read-only)');
-    const languageAudit = workflow.indexOf('Audit original-language v2 contract on production');
-    const historicalAudit = workflow.indexOf('Audit Transform-9 historical core contract on production');
-    const spineAudit = workflow.indexOf('Audit Transform-11 historical spine contract on production');
+    const languageAudit = workflow.indexOf('Audit the corpus release in both protocol eras');
+    const historicalAudit = workflow.indexOf('Audit the corpus release in both protocol eras');
+    const spineAudit = workflow.indexOf('Audit the corpus release in both protocol eras');
     const stable = workflow.indexOf('Verify production Worker remained active through audit (read-only)');
     const finalObservation = workflow.indexOf('Capture final production routing/binding observation (read-only)');
     const finalArtifact = workflow.indexOf('Upload final production routing/binding observation');
@@ -53,33 +61,35 @@ describe('production release guards', () => {
     expect(identity).toBeGreaterThan(deploy);
     expect(candidateCutover).toBeGreaterThan(identity);
     expect(languageAudit).toBeGreaterThan(candidateCutover);
-    expect(historicalAudit).toBeGreaterThan(languageAudit);
-    expect(spineAudit).toBeGreaterThan(historicalAudit);
+    expect(historicalAudit).toBe(languageAudit);
+    expect(spineAudit).toBe(historicalAudit);
     expect(stable).toBeGreaterThan(spineAudit);
     expect(finalObservation).toBeGreaterThan(stable);
     expect(finalArtifact).toBeGreaterThan(finalObservation);
     expect(artifact).toBeGreaterThan(finalArtifact);
     expect(workflow).toContain('scripts/production-release-reconciliation.ts candidate-d1-name');
-    expect(workflow).toContain('npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name"');
+    expect(workflow).not.toContain('scripts/check-remote-d1-readiness.ts');
+    expect(workflow).not.toContain('legacy-corpus-proof');
+    expect(workflow).toContain('uses: ./.github/actions/operator-corpus-proof');
     expect(workflow).toContain('scripts/verify-production-worker-deployment.ts verify-deploy');
     expect(workflow).toContain('scripts/verify-production-worker-deployment.ts verify-audit-stability');
-    expect(workflow).toContain('npx --no-install tsx scripts/audit-original-language-v2-production.ts');
-    expect(workflow).toContain('npx --no-install tsx scripts/audit-historical-core-production.ts');
-    expect(workflow).toContain('npx --no-install tsx scripts/audit-historical-spine-production.ts');
+    expect(workflow).toContain('npx --no-install tsx scripts/norton-aquinas-live.ts production');
+    expect(workflow).toContain('npx --no-install tsx scripts/norton-aquinas-live.ts production');
+    expect(workflow).toContain('npx --no-install tsx scripts/norton-aquinas-live.ts production');
     expect(workflow).not.toContain('d1 create');
     expect(workflow).not.toContain('d1 delete');
   });
 
   it('verifies the protected receipt against the preview-suffixed server identity', async () => {
-    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const workflow = originalGates(await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'));
     expect((workflow.match(/process\.stdout\.write\(packageJson\.version \+ '-preview'\)/g) ?? [])).toHaveLength(2);
     expect((workflow.match(/--expected-server-version "\$preview_server_version"/g) ?? [])).toHaveLength(2);
     expect(workflow).not.toContain('process.stdout.write(packageJson.version)');
     expect(workflow).not.toContain('--expected-server-version "$server_version"');
   });
 
-  it('revalidates the exact gate artifact before dependencies, secrets, Cloudflare, or D1 and retains seven release artifacts', async () => {
-    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+  it('revalidates the exact gate artifact before dependencies, secrets, Cloudflare, or D1 and retains the seven release artifacts plus scoped failure evidence', async () => {
+    const workflow = originalGates(await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'));
     const deployStart = workflow.indexOf('  deploy:');
     const resolveContext = workflow.indexOf('Resolve production release comparison context', deployStart);
     const downloadPlan = workflow.indexOf('Download verified production deployment plan gate', deployStart);
@@ -105,11 +115,17 @@ describe('production release guards', () => {
     expect(revalidationToInstall).not.toMatch(/secrets\.|wrangler|cloudflare|d1\b/i);
 
     const deployJob = workflow.slice(deployStart);
-    expect((deployJob.match(/uses: actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7\.0\.1/g) ?? [])).toHaveLength(7);
-    expect((deployJob.match(/retention-days: 30/g) ?? [])).toHaveLength(7);
+    expect((deployJob.match(/uses: actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7\.0\.1/g) ?? [])).toHaveLength(8);
+    expect((deployJob.match(/retention-days: 30/g) ?? [])).toHaveLength(8);
     const releaseUploads = [...deployJob.matchAll(/      - name: Upload [^\n]+[\s\S]*?(?=\n      - name:|$)/g)].map(match => match[0]);
     expect(releaseUploads).toHaveLength(7);
-    for (const upload of releaseUploads) {
+    const failureUpload = deployJob.split('      - name: Retain sanitized production corpus failure evidence')[1]!.split('      - name:')[0]!;
+    expect(failureUpload).toContain("steps.production-corpus-live.outcome == 'failure'");
+    expect(failureUpload).toContain("steps.production-corpus-live.outcome == 'cancelled'");
+    expect(failureUpload.match(/\$\{\{ runner\.temp \}\}\/[^\s]+/g)).toEqual([
+      '${{ runner.temp }}/corpus-live.json', '${{ runner.temp }}/corpus-live.json.events.jsonl',
+    ]);
+    for (const upload of [...releaseUploads, failureUpload]) {
       expect(upload).not.toContain('production-deployment-plan.json');
       expect(upload).not.toContain('production-deployment-plan.sha256');
       expect(upload).not.toContain('retention-days: 1\n');
@@ -117,7 +133,7 @@ describe('production release guards', () => {
   });
 
   it('retains a non-strict final routing observation after every attempted deploy, while requiring it for a successful release', async () => {
-    const workflow = await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8');
+    const workflow = originalGates(await readFile(new URL('.github/workflows/deploy.yml', root), 'utf8'));
     const historicalAuditScript = await readFile(new URL('../../../scripts/audit-historical-core-preview.ts', import.meta.url), 'utf8');
     const finalObservation = workflow.indexOf('Capture final production routing/binding observation (read-only)');
     const finalArtifact = workflow.indexOf('Upload final production routing/binding observation');
@@ -141,7 +157,7 @@ describe('production release guards', () => {
     // A failed deploy never becomes green because its action failed. A deploy
     // that otherwise passed its strict gates is also terminal if final
     // routing/binding evidence could not be captured or hashed.
-    expect(workflow).toContain("id: production-audit-evidence\n        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' && steps.production-final-post-audit-identity.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-audit-evidence\n        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && (steps.production-corpus-live.outcome == 'success' || (steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success')) && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' && steps.production-final-post-audit-identity.outcome == 'success' }}");
     expect(workflow).toContain('Capture preview control before production deployment (read-only)');
     expect(workflow).toContain('Verify preview control remained unchanged after production deployment (read-only)');
     expect(workflow).toContain('Verify preview control remained unchanged after production audits (read-only)');
@@ -160,9 +176,7 @@ describe('production release guards', () => {
     expect(workflow).toContain("id: production-worker-pre-audit-identity\n        if: ${{ steps.production-worker-deploy.outcome == 'success' }}");
     expect(workflow).toContain("id: production-worker-candidate-cutover\n        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-pre-audit-identity.outcome == 'success' && steps.preview-control-after-production-deploy.outcome == 'success' }}");
     expect(workflow).toContain("id: production-primary-source-edge-stabilization-gate\n        if: ${{ always() && steps.production-worker-candidate-cutover.outcome == 'success' }}");
-    expect(workflow).toContain("id: production-original-language-v2-audit\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' }}");
-    expect(workflow).toContain("id: production-historical-core-audit\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' }}");
-    expect(workflow).toContain("id: production-historical-spine-audit\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}");
-    expect(workflow).toContain("id: production-worker-audit-identity\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-corpus-live\n        if: ${{ needs.build-worker.outputs.release_policy == 'norton-aquinas.v1' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' }}");
+    expect(workflow).toContain("id: production-worker-audit-identity\n        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && (steps.production-corpus-live.outcome == 'success' || (steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success')) }}");
   });
 });

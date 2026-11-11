@@ -119,6 +119,7 @@ runs:
         npm run audit:release-corpus-capacity -- --output-database "$RUNNER_TEMP/theologai.db"
         test -f "$THEOLOGAI_TEST_DATABASE_PATH"
         npm run test:d1-readiness-generated-db
+        npx --no-install vitest run test/unit/services/historical/snippetLowercaseDifferential.test.ts
         npm run d1:seed:export -- --database "$RUNNER_TEMP/theologai.db" --clean
         npm run d1:seed:verify
         cp scripts/d1-seed/seed-manifest.json "$RUNNER_TEMP/d1-seed-manifest.json"

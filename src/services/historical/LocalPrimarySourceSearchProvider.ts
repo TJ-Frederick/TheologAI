@@ -191,11 +191,11 @@ export function boundedMatchContext(value: string, query: string, matchMode: 'al
 
 function findCaseInsensitive(haystack: string[], needle: string[]): { start: number; length: number } | undefined {
   if (needle.length === 0) return undefined;
-  const foldedNeedle = needle.map(character => character.toLocaleLowerCase('en-US'));
+  const foldedNeedle = needle.map(character => character.toLowerCase());
   for (let start = 0; start <= haystack.length - needle.length; start++) {
     let matches = true;
     for (let offset = 0; offset < needle.length; offset++) {
-      if (haystack[start + offset].toLocaleLowerCase('en-US') !== foldedNeedle[offset]) {
+      if (haystack[start + offset].toLowerCase() !== foldedNeedle[offset]) {
         matches = false;
         break;
       }

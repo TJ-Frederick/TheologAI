@@ -111,7 +111,7 @@ describe('custom-domain infrastructure contract', () => {
     expect(detector).toContain("if [ '${{ steps.production-release-context.outputs.custom_domain_required }}' = 'true' ]; then");
     expect(detector).toContain("echo 'required=true' >> \"$GITHUB_OUTPUT\"");
     const prerequisite = productionWorkflow.slice(prerequisiteStart, deployStart);
-    expect(prerequisite).toContain("if: steps.production-custom-domain-change.outputs.required == 'true'");
+    expect(prerequisite).toContain("if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-custom-domain-change.outputs.required == 'true') }}");
     expect(prerequisite).toContain('https://theologai.xyz/');
     expect(prerequisite).toContain('https://preview-mcp.theologai.xyz/mcp');
     expect(prerequisite).toContain("%{url_effective}");

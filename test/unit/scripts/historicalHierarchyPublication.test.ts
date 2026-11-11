@@ -57,7 +57,7 @@ describe('Transform 10 dormant hierarchy publication projection', () => {
           canonicalUri: 'theologai://documents/summa-theologiae', deliveryKind: 'hierarchy_nodes_v1', activationState: 'dormant',
           coverageJson: JSON.stringify(publication.coverage),
         });
-      expect(publication.coverage.statement).toContain('Prima (q1–119), Prima Secundae (q1–114), Secunda Secundae (q1–189), and Tertia through q90');
+      expect(publication.coverage.statement).toContain('Prima (q1–119), Prima Secundae (q1–114), Secunda Secundae (q1–189), and Tertia (q1–90, the end of the authored Tertia)');
       expect(publication.coverage.descriptors).toContainEqual({
         relationship: 'excluded', label: 'Traditional Supplement', address: { scheme: 'part', start: 'Supplement', end: null },
       });

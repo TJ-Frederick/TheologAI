@@ -1,0 +1,78 @@
+{
+  "cutover/preview-worker-candidate-cutover-observation.json": {
+    "bytes": 1142,
+    "sha256": "0253060587ca9a7e6940127f518dabea0ae39ac59bf9ee48864c35544abc162f"
+  },
+  "cutover/preview-worker-candidate-cutover.json": {
+    "bytes": 1142,
+    "sha256": "0253060587ca9a7e6940127f518dabea0ae39ac59bf9ee48864c35544abc162f"
+  },
+  "cutover/preview-worker-post-mutation-reconciliation.json": {
+    "bytes": 1142,
+    "sha256": "0253060587ca9a7e6940127f518dabea0ae39ac59bf9ee48864c35544abc162f"
+  },
+  "recovery-original-equivalence.json": {
+    "bytes": 5867,
+    "sha256": "4ea5a177f964372f09ead544e171d28ffd31f94a07e7791326f7507bcc2de7c0"
+  },
+  "proof/operator-authorization.json": {
+    "bytes": 1665,
+    "sha256": "36bf8d6441ccbc2ab49fbf8596c70aff7d04aa4d47bef24d0452bf0356825a7d"
+  },
+  "proof/operator-corpus-challenge.json": {
+    "bytes": 3775,
+    "sha256": "2c1eabf506b9dd8439d3d94f7d75b058c55dec274bca34420532b12e02480fd0"
+  },
+  "proof/operator-corpus-challenge.json.admission.jsonl": {
+    "bytes": 55913,
+    "sha256": "9c4f7e92bdb4b3c00bca0dd343e5cbbc591c81c20f9f01afb1f3b77a47610770"
+  },
+  "proof/operator-proof/operator-proof-envelope.json": {
+    "bytes": 6697,
+    "sha256": "60b5ce19439351053207a9b81dafe84919f4e40a2a65addd92d4940bbd1154f7"
+  },
+  "proof/operator-proof-envelope.json": {
+    "bytes": 13368,
+    "sha256": "74842d254f0c6312f02d3b9908d3dcf8a5b24752f2eb6a93e4490856cb78f724"
+  },
+  "proof/preview-operator-readiness.json": {
+    "bytes": 8451,
+    "sha256": "3d3c1efdc674bbeffd4606fee256b3d5775420261b84600aeb549e245894a726"
+  },
+  "proof/preview-operator-readiness.json.budget.json": {
+    "bytes": 543,
+    "sha256": "4833363be170a50f86cc64cf09c9047ee83232030455d9c5ae9c22d717dc6d1f"
+  },
+  "proof/preview-operator-readiness.json.events.jsonl": {
+    "bytes": 2464046,
+    "sha256": "87ccbea29f811be9c6c21a1601332daed583fe8ff56eb39481c2f7d282c1b4e4"
+  },
+  "retained-equivalence.json": {
+    "bytes": 4980,
+    "sha256": "58003f59c8a84eeb0fba1130de201a70cd0ef172bbc02ce2bdae3bb4fe378729"
+  },
+  "retained-stop.events.jsonl": {
+    "bytes": 3245,
+    "sha256": "65bb598fdabaf74766370f2458000f28063550de75fc4a661fa55c0616fe9b63"
+  },
+  "source/plan.json": {
+    "bytes": 80878,
+    "sha256": "2d8221f3af48f5865e4fd737253f72a831fa78f289ac3ba504a6043d346607c2"
+  },
+  "worker/README.md": {
+    "bytes": 118,
+    "sha256": "e5074ad9018d44761b36beebb5f3f2fa6136a94fe15cbd14f06350b40277fc2f"
+  },
+  "worker/release-manifest.json": {
+    "bytes": 560,
+    "sha256": "4911c593dc6383a6026250489eac9d094cb6c79e2506aeeb3e917ad22d59c1ff"
+  },
+  "worker/worker.js.map": {
+    "bytes": 5569590,
+    "sha256": "9c31b72161e12dea9b048dc9ea545bb32c45103a896777895d53d5a5a484c29d"
+  },
+  "recovery-native-capture.json": {
+    "bytes": 1453,
+    "sha256": "0393b5e1a347c0df765707b0865ac68b7870386b2f2dedd86293fab0516ce2f1"
+  }
+}

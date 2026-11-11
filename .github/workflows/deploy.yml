@@ -223,6 +223,10 @@ jobs:
       artifact_name: ${{ steps.evidence.outputs.artifact_name }}
       run_id: ${{ steps.evidence.outputs.run_id }}
       source_commit: ${{ steps.evidence.outputs.source_commit }}
+      evidence_kind: ${{ steps.evidence.outputs.evidence_kind }}
+      native_binding_json: ${{ steps.evidence.outputs.native_binding_json }}
+      artifact_id: ${{ steps.evidence.outputs.artifact_id }}
+      inputs_artifact_id: ${{ steps.evidence.outputs.inputs_artifact_id }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -254,6 +258,23 @@ jobs:
               return;
             }
             const pull = merged[0];
+            let existingNortonAllowed = false;
+            if (pull.number === 176) {
+              const { pathToFileURL } = require('node:url');
+              const { selectReleaseProofPolicy } = await import(pathToFileURL(require('node:path').resolve('.github/scripts/release-proof-policy.mjs')).href);
+              existingNortonAllowed = selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1';
+            }
+            if (existingNortonAllowed) {
+              const binding = await require('./.github/scripts/runtime-preview-handoff.cjs').resolveRuntimePreviewHandoff({github,context});
+              core.setOutput('evidence_kind', binding.kind);
+              core.setOutput('native_binding_json', JSON.stringify(binding));
+              core.setOutput('artifact_name', binding.artifacts.result.name);
+              core.setOutput('artifact_id', String(binding.artifacts.result.id));
+              core.setOutput('inputs_artifact_id', String(binding.artifacts.inputs.id));
+              core.setOutput('run_id', String(binding.run.id));
+              core.setOutput('source_commit', binding.acceptedSource.commit);
+              return;
+            }
             const artifactName = `preview-release-audit-${pull.number}-${pull.head.sha}`;
             const { data } = await github.rest.actions.listArtifactsForRepo({
               owner: context.repo.owner,
@@ -287,11 +308,13 @@ jobs:
               return;
             }
             const { artifact, run } = selected;
+            core.setOutput('evidence_kind', 'legacy');
             core.setOutput('artifact_name', artifactName);
             core.setOutput('run_id', String(run.id));
             core.setOutput('source_commit', pull.head.sha);
 
       - name: Download exact protected preview evidence with digest validation
+        if: ${{ !contains(fromJSON('["norton-existing-preview","norton-runtime-preview"]'), steps.evidence.outputs.evidence_kind) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ steps.evidence.outputs.artifact_name }}
@@ -301,10 +324,55 @@ jobs:
           merge-multiple: false
           digest-mismatch: error
 
+      - name: Download Norton validation evidence by native ID
+        if: steps.evidence.outputs.evidence_kind == 'norton-existing-preview'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ steps.evidence.outputs.artifact_id }}
+          run-id: ${{ steps.evidence.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/protected-dual-era-preview/continuation
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Download Norton retained source chain by native ID
+        if: steps.evidence.outputs.evidence_kind == 'norton-existing-preview'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ steps.evidence.outputs.inputs_artifact_id }}
+          run-id: ${{ steps.evidence.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/protected-dual-era-preview/inputs
+          merge-multiple: true
+          digest-mismatch: error
+
+      - name: Download split native runtime preview archives
+        if: steps.evidence.outputs.evidence_kind == 'norton-runtime-preview'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          NATIVE_BINDING_JSON: ${{ steps.evidence.outputs.native_binding_json }}
+        with:
+          script: |
+            await require('./.github/scripts/runtime-preview-handoff.cjs').downloadRuntimePreviewArchives({github,binding:JSON.parse(process.env.NATIVE_BINDING_JSON),directory:process.env.RUNNER_TEMP+'/protected-runtime-preview'});
+
       - name: Verify source-bound dual-era preview release receipt
         env:
           SOURCE_COMMIT: ${{ steps.evidence.outputs.source_commit }}
+          EVIDENCE_KIND: ${{ steps.evidence.outputs.evidence_kind }}
+          NATIVE_BINDING_JSON: ${{ steps.evidence.outputs.native_binding_json }}
         run: |
+          if [ "$EVIDENCE_KIND" = 'norton-runtime-preview' ]; then
+            printf '%s\n' "$NATIVE_BINDING_JSON" > "$RUNNER_TEMP/runtime-native-binding.json"
+            git worktree add --detach "$RUNNER_TEMP/preview-candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
+            npx --no-install tsx .github/scripts/verify-runtime-preview-handoff.ts \
+              "$RUNNER_TEMP/runtime-native-binding.json" "$RUNNER_TEMP/protected-runtime-preview" \
+              "$RUNNER_TEMP/preview-candidate-cc14" > "$RUNNER_TEMP/runtime-preview-handoff.json"
+          elif [ "$EVIDENCE_KIND" = 'norton-existing-preview' ]; then
+            printf '%s\n' "$NATIVE_BINDING_JSON" > "$RUNNER_TEMP/norton-native-binding.json"
+            git worktree add --detach "$RUNNER_TEMP/preview-candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
+            npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify-existing \
+              --native-binding "$RUNNER_TEMP/norton-native-binding.json" \
+              --directory "$RUNNER_TEMP/protected-dual-era-preview" --candidate-root "$RUNNER_TEMP/preview-candidate-cc14"
+          else
           source_tree="$(git rev-parse 'HEAD^{tree}')"
           preview_server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version + '-preview')")"
           npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify \
@@ -313,6 +381,7 @@ jobs:
             --expected-source-commit "$SOURCE_COMMIT" \
             --expected-source-tree "$source_tree" \
             --expected-server-version "$preview_server_version"
+          fi
 
   build-worker:
     name: Build production Worker artifact (no cloud credentials)
@@ -324,6 +393,7 @@ jobs:
     outputs:
       worker_sha256: ${{ steps.worker-artifact.outputs.sha256 }}
       corpus_plan_sha256: ${{ steps.corpus-source.outputs.sha256 }}
+      release_policy: ${{ steps.corpus-source.outputs.release_policy }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -338,7 +408,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit
 
       - name: Prepare complete corpus proof source without cloud credentials
-        if: hashFiles('release/application-only.json') != ''
+        if: hashFiles('release/norton-aquinas.json') != '' || hashFiles('release/application-only.json') != ''
         id: corpus-source
         run: |
           npm rebuild better-sqlite3 --ignore-scripts=false
@@ -352,7 +422,7 @@ jobs:
           name: corpus-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/corpus-source/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
           overwrite: false
 
       - name: Build Worker without cloud credentials
@@ -368,7 +438,7 @@ jobs:
           name: worker-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/worker-bundle/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
           overwrite: false
 
   operator-authorization:
@@ -376,7 +446,7 @@ jobs:
     needs: [verify-deployment-plan, validate, verify-dual-era-preview, build-worker]
     if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: ${{ needs.build-worker.outputs.release_policy == 'norton-aquinas.v1' && 245 || 65 }}
     permissions:
       actions: read
       contents: read
@@ -393,6 +463,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           OPERATOR_WAIT_AUTHORIZATION: 'true'
+          OPERATOR_PRODUCTION_PREPARATION_WAIT: ${{ needs.build-worker.outputs.release_policy == 'norton-aquinas.v1' && 'true' || 'false' }}
           OPERATOR_BASE_COMMIT: ${{ needs.verify-deployment-plan.outputs.before }}
           OPERATOR_SOURCE_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
         with:
@@ -410,6 +481,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      pull-requests: read
     env:
       EXPECTED_RUN_ID: ${{ github.run_id }}
       EXPECTED_RUN_ATTEMPT: ${{ github.run_attempt }}
@@ -495,7 +567,7 @@ jobs:
           merge-multiple: false
           digest-mismatch: error
       - name: Download source-bound complete corpus proof inputs
-        if: hashFiles('release/application-only.json') != ''
+        if: hashFiles('release/norton-aquinas.json') != '' || hashFiles('release/application-only.json') != ''
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: corpus-production-${{ github.run_id }}-attempt-${{ github.run_attempt }}
@@ -503,12 +575,48 @@ jobs:
           merge-multiple: false
           digest-mismatch: error
       - name: Verify artifact and render upload-only configuration
+        id: release-policy
         env:
+          CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+          EXPECTED_RELEASE_POLICY: ${{ needs.build-worker.outputs.release_policy }}
           EXPECTED_MANIFEST_SHA256: ${{ needs.build-worker.outputs.worker_sha256 }}
         run: |
+          policy="$(node .github/scripts/release-proof-policy.mjs verify-source-plan "$RUNNER_TEMP/corpus-source" "$CORPUS_PLAN_SHA256")"
+          test "$policy" = "$EXPECTED_RELEASE_POLICY"
+          printf 'release_policy=%s\n' "$policy" >> "$GITHUB_OUTPUT"
           node scripts/worker-release-artifact.mjs render production "$RUNNER_TEMP/worker-bundle" "$EXPECTED_MANIFEST_SHA256" "$RUNNER_TEMP/worker-release.json"
+          if test "$policy" = norton-aquinas.v1; then
+            npx --no-install tsx scripts/corpus-execution-config.ts production "$RUNNER_TEMP/corpus-wrangler.toml"
+          else
+            cp wrangler.toml "$RUNNER_TEMP/corpus-wrangler.toml"
+          fi
+
+      - name: Recheck pinned split native runtime preview evidence
+        if: needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-runtime-preview'
+        id: recheck-runtime-preview
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          NATIVE_BINDING_JSON: ${{ needs.verify-dual-era-preview.outputs.native_binding_json }}
+        with:
+          script: |
+            const pin = JSON.parse(process.env.NATIVE_BINDING_JSON);
+            const binding = await require('./.github/scripts/runtime-preview-handoff.cjs').resolveRuntimePreviewHandoff({github,context,pin});
+            core.setOutput('native_binding_json', JSON.stringify(binding));
+
+      - name: Recheck pinned Norton native preview evidence
+        if: needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-existing-preview'
+        id: recheck-existing-preview
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          NATIVE_BINDING_JSON: ${{ needs.verify-dual-era-preview.outputs.native_binding_json }}
+        with:
+          script: |
+            const pin = JSON.parse(process.env.NATIVE_BINDING_JSON);
+            const binding = await require('./.github/scripts/resolve-existing-norton-preview.cjs').resolveExistingNortonPreview({github,context,pin});
+            core.setOutput('native_binding_json', JSON.stringify(binding));
 
       - name: Download exact protected preview evidence with digest validation
+        if: ${{ !contains(fromJSON('["norton-existing-preview","norton-runtime-preview"]'), needs.verify-dual-era-preview.outputs.evidence_kind) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.verify-dual-era-preview.outputs.artifact_name }}
@@ -518,10 +626,55 @@ jobs:
           merge-multiple: false
           digest-mismatch: error
 
+      - name: Download Norton validation evidence by native ID
+        if: needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-existing-preview'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.verify-dual-era-preview.outputs.artifact_id }}
+          run-id: ${{ needs.verify-dual-era-preview.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/protected-dual-era-preview/continuation
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Download Norton retained source chain by native ID
+        if: needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-existing-preview'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.verify-dual-era-preview.outputs.inputs_artifact_id }}
+          run-id: ${{ needs.verify-dual-era-preview.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/protected-dual-era-preview/inputs
+          merge-multiple: true
+          digest-mismatch: error
+
+      - name: Download split native runtime preview archives
+        if: needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-runtime-preview'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          NATIVE_BINDING_JSON: ${{ steps.recheck-runtime-preview.outputs.native_binding_json }}
+        with:
+          script: |
+            await require('./.github/scripts/runtime-preview-handoff.cjs').downloadRuntimePreviewArchives({github,binding:JSON.parse(process.env.NATIVE_BINDING_JSON),directory:process.env.RUNNER_TEMP+'/protected-runtime-preview'});
+
       - name: Verify source-bound dual-era preview release receipt
         env:
           SOURCE_COMMIT: ${{ needs.verify-dual-era-preview.outputs.source_commit }}
+          EVIDENCE_KIND: ${{ needs.verify-dual-era-preview.outputs.evidence_kind }}
+          NATIVE_BINDING_JSON: ${{ needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-runtime-preview' && steps.recheck-runtime-preview.outputs.native_binding_json || steps.recheck-existing-preview.outputs.native_binding_json }}
         run: |
+          if [ "$EVIDENCE_KIND" = 'norton-runtime-preview' ]; then
+            printf '%s\n' "$NATIVE_BINDING_JSON" > "$RUNNER_TEMP/runtime-native-binding.json"
+            git worktree add --detach "$RUNNER_TEMP/preview-candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
+            npx --no-install tsx .github/scripts/verify-runtime-preview-handoff.ts \
+              "$RUNNER_TEMP/runtime-native-binding.json" "$RUNNER_TEMP/protected-runtime-preview" \
+              "$RUNNER_TEMP/preview-candidate-cc14" > "$RUNNER_TEMP/runtime-preview-handoff.json"
+          elif [ "$EVIDENCE_KIND" = 'norton-existing-preview' ]; then
+            printf '%s\n' "$NATIVE_BINDING_JSON" > "$RUNNER_TEMP/norton-native-binding.json"
+            git worktree add --detach "$RUNNER_TEMP/preview-candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
+            npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify-existing \
+              --native-binding "$RUNNER_TEMP/norton-native-binding.json" \
+              --directory "$RUNNER_TEMP/protected-dual-era-preview" --candidate-root "$RUNNER_TEMP/preview-candidate-cc14"
+          else
           source_tree="$(git rev-parse 'HEAD^{tree}')"
           preview_server_version="$(node --input-type=module -e "import packageJson from './package.json' with { type: 'json' }; process.stdout.write(packageJson.version + '-preview')")"
           npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify \
@@ -530,6 +683,7 @@ jobs:
             --expected-source-commit "$SOURCE_COMMIT" \
             --expected-source-tree "$source_tree" \
             --expected-server-version "$preview_server_version"
+          fi
 
       - name: Detect production custom-domain declaration change
         id: production-custom-domain-change
@@ -550,11 +704,22 @@ jobs:
       # Resolve the checked-out production candidate by both name and UUID.
       # This is read-only; candidate creation/preparation is a separately
       # authorized, fail-stop operation and this workflow cannot perform it.
-      - name: Capture checked-out candidate production D1 mapping (read-only)
+      - name: Verify closed release policy before provider access
+        id: release-operation
+        env:
+          CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+          EXPECTED_RELEASE_POLICY: ${{ needs.build-worker.outputs.release_policy }}
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/production-d1-inventory.json"
+          policy="$(npx --no-install tsx .github/scripts/verify-release-operation.ts owner "$RUNNER_TEMP/corpus-source" "$CORPUS_PLAN_SHA256" "$RUNNER_TEMP/operator-authorization.json")"
+          test "$policy" = "$EXPECTED_RELEASE_POLICY"
+          printf 'release_policy=%s\n' "$policy" >> "$GITHUB_OUTPUT"
+
+      - name: Capture checked-out candidate production D1 mapping (read-only)
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') }}
+        run: |
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/production-d1-inventory.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts candidate-d1-name \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/production-d1-inventory.json" \
             > "$RUNNER_TEMP/production-candidate-d1-name.txt"
         env:
@@ -564,7 +729,7 @@ jobs:
       # Production still requires its independent source-bound proof and its
       # separate protected approval. No production operation is authorized here.
       - name: Verify fresh corpus (up to 3.8M reads and four integrity commands)
-        if: hashFiles('release/application-only.json') != ''
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') }}
         id: corpus-proof
         uses: ./.github/actions/operator-corpus-proof
         with:
@@ -575,17 +740,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Verify legacy production D1 readiness
-        if: hashFiles('release/application-only.json') == ''
-        id: legacy-corpus-proof
-        run: |
-          candidate_d1_name="$(< "$RUNNER_TEMP/production-candidate-d1-name.txt")"
-          npx --no-install tsx scripts/check-remote-d1-readiness.ts --database "$candidate_d1_name" --output "$RUNNER_TEMP/production-d1-readiness-receipt.json"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Upload sanitized production D1 readiness receipt
-        if: always() && (steps.corpus-proof.outcome != 'skipped' || steps.legacy-corpus-proof.outcome != 'skipped')
+        if: always() && steps.corpus-proof.outcome != 'skipped'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-d1-readiness-${{ github.sha }}
@@ -607,20 +763,21 @@ jobs:
       # manual recovery decision if a later step fails; it cannot roll back,
       # bind, seed, delete, or otherwise mutate production.
       - name: Capture production predecessor reconciliation anchor (read-only)
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') }}
         id: production-predecessor
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-predecessor.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-predecessor.json"
           predecessor_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-predecessor.json")"
-          npx --no-install wrangler versions view "$predecessor_version" --json > "$RUNNER_TEMP/production-worker-predecessor-version-view.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$predecessor_version" --json > "$RUNNER_TEMP/production-worker-predecessor-version-view.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts capture-predecessor \
             --deployments "$RUNNER_TEMP/production-worker-deployments-predecessor.json" \
             --predecessor-version-view "$RUNNER_TEMP/production-worker-predecessor-version-view.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/production-d1-inventory.json" \
             --output "$RUNNER_TEMP/production-worker-predecessor-anchor.json"
 
@@ -633,14 +790,15 @@ jobs:
           if-no-files-found: error
 
       - name: Capture production Worker versions before deployment (read-only)
-        run: npx --no-install wrangler versions list --json > "$RUNNER_TEMP/production-worker-versions-before.json"
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') }}
+        run: npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions list --json > "$RUNNER_TEMP/production-worker-versions-before.json"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
 
       - name: Require live website and audited preview custom domain
-        if: steps.production-custom-domain-change.outputs.required == 'true'
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-custom-domain-change.outputs.required == 'true') }}
         run: |
           IFS=$'\t' read -r website_status website_effective_url <<< "$(curl --fail --silent --show-error --location --max-time 30 \
             --output "$RUNNER_TEMP/theologai-website.html" \
@@ -673,25 +831,35 @@ jobs:
       # Worker untouched. Capture its exact sole-active version and binding
       # before the first mutating step; later verification reuses this record.
       - name: Capture preview control before production deployment (read-only)
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') }}
         id: preview-control-before-production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-before.json"
-          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-before.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-before.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-before.json"
           preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/preview-control-deployments-before.json")"
-          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-before.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-before.json"
           npx --no-install tsx scripts/preview-release-reconciliation.ts capture-control \
             --deployments "$RUNNER_TEMP/preview-control-deployments-before.json" \
             --active-version-view "$RUNNER_TEMP/preview-control-version-before.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-before.json" \
             --output "$RUNNER_TEMP/preview-control-before-production.json"
 
+      - name: Check accepted controls and current corpus authority at mutation boundary
+        if: ${{ steps.release-operation.outputs.release_policy == 'norton-aquinas.v1' }}
+        run: |
+          npx --no-install tsx .github/scripts/verify-runtime-preview-handoff.ts boundary \
+            "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
+            "$RUNNER_TEMP/preview-control-before-production.json" \
+            "$RUNNER_TEMP/operator-corpus-challenge.json" > "$RUNNER_TEMP/production-mutation-boundary.json"
+
       - name: Deploy to Cloudflare Workers
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') }}
         id: production-worker-deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -699,19 +867,25 @@ jobs:
           ESV_API_KEY: ${{ secrets.ESV_API_KEY }}
         run: |
           set -euo pipefail
-          printf '%s' "$ESV_API_KEY" | npx --no-install wrangler secret put ESV_API_KEY --env= --env-file /dev/null
+          printf '%s' "$ESV_API_KEY" | npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" secret put ESV_API_KEY --env= --env-file /dev/null
+          if test '${{ steps.release-operation.outputs.release_policy }}' = norton-aquinas.v1; then
+            env -u CLOUDFLARE_API_TOKEN -u ESV_API_KEY npx --no-install tsx .github/scripts/verify-runtime-preview-handoff.ts boundary \
+              "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
+              "$RUNNER_TEMP/preview-control-before-production.json" \
+              "$RUNNER_TEMP/operator-corpus-challenge.json" > "$RUNNER_TEMP/production-deploy-boundary.json"
+          fi
           npx --no-install wrangler deploy --config "$RUNNER_TEMP/worker-release.json" --no-bundle --env-file /dev/null | tee "$RUNNER_TEMP/production-worker-deploy.command-output.txt"
 
       - name: Verify exact active production Worker version (read-only)
         id: production-worker-pre-audit-identity
-        if: ${{ steps.production-worker-deploy.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-worker-deploy.outcome == 'success') }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler versions list --json > "$RUNNER_TEMP/production-worker-versions-after.json"
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-after.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions list --json > "$RUNNER_TEMP/production-worker-versions-after.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-after.json"
           npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-deploy \
             --before-versions "$RUNNER_TEMP/production-worker-versions-before.json" \
             --after-versions "$RUNNER_TEMP/production-worker-versions-after.json" \
@@ -722,22 +896,22 @@ jobs:
 
       - name: Verify preview control remained unchanged after production deployment (read-only)
         id: preview-control-after-production-deploy
-        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.preview-control-before-production.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-worker-deploy.outcome == 'success' && steps.preview-control-before-production.outcome == 'success') }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-deploy.json"
-          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-deploy.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-deploy.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-deploy.json"
           preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/preview-control-deployments-after-deploy.json")"
-          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-deploy.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-deploy.json"
           npx --no-install tsx scripts/preview-release-reconciliation.ts verify-control \
             --control "$RUNNER_TEMP/preview-control-before-production.json" \
             --deployments "$RUNNER_TEMP/preview-control-deployments-after-deploy.json" \
             --active-version-view "$RUNNER_TEMP/preview-control-version-after-deploy.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-after-deploy.json" \
             --output "$RUNNER_TEMP/preview-control-after-production-deploy.json"
 
@@ -745,7 +919,7 @@ jobs:
       # passed readiness before either production black-box audit can begin.
       - name: Require deployed candidate production D1 binding (read-only)
         id: production-worker-candidate-cutover
-        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-pre-audit-identity.outcome == 'success' && steps.preview-control-after-production-deploy.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-worker-deploy.outcome == 'success' && steps.production-worker-pre-audit-identity.outcome == 'success' && steps.preview-control-after-production-deploy.outcome == 'success') }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -753,19 +927,19 @@ jobs:
         run: |
           observed_active_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-after.json")"
-          npx --no-install wrangler versions view "$observed_active_version" --json \
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$observed_active_version" --json \
             > "$RUNNER_TEMP/production-worker-candidate-version-view.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts observe-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-after.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-candidate-version-view.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --output "$RUNNER_TEMP/production-worker-candidate-cutover-observation.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts reconcile-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-after.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-candidate-version-view.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --output "$RUNNER_TEMP/production-worker-candidate-cutover.json"
 
       - name: Upload production candidate cutover observation
@@ -782,11 +956,13 @@ jobs:
       # checked-out resource identity first.
       - name: Stabilize production release registrations at edge (read-only)
         id: production-primary-source-edge-stabilization
-        if: ${{ steps.production-worker-candidate-cutover.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-worker-candidate-cutover.outcome == 'success') }}
         continue-on-error: true
         run: |
+          corpus_flag=()
+          if test '${{ needs.build-worker.outputs.release_policy }}' = norton-aquinas.v1; then corpus_flag+=(--corpus-release); fi
           npx --no-install tsx scripts/audit-primary-source-edge-stabilization-production.ts \
-            --output "$RUNNER_TEMP/production-primary-source-edge-stabilization.json"
+            --output "$RUNNER_TEMP/production-primary-source-edge-stabilization.json" "${corpus_flag[@]}"
 
       - name: Upload production edge-stabilization evidence
         if: ${{ always() && steps.production-worker-candidate-cutover.outcome == 'success' }}
@@ -804,7 +980,7 @@ jobs:
 
       - name: Audit original-language v2 contract on production
         id: production-original-language-v2-audit
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (needs.build-worker.outputs.release_policy == 'application-only' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success') }}
         run: |
           npx --no-install tsx scripts/audit-original-language-v2-production.ts \
             --output "$RUNNER_TEMP/original-language-v2-production-audit.json"
@@ -812,35 +988,48 @@ jobs:
 
       - name: Audit Transform-9 historical core contract on production
         id: production-historical-core-audit
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (needs.build-worker.outputs.release_policy == 'application-only' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success') }}
         run: |
           npx --no-install tsx scripts/audit-historical-core-production.ts \
             --output "$RUNNER_TEMP/historical-core-production-audit.json"
           test -s "$RUNNER_TEMP/historical-core-production-audit.json"
 
       - name: Respect the shared IP request budget before the spine audit
-        if: ${{ steps.production-historical-core-audit.outcome == 'success' }}
+        if: ${{ needs.build-worker.outputs.release_policy == 'application-only' && steps.production-historical-core-audit.outcome == 'success' }}
         # SEC-03 makes all audit User-Agents share one IP allowance. Let the
         # earlier bounded suites leave the 60-second window; audits never retry.
         run: sleep 65
 
       - name: Audit Transform-11 historical spine contract on production
         id: production-historical-spine-audit
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (needs.build-worker.outputs.release_policy == 'application-only' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success') }}
         run: |
           npx --no-install tsx scripts/audit-historical-spine-production.ts \
             --output "$RUNNER_TEMP/historical-spine-production-audit.json"
           test -s "$RUNNER_TEMP/historical-spine-production-audit.json"
 
+      - name: Audit the corpus release in both protocol eras
+        id: production-corpus-live
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (needs.build-worker.outputs.release_policy == 'norton-aquinas.v1' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success') }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
+        run: |
+          npx --no-install tsx scripts/norton-aquinas-live.ts production \
+            "$RUNNER_TEMP/corpus-source" "$CORPUS_PLAN_SHA256" \
+            "$RUNNER_TEMP/operator-corpus-challenge.json" "$RUNNER_TEMP/production-d1-readiness-receipt.json" \
+            "$RUNNER_TEMP/production-worker-candidate-cutover.json" "$RUNNER_TEMP"
+
       - name: Verify production Worker remained active through audit (read-only)
         id: production-worker-audit-identity
-        if: ${{ steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && (steps.production-corpus-live.outcome == 'success' || (steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success'))) }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-audit.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-audit.json"
           npx --no-install tsx scripts/verify-production-worker-deployment.ts verify-audit-stability \
             --pre-audit-identity "$RUNNER_TEMP/production-worker-deployment-pre-audit-identity.json" \
             --post-audit-deployments "$RUNNER_TEMP/production-worker-deployments-post-audit.json" \
@@ -849,49 +1038,49 @@ jobs:
 
       - name: Verify preview control remained unchanged after production audits (read-only)
         id: preview-control-after-production-audits
-        if: ${{ steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-deploy.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-deploy.outcome == 'success') }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-audits.json"
-          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-audits.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-control-d1-inventory-after-audits.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --env preview --json > "$RUNNER_TEMP/preview-control-deployments-after-audits.json"
           preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/preview-control-deployments-after-audits.json")"
-          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-audits.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/preview-control-version-after-audits.json"
           npx --no-install tsx scripts/preview-release-reconciliation.ts verify-control \
             --control "$RUNNER_TEMP/preview-control-before-production.json" \
             --deployments "$RUNNER_TEMP/preview-control-deployments-after-audits.json" \
             --active-version-view "$RUNNER_TEMP/preview-control-version-after-audits.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-after-audits.json" \
             --output "$RUNNER_TEMP/preview-control-after-production-audits.json"
 
       - name: Capture final schema-0009 environment isolation receipt (read-only)
         id: final-environment-isolation
-        if: ${{ steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success') }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/final-environment-d1-inventory.json"
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/final-environment-production-deployments.json"
-          npx --no-install wrangler deployments list --env preview --json > "$RUNNER_TEMP/final-environment-preview-deployments.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/final-environment-d1-inventory.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/final-environment-production-deployments.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --env preview --json > "$RUNNER_TEMP/final-environment-preview-deployments.json"
           production_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/final-environment-production-deployments.json")"
           preview_version="$(npx --no-install tsx scripts/preview-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/final-environment-preview-deployments.json")"
-          npx --no-install wrangler versions view "$production_version" --json > "$RUNNER_TEMP/final-environment-production-version.json"
-          npx --no-install wrangler versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/final-environment-preview-version.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$production_version" --json > "$RUNNER_TEMP/final-environment-production-version.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$preview_version" --env preview --json > "$RUNNER_TEMP/final-environment-preview-version.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts capture-environment-isolation \
             --production-deployments "$RUNNER_TEMP/final-environment-production-deployments.json" \
             --production-active-version-view "$RUNNER_TEMP/final-environment-production-version.json" \
             --preview-deployments "$RUNNER_TEMP/final-environment-preview-deployments.json" \
             --preview-active-version-view "$RUNNER_TEMP/final-environment-preview-version.json" \
             --production-audited-identity "$RUNNER_TEMP/production-worker-deployment-identity.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/final-environment-d1-inventory.json" \
             --output "$RUNNER_TEMP/final-environment-isolation-receipt.json"
 
@@ -902,21 +1091,21 @@ jobs:
       # release, a failed observation is terminal rather than fail-open.
       - name: Capture final production routing/binding observation (read-only)
         id: production-final-observation
-        if: ${{ always() && steps.production-predecessor.outcome == 'success' && steps.production-worker-deploy.outcome != 'skipped' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (always() && steps.production-predecessor.outcome == 'success' && steps.production-worker-deploy.outcome != 'skipped') }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-mutation.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-post-mutation.json"
           observed_active_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json")"
-          npx --no-install wrangler versions view "$observed_active_version" --json > "$RUNNER_TEMP/production-worker-observed-active-version-view.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$observed_active_version" --json > "$RUNNER_TEMP/production-worker-observed-active-version-view.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts observe-post-mutation \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-post-mutation.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-observed-active-version-view.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --output "$RUNNER_TEMP/production-worker-final-routing-observation.json"
 
       - name: Upload final production routing/binding observation
@@ -933,27 +1122,27 @@ jobs:
       # post-observation identity record that must match the audited Worker.
       - name: Verify final production identity after audited release (read-only)
         id: production-final-post-audit-identity
-        if: ${{ steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' }}
+        if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success') }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
         run: |
-          npx --no-install wrangler deployments list --json > "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --json > "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json"
           final_version="$(npx --no-install tsx scripts/production-release-reconciliation.ts active-version-id \
             --deployments "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json")"
-          npx --no-install wrangler versions view "$final_version" --json > "$RUNNER_TEMP/production-worker-final-post-audit-version-view.json"
+          npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$final_version" --json > "$RUNNER_TEMP/production-worker-final-post-audit-version-view.json"
           npx --no-install tsx scripts/production-release-reconciliation.ts observe-final-post-audit \
             --predecessor-anchor "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
             --deployments "$RUNNER_TEMP/production-worker-deployments-final-post-audit.json" \
             --observed-active-version-view "$RUNNER_TEMP/production-worker-final-post-audit-version-view.json" \
             --production-audited-identity "$RUNNER_TEMP/production-worker-deployment-identity.json" \
-            --wrangler-config wrangler.toml \
+            --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --output "$RUNNER_TEMP/production-worker-final-post-audit-identity.json"
 
       - name: Hash sanitized production audit and reconciliation evidence
         id: production-audit-evidence
-        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success' && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' && steps.production-final-post-audit-identity.outcome == 'success' }}
+        if: ${{ steps.production-worker-deploy.outcome == 'success' && steps.production-worker-candidate-cutover.outcome == 'success' && steps.production-primary-source-edge-stabilization-gate.outcome == 'success' && (steps.production-corpus-live.outcome == 'success' || (steps.production-original-language-v2-audit.outcome == 'success' && steps.production-historical-core-audit.outcome == 'success' && steps.production-historical-spine-audit.outcome == 'success')) && steps.production-worker-audit-identity.outcome == 'success' && steps.preview-control-after-production-audits.outcome == 'success' && steps.final-environment-isolation.outcome == 'success' && steps.production-final-observation.outcome == 'success' && steps.production-final-post-audit-identity.outcome == 'success' }}
         run: |
           edge_stabilization_sha256="$(sha256sum "$RUNNER_TEMP/production-primary-source-edge-stabilization.json" | awk '{print $1}')"
           original_language_audit_sha256="$(sha256sum "$RUNNER_TEMP/original-language-v2-production-audit.json" | awk '{print $1}')"
@@ -996,12 +1185,25 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      - name: Retain sanitized production corpus failure evidence
+        if: ${{ always() && (steps.production-corpus-live.outcome == 'failure' || steps.production-corpus-live.outcome == 'cancelled') }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-corpus-stop-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/corpus-live.json
+            ${{ runner.temp }}/corpus-live.json.events.jsonl
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: Upload protected production audit evidence
         if: ${{ steps.production-audit-evidence.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-release-audit-${{ github.sha }}
           path: |
+            ${{ runner.temp }}/corpus-live.json
+            ${{ runner.temp }}/corpus-live.json.events.jsonl
             ${{ runner.temp }}/production-primary-source-edge-stabilization.json
             ${{ runner.temp }}/original-language-v2-production-audit.json
             ${{ runner.temp }}/historical-core-production-audit.json

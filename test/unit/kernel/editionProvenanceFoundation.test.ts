@@ -417,6 +417,19 @@ describe('inactive edition provenance foundation', () => {
     }
   });
 
+  it('keeps all format-character checks after long ordinary text or an allowed joiner', () => {
+    const prefix = 'Ordinary ASCII prose '.repeat(1024);
+    for (const hostile of ['\u00ad', '\u2060', '\u{e0001}', '\u{e0061}']) {
+      for (const value of [`${prefix}${hostile}end`, `${prefix}\u200d${hostile}end`]) {
+        expect(() => escapeEditionPlainTextForMarkdown(value)).toThrow(/unapproved invisible format character/);
+        expect(() => escapeFrozenEditionSectionContentForMarkdown(`\n${value}\n`)).toThrow(/unapproved invisible format character/);
+      }
+    }
+    const valid = `${prefix}cafe\u0301 😀 \u200c \u200d end`;
+    expect(escapeEditionPlainTextForMarkdown(valid)).toBe(valid.normalize('NFC'));
+    expect(escapeFrozenEditionSectionContentForMarkdown(`\n${valid}\n`)).toBe(`\n${valid.normalize('NFC')}\n`);
+  });
+
   it('requires an immutable locator, pin, content hash, byte count, and truthful acquisition precision', () => {
     const queryLocator = inventedEditionPackageFixture();
     source(queryLocator).locator = 'https://example.invalid/file.txt?moving=latest';

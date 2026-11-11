@@ -1,4 +1,10 @@
-import { readFile } from 'node:fs/promises';
+import {parse as parseYaml} from 'yaml';
+import {createHash} from 'node:crypto';
+import {RESTORE,admit,restoreMatchedPreview,type Dependencies,type Request} from '../../../.github/scripts/restore-norton-preview.js';
+import { readFile,writeFile,mkdtemp,rm } from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {execFileSync,spawnSync} from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   activeProductionVersionId,
@@ -386,8 +392,8 @@ describe('preview release reconciliation evidence', () => {
     const readiness = workflow.indexOf('Verify fresh corpus (up to 3.8M reads and four integrity commands)');
     const predecessor = workflow.indexOf('Capture preview predecessor reconciliation anchor (read-only)');
     const candidateCutover = workflow.indexOf('Require deployed candidate preview D1 binding (read-only)');
-    const originalLanguageAudit = workflow.indexOf('Audit original-language v2 contract on preview');
-    const historicalAudit = workflow.indexOf('Audit Transform-9 historical core contract on preview');
+    const originalLanguageAudit = workflow.indexOf('Audit the corpus release in both protocol eras');
+    const historicalAudit = workflow.indexOf('Audit the corpus release in both protocol eras');
     const previewAuditIdentity = workflow.indexOf('Verify preview Worker remained active through audit (read-only)');
     const postAuditProductionControl = workflow.indexOf('Verify production control remained unchanged after preview audits (read-only)');
     const evidenceHash = workflow.indexOf('Hash sanitized preview audit evidence');
@@ -400,8 +406,9 @@ describe('preview release reconciliation evidence', () => {
     expect(previewAuditIdentity).toBeGreaterThan(historicalAudit);
     expect(postAuditProductionControl).toBeGreaterThan(previewAuditIdentity);
     expect(evidenceHash).toBeGreaterThan(postAuditProductionControl);
-    expect(workflow).toContain('npx --no-install wrangler d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"');
-    expect(workflow).toContain('--database "$candidate_d1_name" --env preview');
+    expect(workflow).toContain('npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" d1 list --json > "$RUNNER_TEMP/preview-d1-inventory.json"');
+    expect(workflow).not.toContain('scripts/check-remote-d1-readiness.ts');
+    expect(workflow).toContain('scripts/operator-corpus-proof.ts accept');
     expect(workflow).toContain('observe-post-mutation');
     expect(workflow).toContain('Upload preview candidate cutover observation');
     expect(workflow).toContain('Hash sanitized preview reconciliation evidence');
@@ -410,8 +417,112 @@ describe('preview release reconciliation evidence', () => {
     expect(workflow).toContain('production-control-d1-inventory-before.json');
     expect(workflow).toContain('production-control-d1-inventory-after-deploy.json');
     expect(workflow).toContain('production-control-d1-inventory-post-audit.json');
-    expect(workflow).toContain('--wrangler-config wrangler.toml');
+    expect(workflow).toContain('--wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml"');
     expect(workflow).toContain('production_control_post_audit_sha256');
     expect(workflow).toContain('production-control-post-audit.json');
   });
+});
+
+describe('fixed Norton preview restoration', () => {
+  const version=(id:string,database:string)=>JSON.stringify({id,resources:{bindings:[{name:'THEOLOGAI_DB',type:'d1',id:database,database_id:database}]}});
+  const target=version(RESTORE.target,RESTORE.targetDatabase);
+  const anchor=JSON.stringify({schemaVersion:3,worker:'theologai-preview',predecessorVersionId:RESTORE.target,
+    predecessorDeploymentId:'52a5387c-9367-457a-8a85-14b23d5dd629',predecessorDeploymentsSha256:'a'.repeat(64),
+    predecessorVersionViewSha256:createHash('sha256').update(target).digest('hex'),candidateD1InventorySha256:'b'.repeat(64),
+    predecessorD1:{binding:'THEOLOGAI_DB',databaseId:RESTORE.targetDatabase},candidateD1:{binding:'THEOLOGAI_DB',databaseName:'theologai-preview-20260728-transform11-a',databaseId:RESTORE.candidate},d1Changed:true});
+  const list=(id:string,v:string)=>JSON.stringify([{id,created_on:'2026-11-05T02:49:10Z',versions:[{version_id:v,percentage:100}]}]);
+  function fixture(fault=''){
+    const commands:string[][]=[],events:any[]=[];let mutated=false,previews=0,productions=0;
+    const request={sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40),expiresAt:'2026-11-05T04:00:00Z',confirmation:RESTORE.confirmation};
+    const d:Dependencies={sourceCommit:request.sourceCommit,sourceTree:request.sourceTree,runId:'9',environment:{},now:()=>Date.parse('2026-11-05T03:00:00Z'),github:async()=>{throw Error('not expected in fixed assignment fixture');},
+      record:e=>{if(fault==='post journal all'&&mutated)throw Error('disk');if((fault==='intent journal'&&(e as any).kind==='mutation-intent')||(fault.startsWith('status journal')&&(e as any).kind==='mutation-command'))throw Error('disk');events.push(e);},
+      run:async args=>{
+        commands.push(args);
+        if(args[0]==='versions'&&args[1]==='deploy'){mutated=true;if(fault==='unknown command'||fault==='status journal error')throw Error('timeout');return '';}
+        if(args[0]==='deployments'){
+          if(args.includes('--env')){previews++;if(fault==='post read'&&mutated)throw Error('network');
+            if(fault==='race'&&previews===2)return list('423e4567-e89b-42d3-a456-426614174000',RESTORE.current);
+            return mutated?list('423e4567-e89b-42d3-a456-426614174000',fault==='wrong restored worker'?RESTORE.current:RESTORE.target):list(RESTORE.currentDeployment,fault==='wrong current'?RESTORE.target:RESTORE.current);}
+          productions++;return list(RESTORE.productionDeployment,fault==='production'&&productions===2?RESTORE.target:RESTORE.production);
+        }
+        const id=args[2]!;
+        if(id===RESTORE.target)return fault==='changed target'?target+' ':target;
+        if(id===RESTORE.current)return version(id,fault==='wrong D1'?RESTORE.targetDatabase:RESTORE.candidate);
+        return version(RESTORE.production,RESTORE.productionDatabase);
+      }};
+    const revalidate=async()=>{if(fault==='revoked')throw Error('revoked');};
+    return {commands,events,run:()=>restoreMatchedPreview(request,d,anchor,revalidate)};
+  }
+  it('restores exactly once and records the new deployment with the retained predecessor D1',async()=>{
+    const f=fixture(),r=await f.run();expect(r).toMatchObject({d1Reads:0,d1Writes:0,mutationCommands:1,observation:{observedActiveVersionId:RESTORE.target,observedActiveD1:{databaseId:RESTORE.targetDatabase},candidateBindingMatches:false}});
+    expect(f.commands.filter(c=>c[1]==='deploy')).toEqual([['versions','deploy',RESTORE.target+'@100','--env','preview','--yes']]);
+    expect(f.commands.every(c=>c[0]!=='d1')).toBe(true);
+  });
+  it('records the hash of the actual routing-config bytes written by the CLI',async()=>{
+    const dir=await mkdtemp(join(tmpdir(),'norton-restore-config-'));
+    try{
+      const request=join(dir,'request.json'),output=join(dir,'result.json'),preload=join(dir,'deny-network.mjs');
+      const commit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),tree=execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim();
+      await writeFile(request,JSON.stringify({sourceCommit:commit,sourceTree:tree,expiresAt:new Date(Date.now()+600000).toISOString(),confirmation:RESTORE.confirmation}));
+      // Fail authenticated owner admission before any Cloudflare command. All fetches stay in this local fixture.
+      await writeFile(preload,"globalThis.fetch=async()=>new Response(JSON.stringify({actor:{id:2}}),{status:200});");
+      const child=spawnSync(process.execPath,['--import',resolve('node_modules/tsx/dist/loader.mjs'),'--import',preload,'.github/scripts/restore-norton-preview.ts','restore',request,output],{encoding:'utf8',timeout:15000,env:{PATH:process.env.PATH,GITHUB_TOKEN:'offline-only',CLOUDFLARE_API_TOKEN:'offline-only',CLOUDFLARE_ACCOUNT_ID:RESTORE.account,GITHUB_REPOSITORY:RESTORE.repo,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_RUN_ATTEMPT:'1',GITHUB_ACTOR_ID:String(RESTORE.actor),GITHUB_RUN_ID:'9',GITHUB_REF:'refs/heads/offline'}});
+      expect(child.status).toBe(1);expect(child.stderr).toContain('Preview restoration stopped');
+      const f=fixture();await f.run();
+      expect(f.events.find(e=>e.kind==='routing-config').sha256).toBe(createHash('sha256').update(await readFile(output+'.toml')).digest('hex'));
+    }finally{await rm(dir,{recursive:true,force:true});}
+  });
+  it.each(['wrong current','wrong D1','changed target','production','race','revoked','intent journal'])('refuses %s before a mutation',async fault=>{
+    const f=fixture(fault);await expect(f.run()).rejects.toThrow();expect(f.commands.filter(c=>c[1]==='deploy')).toHaveLength(0);
+  });
+  it.each(['unknown command','post read','wrong restored worker','status journal success','status journal error','post journal all'])('stops after %s without replay or reverse mutation',async fault=>{
+    const f=fixture(fault);await expect(f.run()).rejects.toThrow();expect(f.commands.filter(c=>c[1]==='deploy')).toHaveLength(1);
+    expect(f.events.some(e=>e.kind==='mutation-intent')).toBe(true);
+    if(fault==='post journal all')expect(f.commands.slice(-4).filter(c=>c[0]==='deployments'||c[1]==='view')).toHaveLength(4);
+    if(fault.startsWith('status journal')){expect(f.events.some(e=>e.kind==='restored-assignment-observed')).toBe(true);expect(f.events.some(e=>e.kind==='production-assignment-observed')).toBe(true);}
+    if(fault==='wrong restored worker')expect(f.events.find(e=>e.kind==='restored-assignment-observed').observation.observedActiveVersionId).toBe(RESTORE.current);
+  });
+  it.each(['actor','attempt','source','confirmation','expired'])('refuses invalid %s before any GitHub or cloud access',async fault=>{
+    const f:Request={sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40),expiresAt:'2026-11-05T04:00:00Z',confirmation:RESTORE.confirmation};let calls=0;
+    const d:Dependencies={sourceCommit:f.sourceCommit,sourceTree:f.sourceTree,runId:'9',now:()=>Date.parse('2026-11-05T03:00:00Z'),environment:{GITHUB_REPOSITORY:RESTORE.repo,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_RUN_ATTEMPT:fault==='attempt'?'2':'1',GITHUB_ACTOR_ID:fault==='actor'?'8':String(RESTORE.actor)},github:async()=>{calls++;throw Error('unexpected');},run:async()=>{throw Error('unexpected');},record:()=>{}};
+    if(fault==='source')f.sourceCommit='c'.repeat(40);if(fault==='confirmation')f.confirmation='wrong';if(fault==='expired')f.expiresAt='2026-11-05T02:00:00Z';
+    await expect(admit(f,d)).rejects.toThrow();expect(calls).toBe(0);
+  });
+});
+
+
+describe('fixed restoration native owner admission',()=>{
+  // Sanitized immutable predecessor artifact already retained by the failed protected run.
+  const zip=Buffer.from('UEsDBBQACAAIABwWZV0AAAAAAAAAAAAAAAAmAAAAcHJldmlldy13b3JrZXItcHJlZGVjZXNzb3ItYW5jaG9yLmpzb26VUl9rFDEQf79PEfbZQDKZJLP3plb0QOyD0leZJDO9xd5u2V17lNLvLtcKFT0FX4ff35l52BjTLXUvB76SeRmmsdua8Oo0PU7zN5m7renWvUw30zUP9naWu0GO3RPgdpYmVZZlmn9yd+0ED8FD9klsC5gtKmZLOQabKQsye3KkfyhcyO3NdH+QcX0WicAxUK62DylbjJktMUXrsUBosbUE/T9Els97hphOSupyqYpYiIM0YfbOSRatItJLFUjNMRfxIKGHpJiY1Qlmdllzkb+VvRrk+OKSlMBLouoZIziSWipEYEoxFKRGEUWAJQfuVTAkjaS+9QAI4HJ8dqk8tqHxKhd+N97JuE7z/S9NUpNaWqlAmgNhCo25UV8I1KF3lSlKCxh9aJkq1xwoBM2MAsrn9uW7rXnYGGNMV4axDeP1yefLh3eXHy/fv959vXjzxDGma7xy4UWer5NRMSYBm/roLToXbClJbe/76ANCUdJuY8zj763+2+8TH+TsD1pwkFwGsuvM46LTfPDe8vm8CQplz8nGgs1i64sljWCD85oqZVKkl7zNv93zeC0n6jp/l83j5gdQSwcIToo5mbMBAAAoAwAAUEsBAi0DFAAIAAgAHBZlXU6KOZmzAQAAKAMAACYAAAAAAAAAAAAgAKSBAAAAAHByZXZpZXctd29ya2VyLXByZWRlY2Vzc29yLWFuY2hvci5qc29uUEsFBgAAAAABAAEAVAAAAAcCAAAAAA==','base64');
+  function fixture(fault=''){
+    const request={sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40),expiresAt:'2026-11-05T04:00:00Z',confirmation:RESTORE.confirmation};
+    const calls:string[]=[];
+    const d:Dependencies={sourceCommit:request.sourceCommit,sourceTree:request.sourceTree,runId:'9',environment:{GITHUB_REPOSITORY:RESTORE.repo,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_RUN_ATTEMPT:'1',GITHUB_ACTOR_ID:String(RESTORE.actor),GITHUB_REF:'refs/heads/codex/norton-aquinas-successor'},now:()=>Date.parse('2026-11-05T03:00:00Z'),record:()=>{},run:async()=>{throw Error('cloud forbidden in admission');},github:async route=>{
+      calls.push(route);
+      if(route==='/actions/runs/9')return {actor:{id:RESTORE.actor},triggering_actor:{id:fault==='trigger'?2:RESTORE.actor},run_attempt:1,event:'workflow_dispatch',path:'.github/workflows/pr.yml',head_sha:request.sourceCommit,head_branch:'codex/norton-aquinas-successor'};
+      if(route==='/pulls/176')return {state:'open',draft:false,base:{ref:'main',sha:RESTORE.base},head:{sha:fault==='changed head'?'c'.repeat(40):request.sourceCommit,ref:'codex/norton-aquinas-successor',repo:{full_name:RESTORE.repo}},labels:fault==='label'?[{name:'deploy-preview'}]:[]};
+      if(route.startsWith('/git/commits/'))return {tree:{sha:request.sourceTree}};
+      if(route==='/git/ref/heads/main')return {object:{sha:RESTORE.base}};
+      if(route==='/actions/runs/'+RESTORE.failedRun)return {status:fault==='active prior'?'in_progress':'completed',conclusion:'failure',run_attempt:1,head_sha:RESTORE.failedSource,path:'.github/workflows/pr.yml'};
+      if(route.includes('/jobs?'))return {jobs:[{name:'Deploy Preview',conclusion:'failure',steps:[{name:'Require stable preview release registrations before audits',conclusion:'failure'},{name:'Verify production control remained unchanged (read-only)',conclusion:'success'}]}]};
+      if(route.includes('/workflows/'))return {workflow_runs:fault==='missing CI'?[]:[{head_sha:request.sourceCommit,conclusion:'success',event:'pull_request',path:'.github/workflows/pr.yml'}]};
+      if(route.endsWith('/zip'))return fault==='archive'?Buffer.from('wrong'):zip;
+      if(route==='/actions/artifacts/'+RESTORE.artifact)return {name:'preview-release-predecessor-176-'+RESTORE.failedSource,digest:fault==='digest'?'sha256:'+'0'.repeat(64):RESTORE.artifactDigest,expired:false,expires_at:'2026-11-12T00:00:00Z',workflow_run:{id:RESTORE.failedRun,head_sha:fault==='artifact source'?'c'.repeat(40):RESTORE.failedSource}};
+      throw Error('unexpected route');
+    }};return {request,d,calls};
+  }
+  it('authenticates exact live owner dispatch, CI and immutable native artifact before any cloud request',async()=>{const f=fixture();expect(JSON.parse(await admit(f.request,f.d)).predecessorVersionId).toBe(RESTORE.target);expect(f.calls).toHaveLength(9);});
+  it.each(['trigger','changed head','label','active prior','missing CI','digest','artifact source','archive'])('refuses native %s evidence without cloud access',async fault=>{const f=fixture(fault);await expect(admit(f.request,f.d)).rejects.toThrow();});
+});
+
+
+it('isolates restoration in the existing protected preview workflow without SQL or production credentials',async()=>{
+  const workflow=parseYaml(await readFile(new URL('.github/workflows/pr.yml',root),'utf8'));
+  const job=workflow.jobs['restore-norton-preview'];
+  expect(job.environment).toBe('preview');expect(job.concurrency).toEqual({group:'theologai-shared-preview-mutation','cancel-in-progress':false});
+  expect(job.if).toContain("github.event_name == 'workflow_dispatch'");
+  const text=JSON.stringify(job);expect(text).not.toContain('PRODUCTION');expect(text).not.toContain('d1 execute');expect(text).not.toContain('operator-corpus-proof.ts');
+  expect(job.steps.find((s:any)=>s.name==='Restore once and reconcile the fixed preview assignment').env).toEqual({GITHUB_TOKEN:'${{ github.token }}',CLOUDFLARE_API_TOKEN:'${{ secrets.CLOUDFLARE_API_TOKEN }}',CLOUDFLARE_ACCOUNT_ID:'${{ secrets.CLOUDFLARE_ACCOUNT_ID }}'});
+  expect(workflow.jobs.classify.if).toContain("inputs.preview_restore_json != ''");
+  expect(workflow.jobs['operator-proof-upload'].if).toContain("inputs.preview_restore_json == ''");
 });

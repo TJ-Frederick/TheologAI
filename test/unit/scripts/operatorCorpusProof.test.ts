@@ -1,3 +1,4 @@
+import{prepareApplicationReleaseSource}from '../../helpers/applicationReleaseSource.js';
 import {describe,expect,it,vi} from 'vitest';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
@@ -158,11 +159,12 @@ describe('GitHub owner artifact provenance',()=>{
       const sourceRoot=join(directory,'source');
       execFileSync('git',['clone','--shared','--no-checkout',process.cwd(),sourceRoot],{stdio:'pipe'});
       const git=(args:string[])=>execFileSync('git',args,{cwd:sourceRoot,stdio:'pipe'});
-      git(['sparse-checkout','init','--cone']);git(['sparse-checkout','set','scripts','release','src','data','migrations','.github']);git(['checkout','--detach','HEAD']);
+      git(['sparse-checkout','init','--cone']);git(['sparse-checkout','set','scripts','release','src','data','migrations','.github']);git(['checkout','--detach','HEAD']);prepareApplicationReleaseSource(sourceRoot);
       for(const name of ['operator-corpus-proof.ts','application-corpus-check.ts','application-release-policy.mjs','corpus-proof-transport.ts'])copyFileSync(resolve('scripts',name),join(sourceRoot,'scripts',name));
       for(const name of ['operator-authorization.cjs'])copyFileSync(resolve('.github/scripts',name),join(sourceRoot,'.github/scripts',name));
       git(['add','scripts','.github']);git(['-c','user.name=Operator proof test','-c','user.email=test@example.invalid','commit','--allow-empty','-m','Test exact operator proof source']);
       symlinkSync(resolve('node_modules'),join(sourceRoot,'node_modules'),'dir');
+      writeFileSync(join(sourceRoot,'.git/info/exclude'),'\n/node_modules\n',{flag:'a'});
       const source=classifyApplicationRelease(sourceRoot);
       f.plan.classification=source;
       f.c.sourceCommit=source.sourceCommit;f.c.sourceTree=source.sourceTree;
@@ -281,7 +283,7 @@ describe('operator writes and protected read proof composition',()=>{
   it('archives the complete receipt at the flat downstream path while preserving operator evidence',()=>{
     const workflow=readFileSync(resolve('.github/workflows/pr.yml'),'utf8');const block=workflow.split('name: Retain proof verified by this protected preview job')[1]!.split('  operator-proof-upload:')[0]!;
     const paths=block.split('path: |')[1]!.split('retention-days:')[0]!.trim().split('\n').map(p=>p.trim().replace('${{ runner.temp }}/',''));
-    expect(paths).toContain('operator-proof-envelope.json');expect(paths).toContain('operator-proof/operator-proof-envelope.json');expect(block).toContain('if: always()');
+    expect(paths).toContain('operator-proof-envelope.json');expect(paths).toContain('operator-proof/operator-proof-envelope.json');expect(block).toContain("if: ${{ always() && needs.operator-proof-source.outputs.mode != 'runtime-reuse' }}");
     // upload-artifact preserves paths from the common RUNNER_TEMP ancestor.
     const directory=mkdtempSync(join(tmpdir(),'proof-artifact-layout-'));try{for(const path of paths){mkdirSync(join(directory,path,'..'),{recursive:true});writeFileSync(join(directory,path),path==='operator-proof-envelope.json'?'complete':'operator');}
       const zip=join(directory,'artifact.zip');execFileSync(process.platform==='darwin'?'/opt/homebrew/bin/python3':'python3',['-c',"import sys,zipfile,pathlib; root=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2],'w'); [z.write(root/p,p) for p in sys.argv[3:]]",directory,zip,...paths]);

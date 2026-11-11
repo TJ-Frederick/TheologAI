@@ -1,6 +1,5 @@
 /**
- * Dormant structured-output contracts for hierarchy-node delivery.
- * No MCP handler imports these presenters in Transform-10 PR A.
+ * Closed structured-output contracts for active hierarchy-node delivery.
  */
 
 import { OutputLimitError } from '../kernel/errors.js';

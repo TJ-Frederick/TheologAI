@@ -37,6 +37,7 @@ const TOOL_ORDER = [
   'parallel_passages',
   'commentary_lookup',
   'classic_text_lookup',
+  'historical_hierarchy_lookup',
   'primary_source_search',
   'original_language_lookup',
   'bible_verse_morphology',
@@ -67,20 +68,20 @@ const STATIC_RESOURCE_ORDER = [
 
 // Filled from the four real process/runtime rows and then frozen in this file.
 export const EXPECTED_MCP_CONTRACT_FINGERPRINTS: Record<'6' | '7', McpContractFingerprints> = {
-  '6': {
-    capabilities: '',
-    tools: '013cfd1b41e3ed8a30b0d7aa7dd6fa241d7481611af7c81c0805de478ab118b1',
-    prompts: 'a4b74048b785049c539bcc4868102e6143d4053a79e9da6cf0b41cc2fbf0fc60',
-    resourceTemplates: 'f67c92aa2f3f64ce0a55e0973b61346962edd1533c86024347b63483a04d6ca3',
-    staticResources: '1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b',
+  "6": {
+    "capabilities": "",
+    "tools": "e0c5bf45288a0a01f5f611036b9ce9e56df037d0c5c0d580c581f1f2af2290a7",
+    "prompts": "a4b74048b785049c539bcc4868102e6143d4053a79e9da6cf0b41cc2fbf0fc60",
+    "resourceTemplates": "00f1610e183225227f78b36e6fb04fd72244e5dd042cb7205778703bf0d4accc",
+    "staticResources": "1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b"
   },
-  '7': {
-    capabilities: '',
-    tools: '21ad4813fa053e04065aca7028bbe97c288d58935c65e113ddc1d061ae9eded4',
-    prompts: 'a18ccf15c9a9bc3fd588aebe5ac8a5dc5cf9dec9ef67013c1494b5d2239b7a0f',
-    resourceTemplates: 'f67c92aa2f3f64ce0a55e0973b61346962edd1533c86024347b63483a04d6ca3',
-    staticResources: '1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b',
-  },
+  "7": {
+    "capabilities": "",
+    "tools": "f37f40b7fb8b8abc9cbdbf9e75495b13830c20f23d3029642a886a24f0b6b140",
+    "prompts": "a18ccf15c9a9bc3fd588aebe5ac8a5dc5cf9dec9ef67013c1494b5d2239b7a0f",
+    "resourceTemplates": "00f1610e183225227f78b36e6fb04fd72244e5dd042cb7205778703bf0d4accc",
+    "staticResources": "1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b"
+  }
 };
 
 function invariant(condition: unknown, message: string): asserts condition {

@@ -155,9 +155,9 @@ describe('historical core preview audit contract', () => {
     const predecessorArtifact = workflow.indexOf('- name: Upload preview predecessor reconciliation anchor');
     const deploy = workflow.indexOf('- name: Deploy to Cloudflare Workers (preview)');
     const candidateCutover = workflow.indexOf('- name: Require deployed candidate preview D1 binding (read-only)');
-    const v2 = workflow.indexOf('- name: Audit original-language v2 contract on preview');
-    const historical = workflow.indexOf('- name: Audit Transform-9 historical core contract on preview');
-    const spine = workflow.indexOf('- name: Audit Transform-11 historical spine contract on preview');
+    const v2 = workflow.indexOf('- name: Audit the corpus release in both protocol eras');
+    const historical = workflow.indexOf('- name: Audit the corpus release in both protocol eras');
+    const spine = workflow.indexOf('- name: Audit the corpus release in both protocol eras');
     const reconciliationStep = workflow.indexOf('- name: Capture preview post-mutation reconciliation record (read-only)');
     const identity = workflow.indexOf('- name: Verify preview Worker remained active through audit (read-only)');
     const artifact = workflow.indexOf('name: preview-release-audit-');
@@ -168,8 +168,8 @@ describe('historical core preview audit contract', () => {
     expect(deploy).toBeGreaterThan(predecessorArtifact);
     expect(candidateCutover).toBeGreaterThan(deploy);
     expect(v2).toBeGreaterThan(candidateCutover);
-    expect(historical).toBeGreaterThan(v2);
-    expect(spine).toBeGreaterThan(historical);
+    expect(historical).toBe(v2);
+    expect(spine).toBe(historical);
     expect(reconciliationStep).toBeGreaterThan(spine);
     expect(identity).toBeGreaterThan(spine);
     expect(artifact).toBeGreaterThan(identity);
@@ -177,8 +177,8 @@ describe('historical core preview audit contract', () => {
     expect(workflow).toContain('historical_audit_sha256');
     expect(workflow).toContain('historical-spine-preview-audit.json');
     expect(workflow).toContain('historical_spine_audit_sha256');
-    expect(workflow).toContain('wrangler versions view "$predecessor_version" --env preview --json');
-    expect(workflow).toContain('wrangler versions view "$observed_active_version" --env preview --json');
+    expect(workflow).toContain('wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$predecessor_version" --env preview --json');
+    expect(workflow).toContain('wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" versions view "$observed_active_version" --env preview --json');
   });
 
   it('runs the exact 55-exchange inventory through a representative fake transport without retaining bodies, locators, snippets, cursors, or error data', async () => {

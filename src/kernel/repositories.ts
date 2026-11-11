@@ -295,7 +295,7 @@ export interface IHistoricalDocumentRepository {
   findDocumentByName(name: string): RepositoryResult<DocumentInfo | undefined>;
 }
 
-// ── Inactive edition-scoped hierarchical authority (Transform 10) ──
+// ── Edition-scoped hierarchical authority ──
 //
 // This repository is intentionally not part of the historical-document
 // runtime composition. Search is discovery-only; exact authority text appears
@@ -306,7 +306,7 @@ export interface HistoricalHierarchyProfile {
   packId: string;
   workId: string;
   editionId: string;
-  availability: string;
+  availability: 'local_only_inactive' | 'local_only_active';
   hierarchySchemaVersion: string;
   levelSpec: Record<string, unknown>;
   sourceManifestSha256: string;
@@ -332,7 +332,7 @@ export interface HistoricalHierarchyProvenanceDisclosure {
 }
 
 export interface HistoricalHierarchyAuthorityProvenance {
-  status: 'local_only_inactive';
+  status: 'local_only_inactive' | 'local_only_active';
   rightsStatus: string;
   territoryCaveat: string;
   catalogStatement: string;
@@ -427,8 +427,8 @@ export interface HistoricalHierarchySearchResult {
 }
 
 /**
- * A dormant future-delivery projection. It is deliberately separate from the
- * immutable hierarchy authority profile and is not a documents projection.
+ * A delivery projection separate from the immutable hierarchy authority
+ * profile. It is not a documents projection.
  */
 export interface HistoricalHierarchyPublication {
   publicationId: string;
@@ -446,7 +446,7 @@ export interface HistoricalHierarchyPublication {
   nodeMaxBytes: number;
   searchMaxBytes: number;
   canonicalUri: string;
-  activationState: 'dormant';
+  activationState: 'dormant' | 'active';
 }
 
 /** Work-neutral publication metadata; individual works choose the values. */
@@ -480,6 +480,8 @@ export interface IHistoricalHierarchyRepository {
   getHierarchyProfile(hierarchyId: string): RepositoryResult<HistoricalHierarchyProfile | undefined>;
   getHierarchyPublication(publicationId: string): RepositoryResult<HistoricalHierarchyPublication | undefined>;
   getHierarchyPublicationBySlug(publicSlug: string): RepositoryResult<HistoricalHierarchyPublication | undefined>;
+  /** Active publications only; dormant projections must never enter a public inventory. */
+  listActiveHierarchyPublications(): RepositoryResult<HistoricalHierarchyPublication[]>;
   listHierarchyArtifacts(hierarchyId: string): RepositoryResult<HistoricalHierarchyArtifact[]>;
   /** Exact body + bounded ancestors only; implementations must not concatenate children. */
   getHierarchyNodeContext(hierarchyId: string, nodeKey: string): RepositoryResult<HistoricalHierarchyNodeContext | undefined>;
