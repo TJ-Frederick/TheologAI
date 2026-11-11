@@ -56,3 +56,10 @@ it('checks actual current production authority and both captured assignments imm
 });
 
 it('selects the closed corpus route before any legacy artifact search and checks authority before secret mutation',()=>{const source=readFileSync('.github/workflows/deploy.yml','utf8');expect(source.indexOf("if (existingNortonAllowed)" )).toBeLessThan(source.indexOf('const artifactName = `preview-release-audit-'));expect(source.indexOf('Check accepted controls and current corpus authority at mutation boundary')).toBeLessThan(source.indexOf('name: Deploy to Cloudflare Workers'));expect(source).toContain('production-worker-predecessor-anchor.json');expect(source).toContain('verify-runtime-preview-handoff.ts boundary');});
+
+it('checks authority again after secret synchronization and before sending the deployment',()=>{
+ const workflow=readFileSync('.github/workflows/deploy.yml','utf8');
+ const step=workflow.split('id: production-worker-deploy\n')[1]!.split('      - name:')[0]!;
+ const sync=step.indexOf('secret put ESV_API_KEY'),check=step.indexOf('verify-runtime-preview-handoff.ts boundary'),deploy=step.indexOf('wrangler deploy --config');
+ expect(sync).toBeGreaterThan(-1);expect(check).toBeGreaterThan(sync);expect(deploy).toBeGreaterThan(check);
+});

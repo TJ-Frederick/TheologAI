@@ -868,6 +868,12 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' "$ESV_API_KEY" | npx --no-install wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" secret put ESV_API_KEY --env= --env-file /dev/null
+          if test '${{ steps.release-operation.outputs.release_policy }}' = norton-aquinas.v1; then
+            env -u CLOUDFLARE_API_TOKEN -u ESV_API_KEY npx --no-install tsx .github/scripts/verify-runtime-preview-handoff.ts boundary \
+              "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
+              "$RUNNER_TEMP/preview-control-before-production.json" \
+              "$RUNNER_TEMP/operator-corpus-challenge.json" > "$RUNNER_TEMP/production-deploy-boundary.json"
+          fi
           npx --no-install wrangler deploy --config "$RUNNER_TEMP/worker-release.json" --no-bundle --env-file /dev/null | tee "$RUNNER_TEMP/production-worker-deploy.command-output.txt"
 
       - name: Verify exact active production Worker version (read-only)
