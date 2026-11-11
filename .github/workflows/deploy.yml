@@ -259,7 +259,7 @@ jobs:
             }
             const pull = merged[0];
             let existingNortonAllowed = false;
-            if (pull.number === 176) {
+            {
               const { pathToFileURL } = require('node:url');
               const { selectReleaseProofPolicy } = await import(pathToFileURL(require('node:path').resolve('.github/scripts/release-proof-policy.mjs')).href);
               existingNortonAllowed = selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1';
