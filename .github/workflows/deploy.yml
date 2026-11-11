@@ -259,7 +259,7 @@ jobs:
             }
             const pull = merged[0];
             let existingNortonAllowed = false;
-            if (pull.number === 176) {
+            if (pull.number === 176 || pull.number === 177) {
               const { pathToFileURL } = require('node:url');
               const { selectReleaseProofPolicy } = await import(pathToFileURL(require('node:path').resolve('.github/scripts/release-proof-policy.mjs')).href);
               existingNortonAllowed = selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1';
@@ -659,9 +659,14 @@ jobs:
       - name: Verify source-bound dual-era preview release receipt
         env:
           SOURCE_COMMIT: ${{ needs.verify-dual-era-preview.outputs.source_commit }}
+          RELEASE_POLICY: ${{ needs.build-worker.outputs.release_policy }}
           EVIDENCE_KIND: ${{ needs.verify-dual-era-preview.outputs.evidence_kind }}
           NATIVE_BINDING_JSON: ${{ needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-runtime-preview' && steps.recheck-runtime-preview.outputs.native_binding_json || steps.recheck-existing-preview.outputs.native_binding_json }}
         run: |
+          if [ "$RELEASE_POLICY" = 'norton-aquinas.v1' ] && [ "$EVIDENCE_KIND" != 'norton-runtime-preview' ]; then
+            printf '%s\n' 'Norton production requires the pinned native runtime preview handoff.' >&2
+            exit 1
+          fi
           if [ "$EVIDENCE_KIND" = 'norton-runtime-preview' ]; then
             printf '%s\n' "$NATIVE_BINDING_JSON" > "$RUNNER_TEMP/runtime-native-binding.json"
             git worktree add --detach "$RUNNER_TEMP/preview-candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
