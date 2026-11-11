@@ -56,6 +56,8 @@ it('refuses an observed production overage even when the account still has daily
  try{
   await expect(runCorpusLive(f.input)).rejects.toThrow('observed live/control allowance exceeded');
   expect(audited).toBe(true);
+  const journal=readFileSync(join(f.directory,'corpus-live.json.events.jsonl'),'utf8').trim().split('\n');
+  expect(JSON.parse(journal.at(-1)!)).toMatchObject({kind:'live-budget-stop',reason:'observed live/control allowance exceeded',effectiveAccountReads:3332295,observedAccountReads:3832296,reservationRetained:true,retry:false});
   expect(existsSync(join(f.directory,'corpus-live.json'))).toBe(false);
  }finally{vi.unstubAllEnvs();audit.mockReset();rmSync(f.directory,{recursive:true,force:true});}
 },30000);

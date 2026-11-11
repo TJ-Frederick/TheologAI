@@ -48,10 +48,15 @@ export async function runCorpusLive(input:{role:'preview'|'production';sourceDir
  // Adaptive analytics has no ingestion watermark: a delta can include the earlier full proof.
  // Retain the whole live charge; never present a delayed counter delta as precise per-suite metering.
  const observedAccountReads=finalUsage.candidate.rowsRead+finalUsage.otherDatabases.rowsRead;
- if(input.role==='production')check(observedAccountReads<=effective+liveReads+POLICY.controlReads,'observed live/control allowance exceeded');
  const finalAccountReads=Math.max(observedAccountReads,effective+liveReads);
- check(finalAccountReads+POLICY.controlReads+200000<=accountReadCeiling,'final account headroom exceeded');
- check(finalUsage.candidate.rowsWritten+finalUsage.otherDatabases.rowsWritten<=80000,'final account write ceiling exceeded');
+ const writes=finalUsage.candidate.rowsWritten+finalUsage.otherDatabases.rowsWritten;
+ const refusal=input.role==='production' && observedAccountReads>effective+liveReads+POLICY.controlReads ? 'observed live/control allowance exceeded'
+  : finalAccountReads+POLICY.controlReads+200000>accountReadCeiling ? 'final account headroom exceeded'
+  : writes>80000 ? 'final account write ceiling exceeded' : null;
+ if(refusal){
+  event({kind:'live-budget-stop',reason:refusal,effectiveAccountReads:effective,observedAccountReads,observedAccountWrites:writes,liveReads,controlReads:POLICY.controlReads,uncertaintyMargin:200000,accountReadCeiling,reservationRetained:true,retry:false});
+  check(false,refusal);
+ }
  requireOperatorChallenge(challenge);
  event({kind:'live-complete',sha256:sha(JSON.stringify(live)),reservedReadsRetained:liveReads,precisePerSuiteMeteringUnavailable:true,usageBefore:usage,usageObservation:finalUsage,ingestionWatermarkUnavailable:true});
  writeFileSync(output,JSON.stringify(live,null,2)+'\n',{flag:'wx',mode:0o600});
