@@ -36,6 +36,7 @@
     ".github/scripts/norton-scoped-response-diagnostic.ts",
     ".github/scripts/reconstruct-norton-source.ts",
     ".github/scripts/rehearse-norton-source.ts",
-    ".github/scripts/preview-runtime-reuse.ts"
+    ".github/scripts/preview-runtime-reuse.ts",
+    ".github/scripts/verify-runtime-preview-handoff.ts"
   ]
 }

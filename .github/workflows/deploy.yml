@@ -258,6 +258,23 @@ jobs:
               return;
             }
             const pull = merged[0];
+            let existingNortonAllowed = false;
+            if (pull.number === 176) {
+              const { pathToFileURL } = require('node:url');
+              const { selectReleaseProofPolicy } = await import(pathToFileURL(require('node:path').resolve('.github/scripts/release-proof-policy.mjs')).href);
+              existingNortonAllowed = selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1';
+            }
+            if (existingNortonAllowed) {
+              const binding = await require('./.github/scripts/runtime-preview-handoff.cjs').resolveRuntimePreviewHandoff({github,context});
+              core.setOutput('evidence_kind', binding.kind);
+              core.setOutput('native_binding_json', JSON.stringify(binding));
+              core.setOutput('artifact_name', binding.artifacts.result.name);
+              core.setOutput('artifact_id', String(binding.artifacts.result.id));
+              core.setOutput('inputs_artifact_id', String(binding.artifacts.inputs.id));
+              core.setOutput('run_id', String(binding.run.id));
+              core.setOutput('source_commit', binding.acceptedSource.commit);
+              return;
+            }
             const artifactName = `preview-release-audit-${pull.number}-${pull.head.sha}`;
             const { data } = await github.rest.actions.listArtifactsForRepo({
               owner: context.repo.owner,
@@ -287,23 +304,6 @@ jobs:
               }
             }
             if (!selected) {
-              let existingNortonAllowed = false;
-              if (pull.number === 176) {
-                const { pathToFileURL } = require('node:url');
-                const { selectReleaseProofPolicy } = await import(pathToFileURL(require('node:path').resolve('.github/scripts/release-proof-policy.mjs')).href);
-                existingNortonAllowed = selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1';
-              }
-              if (existingNortonAllowed) {
-                const binding = await require('./.github/scripts/resolve-existing-norton-preview.cjs').resolveExistingNortonPreview({github,context});
-                core.setOutput('evidence_kind', binding.kind);
-                core.setOutput('native_binding_json', JSON.stringify(binding));
-                core.setOutput('artifact_name', binding.validationArtifact.name);
-                core.setOutput('artifact_id', String(binding.validationArtifact.id));
-                core.setOutput('inputs_artifact_id', String(binding.inputsArtifact.id));
-                core.setOutput('run_id', String(binding.run.id));
-                core.setOutput('source_commit', binding.auditorCommit);
-                return;
-              }
               core.setFailed(`No fresh successful protected preview artifact named ${artifactName} matched the merged source.`);
               return;
             }
@@ -314,7 +314,7 @@ jobs:
             core.setOutput('source_commit', pull.head.sha);
 
       - name: Download exact protected preview evidence with digest validation
-        if: steps.evidence.outputs.evidence_kind != 'norton-existing-preview'
+        if: ${{ !contains(fromJSON('["norton-existing-preview","norton-runtime-preview"]'), steps.evidence.outputs.evidence_kind) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ steps.evidence.outputs.artifact_name }}
@@ -345,13 +345,28 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
 
+      - name: Download split native runtime preview archives
+        if: steps.evidence.outputs.evidence_kind == 'norton-runtime-preview'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          NATIVE_BINDING_JSON: ${{ steps.evidence.outputs.native_binding_json }}
+        with:
+          script: |
+            await require('./.github/scripts/runtime-preview-handoff.cjs').downloadRuntimePreviewArchives({github,binding:JSON.parse(process.env.NATIVE_BINDING_JSON),directory:process.env.RUNNER_TEMP+'/protected-runtime-preview'});
+
       - name: Verify source-bound dual-era preview release receipt
         env:
           SOURCE_COMMIT: ${{ steps.evidence.outputs.source_commit }}
           EVIDENCE_KIND: ${{ steps.evidence.outputs.evidence_kind }}
           NATIVE_BINDING_JSON: ${{ steps.evidence.outputs.native_binding_json }}
         run: |
-          if [ "$EVIDENCE_KIND" = 'norton-existing-preview' ]; then
+          if [ "$EVIDENCE_KIND" = 'norton-runtime-preview' ]; then
+            printf '%s\n' "$NATIVE_BINDING_JSON" > "$RUNNER_TEMP/runtime-native-binding.json"
+            git worktree add --detach "$RUNNER_TEMP/preview-candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
+            npx --no-install tsx .github/scripts/verify-runtime-preview-handoff.ts \
+              "$RUNNER_TEMP/runtime-native-binding.json" "$RUNNER_TEMP/protected-runtime-preview" \
+              "$RUNNER_TEMP/preview-candidate-cc14" > "$RUNNER_TEMP/runtime-preview-handoff.json"
+          elif [ "$EVIDENCE_KIND" = 'norton-existing-preview' ]; then
             printf '%s\n' "$NATIVE_BINDING_JSON" > "$RUNNER_TEMP/norton-native-binding.json"
             git worktree add --detach "$RUNNER_TEMP/preview-candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
             npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify-existing \
@@ -431,7 +446,7 @@ jobs:
     needs: [verify-deployment-plan, validate, verify-dual-era-preview, build-worker]
     if: ${{ github.ref == 'refs/heads/main' && needs.verify-deployment-plan.outputs.decision == 'deploy' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: ${{ needs.build-worker.outputs.release_policy == 'norton-aquinas.v1' && 245 || 65 }}
     permissions:
       actions: read
       contents: read
@@ -448,6 +463,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           OPERATOR_WAIT_AUTHORIZATION: 'true'
+          OPERATOR_PRODUCTION_PREPARATION_WAIT: ${{ needs.build-worker.outputs.release_policy == 'norton-aquinas.v1' && 'true' || 'false' }}
           OPERATOR_BASE_COMMIT: ${{ needs.verify-deployment-plan.outputs.before }}
           OPERATOR_SOURCE_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
         with:
@@ -575,6 +591,18 @@ jobs:
             cp wrangler.toml "$RUNNER_TEMP/corpus-wrangler.toml"
           fi
 
+      - name: Recheck pinned split native runtime preview evidence
+        if: needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-runtime-preview'
+        id: recheck-runtime-preview
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          NATIVE_BINDING_JSON: ${{ needs.verify-dual-era-preview.outputs.native_binding_json }}
+        with:
+          script: |
+            const pin = JSON.parse(process.env.NATIVE_BINDING_JSON);
+            const binding = await require('./.github/scripts/runtime-preview-handoff.cjs').resolveRuntimePreviewHandoff({github,context,pin});
+            core.setOutput('native_binding_json', JSON.stringify(binding));
+
       - name: Recheck pinned Norton native preview evidence
         if: needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-existing-preview'
         id: recheck-existing-preview
@@ -588,7 +616,7 @@ jobs:
             core.setOutput('native_binding_json', JSON.stringify(binding));
 
       - name: Download exact protected preview evidence with digest validation
-        if: needs.verify-dual-era-preview.outputs.evidence_kind != 'norton-existing-preview'
+        if: ${{ !contains(fromJSON('["norton-existing-preview","norton-runtime-preview"]'), needs.verify-dual-era-preview.outputs.evidence_kind) }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.verify-dual-era-preview.outputs.artifact_name }}
@@ -619,13 +647,28 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
 
+      - name: Download split native runtime preview archives
+        if: needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-runtime-preview'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          NATIVE_BINDING_JSON: ${{ steps.recheck-runtime-preview.outputs.native_binding_json }}
+        with:
+          script: |
+            await require('./.github/scripts/runtime-preview-handoff.cjs').downloadRuntimePreviewArchives({github,binding:JSON.parse(process.env.NATIVE_BINDING_JSON),directory:process.env.RUNNER_TEMP+'/protected-runtime-preview'});
+
       - name: Verify source-bound dual-era preview release receipt
         env:
           SOURCE_COMMIT: ${{ needs.verify-dual-era-preview.outputs.source_commit }}
           EVIDENCE_KIND: ${{ needs.verify-dual-era-preview.outputs.evidence_kind }}
-          NATIVE_BINDING_JSON: ${{ steps.recheck-existing-preview.outputs.native_binding_json }}
+          NATIVE_BINDING_JSON: ${{ needs.verify-dual-era-preview.outputs.evidence_kind == 'norton-runtime-preview' && steps.recheck-runtime-preview.outputs.native_binding_json || steps.recheck-existing-preview.outputs.native_binding_json }}
         run: |
-          if [ "$EVIDENCE_KIND" = 'norton-existing-preview' ]; then
+          if [ "$EVIDENCE_KIND" = 'norton-runtime-preview' ]; then
+            printf '%s\n' "$NATIVE_BINDING_JSON" > "$RUNNER_TEMP/runtime-native-binding.json"
+            git worktree add --detach "$RUNNER_TEMP/preview-candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
+            npx --no-install tsx .github/scripts/verify-runtime-preview-handoff.ts \
+              "$RUNNER_TEMP/runtime-native-binding.json" "$RUNNER_TEMP/protected-runtime-preview" \
+              "$RUNNER_TEMP/preview-candidate-cc14" > "$RUNNER_TEMP/runtime-preview-handoff.json"
+          elif [ "$EVIDENCE_KIND" = 'norton-existing-preview' ]; then
             printf '%s\n' "$NATIVE_BINDING_JSON" > "$RUNNER_TEMP/norton-native-binding.json"
             git worktree add --detach "$RUNNER_TEMP/preview-candidate-cc14" cc14e062d772e957a24a64bfc15a679ebaca8109
             npx --no-install tsx scripts/dual-era-preview-release-receipt.ts verify-existing \
@@ -806,6 +849,14 @@ jobs:
             --wrangler-config "$RUNNER_TEMP/corpus-wrangler.toml" \
             --d1-inventory "$RUNNER_TEMP/preview-control-d1-inventory-before.json" \
             --output "$RUNNER_TEMP/preview-control-before-production.json"
+
+      - name: Check accepted controls and current corpus authority at mutation boundary
+        if: ${{ steps.release-operation.outputs.release_policy == 'norton-aquinas.v1' }}
+        run: |
+          npx --no-install tsx .github/scripts/verify-runtime-preview-handoff.ts boundary \
+            "$RUNNER_TEMP/production-worker-predecessor-anchor.json" \
+            "$RUNNER_TEMP/preview-control-before-production.json" \
+            "$RUNNER_TEMP/operator-corpus-challenge.json" > "$RUNNER_TEMP/production-mutation-boundary.json"
 
       - name: Deploy to Cloudflare Workers
         if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') }}
@@ -1127,6 +1178,17 @@ jobs:
             ${{ runner.temp }}/final-environment-isolation-receipt.json
           retention-days: 30
           if-no-files-found: error
+
+      - name: Retain sanitized production corpus failure evidence
+        if: ${{ always() && (steps.production-corpus-live.outcome == 'failure' || steps.production-corpus-live.outcome == 'cancelled') }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-corpus-stop-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/corpus-live.json
+            ${{ runner.temp }}/corpus-live.json.events.jsonl
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Upload protected production audit evidence
         if: ${{ steps.production-audit-evidence.outcome == 'success' }}
