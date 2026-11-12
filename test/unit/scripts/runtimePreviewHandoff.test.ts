@@ -79,7 +79,7 @@ it('accepts an empty inline collection only with independent commit and job evid
 it.each(['association-disagreement','duplicate-association','wrong-job-ref','contradictory-job-ref','missing-job-ref','job-disagreement','inline-not-array'])('rechecks independent provenance at protected gate despite matching inline metadata: %s',async fault=>{const pin=await resolveRuntimePreviewHandoff(fixture());await expect(resolveRuntimePreviewHandoff({...fixture(fault),pin})).rejects.toThrow('Runtime preview handoff refused:');});
 
 it('preserves legacy selection and refuses unsupported Norton evidence before protected verification',()=>{
- const source=readFileSync('.github/workflows/deploy.yml','utf8'),{jobs}=parse(source);expect(source).toContain('if (pull.number === 176 || pull.number === 177 || pull.number === 178)');
+ const source=readFileSync('.github/workflows/deploy.yml','utf8'),{jobs}=parse(source);expect(source).toContain('if (pull.number === 176 || pull.number === 177 || pull.number === 178 || pull.number === 180)');
  const step=jobs.deploy.steps.find((s:any)=>s.name==='Verify source-bound dual-era preview release receipt');expect(step.env.RELEASE_POLICY).toBe('${{ needs.build-worker.outputs.release_policy }}');
  const guard=step.run.slice(0,step.run.indexOf("if [ \"$EVIDENCE_KIND\" = 'norton-runtime-preview' ]; then"));
  for(const kind of ['legacy','norton-existing-preview','unknown',''])expect(spawnSync('bash',['-c',guard],{env:{...process.env,RELEASE_POLICY:'norton-aquinas.v1',EVIDENCE_KIND:kind}}).status).toBe(1);
