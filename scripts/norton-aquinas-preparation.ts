@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {unstable_splitSqlQuery as split} from 'wrangler';
 import {canonicalJson} from './audit-historical-core-preview.js';
 import {parseDataManifest,verifyD1Migrations} from './d1-corpus-identity.js';
-import {canonicalTableDigest,PROVIDER_CATALOG} from './corpus-source-proof.js';
+import {canonicalTableDigest,PROVIDER_CATALOG,comparableSchema} from './corpus-source-proof.js';
 import {POLICY} from './norton-aquinas-release-policy.mjs';
 import {CORPUS_INSERT_TABLES,deriveLocalHistoricalAdditions,digestLocalDeltaTable,verifyExactInsertRows,type Row,type ExactInsertRows,type ProofReader} from './corpus-release-data.js';
 export const TARGETS={production:{id:POLICY.targets.production.databaseId,name:POLICY.targets.production.databaseName}};
@@ -215,7 +215,7 @@ export async function applyPreparation(plan:PreparationPlan,session:PreparationS
 export async function checkPreparationBaseline(session:PreparationSession,baseline:Database.Database,expectedLedgerSha256:string,root=process.cwd()){
  check(session.dependencies.databaseId===TARGETS.production.id,'preparation preflight target');check(/^[a-f0-9]{64}$/.test(expectedLedgerSha256),'reviewed original nine-row ledger witness required');
  const catalog=(await session.query(CATALOG_SQL,4096)).rows;
- same(catalog.filter(r=>!['_cf_KV','d1_migrations'].includes(String(r.name))),baseline.prepare(CATALOG_SQL).all(),'target is not the complete baseline schema');
+ same(comparableSchema(catalog.filter(r=>!['_cf_KV','d1_migrations'].includes(String(r.name)))),comparableSchema(baseline.prepare(CATALOG_SQL).all() as Row[]),'target is not the complete baseline schema');
  same(catalog.filter(r=>['_cf_KV','d1_migrations'].includes(String(r.name))),PROVIDER_CATALOG,'exact provider schema before preparation');
  const ledger=(await session.query('SELECT id,name,applied_at FROM d1_migrations ORDER BY id LIMIT 11;',32)).rows;
  const manifest=parseDataManifest(readFileSync(join(root,'data/data-manifest.json')));

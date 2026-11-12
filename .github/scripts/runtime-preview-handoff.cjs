@@ -5,7 +5,7 @@ const {readFileSync,writeFileSync,mkdirSync}=require('node:fs');
 const {execFileSync}=require('node:child_process');
 const {join}=require('node:path');
 const RELEASE_POLICY=require('./norton-aquinas-policy.cjs');
-const PINS=Object.freeze({repository:'TJ-Frederick/TheologAI',owner:40179660,pr:176,successorPR:RELEASE_POLICY.productionReleasePR,originalMerge:'959d6535f3ffb87a00633b208e2ca10d5090fe5f',originalHead:'19efe8f399a89401212874462d5a89f48f48c679',originalTree:'589bdff668072d9e4d72113c490bb0b0074a0c19',source:'6c43cbc5d42f71c6f0c8bae526269313c3539003',tree:'76d5aa0cccb74932307c2024ca9c76bc732a1c03',run:42927858781,producer:42927918549,
+const PINS=Object.freeze({repository:'TJ-Frederick/TheologAI',owner:40179660,pr:176,successorPR:177,preparationPR:178,previousMerge:'7960e5a33b83ca828e3763f765f2450907e494b0',previousTree:'6be4ba3935d80b6453edba263a5c2085fb6294e4',previousHead:'aa219f73cd5c394e2e13a19e5c7e1a637f1b6af2',originalMerge:'959d6535f3ffb87a00633b208e2ca10d5090fe5f',originalHead:'19efe8f399a89401212874462d5a89f48f48c679',originalTree:'589bdff668072d9e4d72113c490bb0b0074a0c19',source:'6c43cbc5d42f71c6f0c8bae526269313c3539003',tree:'76d5aa0cccb74932307c2024ca9c76bc732a1c03',run:42927858781,producer:42927918549,
  result:{id:13816255512,name:'preview-runtime-reuse-42927858781-attempt-1',digest:'sha256:e67668dc8b75294500e60fcf4dfaa18aa07b5e83fcb212c97f40c24232cc9d9d',maxBytes:1024*1024},
  inputs:{id:13813738537,name:'existing-preview-inputs-42927918549-attempt-1',digest:'sha256:267c7b6103bfc1657ee723e88e134e7efd6bb87b1a17db2323146ea6d625bbd1',maxBytes:128*1024*1024},
  request:{id:13814314094,name:'norton-preview-runtime-reuse-request-42927858781-attempt-1',digest:'sha256:aaaa36a221e2cf65e26e311d8b4e71b3b7b13059207dd2bf3e7dd3feb6be80ea',maxBytes:128*1024},
@@ -22,6 +22,9 @@ const TOOLING_PATHS=new Set([
  'release/norton-aquinas.json',
  'scripts/application-corpus-check.ts',
  'scripts/corpus-proof-transport.ts',
+ 'scripts/corpus-source-proof.ts',
+ 'scripts/norton-aquinas-preparation.ts',
+ 'test/unit/scripts/nortonAquinasPreparation.test.ts',
  'scripts/norton-aquinas-live.ts',
  'scripts/norton-aquinas-release-policy.d.mts',
  'scripts/norton-aquinas-release-policy.mjs',
@@ -38,6 +41,8 @@ const TOOLING_PATHS=new Set([
  'tsconfig.release-scripts.json',
 ]);
 const SUCCESSOR_PATHS=new Set(['.github/scripts/runtime-preview-handoff.cjs','.github/scripts/verify-runtime-preview-handoff.ts','test/unit/scripts/runtimePreviewHandoff.test.ts','.github/workflows/deploy.yml','.github/scripts/norton-aquinas-policy.cjs','.github/scripts/operator-authorization.cjs','.github/scripts/prepare-norton-production.ts','scripts/norton-aquinas-release-policy.d.mts','test/unit/scripts/nortonProductionOperation.test.ts']);
+const CHECKER_BLOBS=Object.freeze({'scripts/corpus-source-proof.ts':'7ffec2bc08eb8f5e27ceea5bf6bac55f65fc26a7','scripts/norton-aquinas-preparation.ts':'fba90b146beff2e53e6c89eb721c384ecff0bed7'});
+const PREPARATION_PATHS=new Set(['.github/scripts/operator-authorization.cjs','scripts/norton-aquinas-release-policy.d.mts','.github/scripts/norton-aquinas-policy.cjs','.github/scripts/prepare-norton-production.ts','.github/scripts/runtime-preview-handoff.cjs','.github/scripts/verify-runtime-preview-handoff.ts','.github/workflows/deploy.yml','release/norton-aquinas.json','scripts/corpus-source-proof.ts','scripts/norton-aquinas-preparation.ts','test/unit/scripts/nortonAquinasPreparation.test.ts','test/unit/scripts/nortonProductionOperation.test.ts','test/unit/scripts/runtimePreviewHandoff.test.ts']);
 const check=(value,reason)=>{if(!value)throw Error('Runtime preview handoff refused: '+reason);};
 const sha=v=>createHash('sha256').update(v).digest('hex');
 const hex=v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v);
@@ -47,17 +52,19 @@ function requireToolingOnlySource(root,expected){
  check(git('rev-parse','HEAD')===expected.mergeCommit&&git('rev-parse','HEAD^{tree}')===expected.mergeTree&&git('rev-parse',PINS.source+'^{tree}')===PINS.tree,'exact consumer and accepted source trees');
  execFileSync('git',['merge-base','--is-ancestor',PINS.source,'HEAD'],{cwd:root});
  if(expected.mergeCommit!==PINS.originalMerge){
-  const parents=git('show','-s','--format=%P','HEAD').split(' ');check(parents.length===2&&parents[0]===PINS.originalMerge&&parents[1]===expected.consumerCommit,'local single successor merge');
-  check(git('rev-list','--merges',PINS.originalMerge+'..'+expected.consumerCommit)==='','local linear successor');
-  check(git('diff','--name-only',PINS.originalMerge,'HEAD').split('\n').filter(Boolean).every(p=>SUCCESSOR_PATHS.has(p)),'local closed successor tooling paths');
-  check(git('rev-parse',PINS.originalMerge+'^{tree}')===PINS.originalTree&&git('rev-parse',expected.consumerCommit+'^{tree}')===expected.mergeTree,'local pinned original and successor trees');
+  const preparation=expected.consumerPullRequest===PINS.preparationPR,base=preparation?PINS.previousMerge:PINS.originalMerge,allowed=preparation?PREPARATION_PATHS:SUCCESSOR_PATHS;
+  const parents=git('show','-s','--format=%P','HEAD').split(' ');check(parents.length===2&&parents[0]===base&&parents[1]===expected.consumerCommit,'local single successor merge');
+  check(git('rev-list','--merges',base+'..'+expected.consumerCommit)==='','local linear successor');
+  check(git('diff','--name-only',base,'HEAD').split('\n').filter(Boolean).every(p=>allowed.has(p)),'local closed successor tooling paths');
+  check(git('rev-parse',base+'^{tree}')===(preparation?PINS.previousTree:PINS.originalTree)&&git('rev-parse',expected.consumerCommit+'^{tree}')===expected.mergeTree,'local pinned original and successor trees');
+  if(preparation)for(const [path,blob]of Object.entries(CHECKER_BLOBS))check(git('rev-parse','HEAD:'+path)===blob,'exact reviewed preparation checker blob');
  }
  const paths=reviewedPaths(git('diff','--name-only',PINS.source,'HEAD').split('\n').filter(Boolean));
  for(const path of paths){const line=git('ls-tree','HEAD','--',path);check(/^100644 blob [a-f0-9]{40}\t/.test(line),'regular reviewed tooling file');}
  return{acceptedSource:{commit:PINS.source,tree:PINS.tree},consumerSource:{commit:expected.mergeCommit,tree:expected.mergeTree},reviewedToolingPaths:paths};
 }
 async function resolveRuntimePreviewHandoff({github,context,pin,now=Date.now()}){
- check(RELEASE_POLICY.productMerge===PINS.originalMerge&&PINS.successorPR===177,'fixed successor release policy');
+ check(RELEASE_POLICY.productMerge===PINS.originalMerge&&RELEASE_POLICY.productionReleasePR===178&&RELEASE_POLICY.productionPredecessorMerge===PINS.previousMerge,'fixed successor release policy');
  const repo=context.repo;check(repo.owner==='TJ-Frederick'&&repo.repo==='TheologAI'&&hex(context.sha),'repository and consumer commit');
  const {data:original}=await github.rest.pulls.get({...repo,pull_number:PINS.pr});
  check(original.number===PINS.pr&&original.merged_at&&original.base.ref==='main'&&original.merge_commit_sha===PINS.originalMerge&&original.head.sha===PINS.originalHead&&original.head.repo.full_name===PINS.repository,'pinned original merged PR');
@@ -67,11 +74,17 @@ async function resolveRuntimePreviewHandoff({github,context,pin,now=Date.now()})
  const {data:merge}=await github.rest.git.getCommit({...repo,commit_sha:context.sha}),{data:head}=await github.rest.git.getCommit({...repo,commit_sha:pull.head.sha});check(merge.sha===context.sha&&head.sha===pull.head.sha&&hex(merge.tree.sha)&&merge.tree.sha===head.tree.sha,'exact merged and PR-head tree');
  if(context.sha===PINS.originalMerge)check(pull.number===PINS.pr&&pull.head.sha===PINS.originalHead,'original consumer');
  else{
-  check(pull.number===PINS.successorPR,'exact successor PR');
-  check(merge.parents?.length===2&&merge.parents[0].sha===PINS.originalMerge&&merge.parents[1].sha===pull.head.sha,'single successor merge onto pinned original');
-  const {data:successor}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:PINS.originalMerge+'...'+pull.head.sha});
-  check(successor.status==='ahead'&&successor.merge_base_commit?.sha===PINS.originalMerge&&successor.total_commits>0&&successor.total_commits<=100&&successor.commits?.length===successor.total_commits&&successor.commits.every(c=>c.parents?.length===1),'linear reviewed successor');
-  const paths=reviewedPaths(successor.files?.flatMap(f=>f.previous_filename?[f.filename,f.previous_filename]:[f.filename]));check(paths.every(p=>SUCCESSOR_PATHS.has(p)),'closed successor tooling paths');
+  const preparation=pull.number===PINS.preparationPR,base=preparation?PINS.previousMerge:PINS.originalMerge,allowed=preparation?PREPARATION_PATHS:SUCCESSOR_PATHS;
+  check(pull.number===PINS.successorPR||preparation,'exact successor PR');
+  if(preparation){
+   const {data:previous}=await github.rest.pulls.get({...repo,pull_number:PINS.successorPR}),{data:prior}=await github.rest.git.getCommit({...repo,commit_sha:PINS.previousMerge});
+   check(previous.merged_at&&previous.number===PINS.successorPR&&previous.base.ref==='main'&&previous.merge_commit_sha===PINS.previousMerge&&previous.head.sha===PINS.previousHead&&previous.head.repo.full_name===PINS.repository&&prior.sha===PINS.previousMerge&&prior.tree.sha===PINS.previousTree&&prior.parents?.length===2&&prior.parents[0].sha===PINS.originalMerge&&prior.parents[1].sha===PINS.previousHead,'pinned prior PR177 evidence');
+   for(const [path,blob]of Object.entries(CHECKER_BLOBS)){const{data:file}=await github.rest.repos.getContent({...repo,path,ref:pull.head.sha});check(file.type==='file'&&file.path===path&&file.sha===blob,'exact reviewed preparation checker blob');}
+  }
+  check(merge.parents?.length===2&&merge.parents[0].sha===base&&merge.parents[1].sha===pull.head.sha,'single successor merge onto pinned original');
+  const {data:successor}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:base+'...'+pull.head.sha});
+  check(successor.status==='ahead'&&successor.merge_base_commit?.sha===base&&successor.total_commits>0&&successor.total_commits<=100&&successor.commits?.length===successor.total_commits&&successor.commits.every(c=>c.parents?.length===1),'linear reviewed successor');
+  const paths=reviewedPaths(successor.files?.flatMap(f=>f.previous_filename?[f.filename,f.previous_filename]:[f.filename]));check(paths.every(p=>allowed.has(p)),'closed successor tooling paths');
  }
  const {data:comparison}=await github.rest.repos.compareCommitsWithBasehead({...repo,basehead:PINS.source+'...'+pull.head.sha});check(comparison.merge_base_commit?.sha===PINS.source&&['ahead','identical'].includes(comparison.status)&&comparison.total_commits<=100,'accepted source ancestor');
  reviewedPaths(comparison.files?.flatMap(f=>f.previous_filename?[f.filename,f.previous_filename]:[f.filename]));
@@ -111,4 +124,4 @@ async function downloadRuntimePreviewArchives({github,binding,directory,now=Date
  check(binding.kind==='norton-runtime-preview','download purpose');mkdirSync(directory,{recursive:true,mode:0o700});
  for(const key of['result','inputs','request']){const a=binding.artifacts[key],p=PINS[key];check(a.id===p.id&&a.digest===p.digest&&a.runId===(key==='result'?PINS.run:PINS.producer)&&Date.parse(a.expiresAt)>now,'pinned archive before download');const{data}=await github.rest.actions.downloadArtifact({owner:'TJ-Frederick',repo:'TheologAI',artifact_id:a.id,archive_format:'zip'});const bytes=verifyNativeArchive(key,Buffer.from(data),a,now);writeFileSync(join(directory,key+'.zip'),bytes,{flag:'wx',mode:0o600});}
 }
-module.exports={PINS,TOOLING_PATHS,requireToolingOnlySource,resolveRuntimePreviewHandoff,downloadRuntimePreviewArchives,verifyNativeArchive};
+module.exports={PINS,CHECKER_BLOBS,TOOLING_PATHS,requireToolingOnlySource,resolveRuntimePreviewHandoff,downloadRuntimePreviewArchives,verifyNativeArchive};

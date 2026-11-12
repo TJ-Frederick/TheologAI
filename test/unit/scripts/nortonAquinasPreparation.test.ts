@@ -50,3 +50,28 @@ it('retains the separately reserved discovery reads in the same preparation role
  await s.query('SELECT 1',249968);await expect(s.query('SELECT 2',1)).rejects.toThrow('not admitted');expect(calls).toBe(1);expect(s.reads).toBe(249968);expect(entries).toHaveLength(2);
  expect(()=>new PreparedCorpusSession({...s.dependencies,priorReadsReserved:-1})).toThrow('prior preparation reservation');
 });
+
+import {createHash} from 'node:crypto';
+import {checkPreparationBaseline,type PreparationSession} from '../../../scripts/norton-aquinas-preparation.js';
+import {comparableSchema,PROVIDER_CATALOG} from '../../../scripts/corpus-source-proof.js';
+function baselineCheckFixture(fault=''){
+ const db=new Database(':memory:');db.exec("CREATE TABLE fixture(\n-- imported line comment\nnote TEXT DEFAULT '-- literal', [-- name] TEXT, marker TEXT /* preserve -- block */); CREATE TABLE theologai_metadata(key TEXT,value TEXT); CREATE TABLE historical_corpus_seal(id TEXT);");
+ const sql="SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name;",application=db.prepare(sql).all() as Record<string,unknown>[];
+ const catalog=[...comparableSchema(application),...structuredClone(PROVIDER_CATALOG)].sort((a,b)=>String(a.type).localeCompare(String(b.type))||String(a.name).localeCompare(String(b.name)));
+ const row=catalog.find(r=>r.name==='fixture')!;
+ if(fault==='ddl')row.sql=String(row.sql).replace('note TEXT','note INTEGER');
+ if(fault==='literal')row.sql=String(row.sql).replace('-- literal','changed literal');
+ if(fault==='quoted-identifier')row.sql=String(row.sql).replace('[-- name]','[other name]');
+ if(fault==='block-comment')row.sql=String(row.sql).replace('preserve -- block','different block');
+ if(fault==='provider')catalog.find(r=>r.name==='_cf_KV')!.sql+=' -- provider comment';
+ const manifest=JSON.parse(readFileSync('data/data-manifest.json','utf8')),ledger=manifest.materializations.d1.migrations.slice(0,9).map((m:any,i:number)=>({id:i+1,name:m.path.split('/').at(-1),applied_at:'2026-11-03 00:00:00'}));
+ const ledgerSha=createHash('sha256').update(JSON.stringify(ledger)).digest('hex');if(fault==='ledger')ledger[0].applied_at='2026-11-03 00:00:01';
+ const queries:string[]=[];const session:PreparationSession={dependencies:{databaseId:TARGETS.production.id},requests:0,reads:0,writes:0,query:async(query)=>{queries.push(query);const rows=query===sql?catalog:query.includes('FROM d1_migrations')?ledger:db.prepare(query).all() as Record<string,unknown>[];if(fault==='identity'&&query.includes('FROM theologai_metadata'))rows.push({key:'changed',value:'changed'});if(fault==='seal'&&query.includes('FROM historical_corpus_seal'))rows.push({id:'changed'});return{rows,rowsRead:1,rowsWritten:0};}};
+ return{db,queries,run:()=>checkPreparationBaseline(session,db,ledgerSha)};
+}
+it('accepts only the existing proof normalization for application line comments through all baseline checks',async()=>{const f=baselineCheckFixture();try{expect(await f.run()).toHaveProperty('catalogSha256');expect(f.queries).toHaveLength(4);}finally{f.db.close();}});
+it.each(['ddl','literal','quoted-identifier','block-comment'])('refuses actual application definition drift at the first schema gate: %s',async fault=>{const f=baselineCheckFixture(fault);try{await expect(f.run()).rejects.toThrow('target is not the complete baseline schema');expect(f.queries).toHaveLength(1);}finally{f.db.close();}});
+it('keeps provider definitions exact even for a line-comment-only change',async()=>{const f=baselineCheckFixture('provider');try{await expect(f.run()).rejects.toThrow('exact provider schema before preparation');expect(f.queries).toHaveLength(1);}finally{f.db.close();}});
+it('still rejects changed ledger timestamps after the application schema check',async()=>{const f=baselineCheckFixture('ledger');try{await expect(f.run()).rejects.toThrow('original baseline ledger timestamps changed');expect(f.queries).toHaveLength(2);}finally{f.db.close();}});
+
+it.each(['identity','seal'])('still refuses baseline %s drift after schema acceptance',async fault=>{const f=baselineCheckFixture(fault);try{await expect(f.run()).rejects.toThrow('baseline identity/seal changed');expect(f.queries).toHaveLength(fault==='identity'?3:4);}finally{f.db.close();}});

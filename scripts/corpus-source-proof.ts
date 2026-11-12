@@ -47,7 +47,7 @@ function schemaWithoutLineComments(sql: string): string {
   check(quote === null, 'unterminated schema quote');
   return result;
 }
-function comparableSchema(catalog: ProofRow[]): ProofRow[] {
+export function comparableSchema(catalog: ProofRow[]): ProofRow[] {
   return catalog.map(row => ({ ...row, sql: typeof row.sql === 'string' ? schemaWithoutLineComments(row.sql) : row.sql }));
 }
 function id(value: string): string { check(/^[a-z_][a-z0-9_]*$/.test(value), 'identifier'); return `"${value}"`; }
