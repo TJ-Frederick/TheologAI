@@ -259,7 +259,7 @@ jobs:
             }
             const pull = merged[0];
             let existingNortonAllowed = false;
-            if (pull.number === 176 || pull.number === 177 || pull.number === 178) {
+            if (pull.number === 176 || pull.number === 177 || pull.number === 178 || pull.number === 180) {
               const { pathToFileURL } = require('node:url');
               const { selectReleaseProofPolicy } = await import(pathToFileURL(require('node:path').resolve('.github/scripts/release-proof-policy.mjs')).href);
               existingNortonAllowed = selectReleaseProofPolicy(process.cwd()).id === 'norton-aquinas.v1';
@@ -586,6 +586,7 @@ jobs:
           printf 'release_policy=%s\n' "$policy" >> "$GITHUB_OUTPUT"
           node scripts/worker-release-artifact.mjs render production "$RUNNER_TEMP/worker-bundle" "$EXPECTED_MANIFEST_SHA256" "$RUNNER_TEMP/worker-release.json"
           if test "$policy" = norton-aquinas.v1; then
+            printf '%s  %s\n' '882f7501271ed77097ad3b6967d0708dbbdbab9b03af85cff2476bb188132a84' "$RUNNER_TEMP/worker-bundle/worker.js" '3f8a53c37a585b5c42b2410d7f3167645f738bbf90b51d43b2c0378efb4f898c' "$RUNNER_TEMP/corpus-source/source.db" | sha256sum --check
             npx --no-install tsx scripts/corpus-execution-config.ts production "$RUNNER_TEMP/corpus-wrangler.toml"
           else
             cp wrangler.toml "$RUNNER_TEMP/corpus-wrangler.toml"

@@ -96,7 +96,9 @@ export function assertReviewedActivationEntries(declaration,before,after){
  for(const path of expectedPaths)check(after.get(path)?.mode==='100644' && /^[a-f0-9]{40}$/.test(declaration.files[path]) && after.get(path)?.blob===declaration.files[path],'reviewed activation blob');
  const changed=[...new Set([...before.keys(),...after.keys()])].filter(path=>/^(?:src|data|scripts|migrations)\//.test(path) && JSON.stringify(before.get(path))!==JSON.stringify(after.get(path)));
  check(changed.every(path=>expectedPaths.includes(path) || path.startsWith('scripts/') && RELEASE_SCRIPTS.has(path.slice(8))),'unreviewed corpus/application path');
- for(const path of ['release/application-only.json','wrangler.toml','wrangler.ccel-coordinator.toml','package.json','package-lock.json','.nvmrc','.github/release-toolchain/package.json','.github/release-toolchain/package-lock.json'])check(JSON.stringify(before.get(path))===JSON.stringify(after.get(path)),'binding/dependency/runtime baseline changed');
+ for(const path of ['release/application-only.json','wrangler.toml','wrangler.ccel-coordinator.toml','package.json','.nvmrc','.github/release-toolchain/package.json','.github/release-toolchain/package-lock.json'])check(JSON.stringify(before.get(path))===JSON.stringify(after.get(path)),'binding/dependency/runtime baseline changed');
+ const originalLock=before.get('package-lock.json'),patchedLock=after.get('package-lock.json');
+ check(originalLock?.mode==='100644' && originalLock.blob==='83612eb394b00bff45d7180f2a73388f6f6410eb' && patchedLock?.mode==='100644' && patchedLock.blob===POLICY.productionLockBlob,'exact reviewed production dependency lock');
 }
 export function requireProofApproval(value,expected,now=Date.now()){
  check(value&&Object.keys(value).sort().join(',')===['liveControlReserve','expectedLedgerSha256','releasePolicy','schemaVersion','role','accountId','databaseId','sourceCommit','sourceTree','expiresAt','maxReads','integrityCommands','exclusiveDataWritesDuringProof'].sort().join(','),'verification approval shape');

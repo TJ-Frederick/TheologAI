@@ -1,8 +1,9 @@
 // Fixed release scope. Proposal only: constants grant no operation or allowance.
 const policy=({
   "policy": "norton-aquinas.v1",
-  productionReleasePR: 178,
-  productionPredecessorMerge: "7960e5a33b83ca828e3763f765f2450907e494b0",
+  productionReleasePR: 180,
+  productionPredecessorMerge: "60afe426f87245b6f38c7422135c599410303822",
+  productionLockBlob: "2f7bc897adeea0f3f1057cd788c0885a0a584af0",
   productMerge: "959d6535f3ffb87a00633b208e2ca10d5090fe5f",
   "baseline": "328168d5b817e9eaa0e702de382adc2c46c858ef",
   "account": "0594ed1e4c9fe35ab7d9f47991e99f3e",

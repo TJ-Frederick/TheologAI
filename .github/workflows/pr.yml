@@ -105,6 +105,17 @@ jobs:
           classifier-result: ${{ needs.classify.result }}
           selection-mode: ${{ needs.classify.outputs.mode }}
 
+      - name: Compare the rebuilt production Worker and corpus with accepted preview
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 180
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          npm run build:db
+          npx --no-install wrangler deploy --dry-run --env= --env-file /dev/null --outdir "$RUNNER_TEMP/production-byte-check"
+          sha256sum data/theologai.db "$RUNNER_TEMP/production-byte-check/worker.js"
+          printf '%s  %s\n' '3f8a53c37a585b5c42b2410d7f3167645f738bbf90b51d43b2c0378efb4f898c' data/theologai.db '882f7501271ed77097ad3b6967d0708dbbdbab9b03af85cff2476bb188132a84' "$RUNNER_TEMP/production-byte-check/worker.js" | sha256sum --check
+
       - name: Rehearse complete original Norton source recovery without cloud credentials
         id: original-source-rehearsal
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 176 && needs.classify.outputs.data == 'true' }}
