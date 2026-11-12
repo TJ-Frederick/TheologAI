@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 317,
-    "activeVitest": 236,
+    "totalTestTypeScript": 318,
+    "activeVitest": 237,
     "support": 26,
     "manual": 4,
     "legacyOrphan": 50,
@@ -183,6 +183,7 @@
       "test/unit/scripts/nortonAquinasPolicy.test.ts",
       "test/unit/scripts/nortonAquinasPreparation.test.ts",
       "test/unit/scripts/nortonCapacityDecisionEvidence.test.ts",
+      "test/unit/scripts/nortonOperation430Continuation.test.ts",
       "test/unit/scripts/nortonOperatorCorpusProof.test.ts",
       "test/unit/scripts/nortonOperatorSuccessorFlow.test.ts",
       "test/unit/scripts/nortonProductionOperation.test.ts",
