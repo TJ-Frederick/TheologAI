@@ -140,7 +140,7 @@ async function requireLedgerMarker({github,package:p,now=Date.now()}) {
 async function waitForAuthorization({github,expected,revalidate,core,runtimeReuse,expectedPurpose,environment=process.env,now=Date.now,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),wait=environment.OPERATOR_WAIT_AUTHORIZATION==='true'}) {
   // Preparation and cutover occupy separate quota days in the same production run.
   const preparationWait = wait && environment.OPERATOR_PRODUCTION_PREPARATION_WAIT === 'true';
-  if (preparationWait) check(expected.role === 'production' && expected.pullRequestNumber === policy.productionReleasePR && expected.baseCommit === policy.productMerge && expected.headBranch === 'main' && environment.GITHUB_REF === 'refs/heads/main' && environment.GITHUB_EVENT_NAME === 'workflow_dispatch' && environment.GITHUB_RUN_ATTEMPT === '1', 'production preparation wait context');
+  if (preparationWait) check(expected.role === 'production' && expected.pullRequestNumber === policy.productionReleasePR && expected.baseCommit === policy.productionPredecessorMerge && expected.headBranch === 'main' && environment.GITHUB_REF === 'refs/heads/main' && environment.GITHUB_EVENT_NAME === 'workflow_dispatch' && environment.GITHUB_RUN_ATTEMPT === '1', 'production preparation wait context');
   const end = now() + (wait ? (preparationWait ? 14400000 : 3600000) : 0);
   if (core?.summary) await core.summary.addHeading('Explicit operator authorization required').addRaw(JSON.stringify(expected)).write();
   do {
