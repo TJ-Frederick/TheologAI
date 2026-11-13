@@ -35,11 +35,12 @@ describe('closed Norton/Aquinas release policy',()=>{
   const raw=execFileSync('git',['ls-tree','-r','-z',declaration.baseline]).toString();
   const before=new Map<string,{mode:string;blob:string}>(raw.split('\0').filter(Boolean).map(entry=>{const [metadata,path]=entry.split('\t');const [mode,,blob]=metadata!.split(' ');return [path!,{mode:mode!,blob:blob!}];}));
   const after=new Map(before);for(const [path,blob]of Object.entries(declaration.files))after.set(path,{mode:'100644',blob:blob as string});
+  after.set('package.json',{mode:'100644',blob:execFileSync('git',['hash-object','package.json'],{encoding:'utf8'}).trim()});
   expect(()=>assertReviewedActivationEntries(declaration,before,after)).toThrow('exact reviewed production dependency lock');
   after.set('package-lock.json',{mode:'100644',blob:execFileSync('git',['hash-object','package-lock.json'],{encoding:'utf8'}).trim()});
   expect(()=>assertReviewedActivationEntries(declaration,before,after)).not.toThrow();
   expect(classifyApplicationEntries(before,after,{}).applicationOnly).toBe(false);
-  for(const changed of [new Map(after).set('src/http/requestLimitBypass.ts',{mode:'100644',blob:commit}),new Map(after).set('src/mcp/server.ts',{mode:'100644',blob:commit}),new Map(after).set('package-lock.json',{mode:'100644',blob:commit})])expect(()=>assertReviewedActivationEntries(declaration,before,changed)).toThrow();
+  for(const changed of [new Map(after).set('src/http/requestLimitBypass.ts',{mode:'100644',blob:commit}),new Map(after).set('src/mcp/server.ts',{mode:'100644',blob:commit}),new Map(after).set('package-lock.json',{mode:'100644',blob:commit}),new Map(after).set('package.json',{mode:'100644',blob:commit})])expect(()=>assertReviewedActivationEntries(declaration,before,changed)).toThrow();
   expect(()=>assertReviewedActivationEntries({...declaration,policy:'application-only'},before,after)).toThrow();
  });
  it('rejects partial/source-schema/budget/reserve receipt substitution',()=>{
