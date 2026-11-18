@@ -1681,6 +1681,7 @@ jobs:
     outputs:
       operation_id: ${{ steps.admit.outputs.operation_id }}
       inputs_artifact_id: ${{ steps.inputs.outputs.artifact-id }}
+      target_run_id: ${{ steps.admit.outputs.target_run_id }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -1702,7 +1703,7 @@ jobs:
       - run: npm rebuild better-sqlite3 --ignore-scripts=false
       - run: npm run audit:dependencies:high
       - run: npm audit --omit=dev
-      - name: Validate the closed normalized owner request without provider access
+      - name: Validate the closed exact owner request without provider access
         run: |
           node --import tsx --input-type=module -e '
             import {readFileSync} from "node:fs";
@@ -1728,19 +1729,52 @@ jobs:
           path: ${{ runner.temp }}/refresh-request.json
           retention-days: 7
           if-no-files-found: error
+      - name: Reserve the exact waiting PR target
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: norton-preview-live-refresh-request-${{ steps.admit.outputs.target_run_id }}-attempt-1
+          path: ${{ runner.temp }}/refresh-request.json
+          retention-days: 7
+          if-no-files-found: error
       - name: Retain exact fresh-preview inputs
         id: inputs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fresh-preview-inputs-${{ github.run_id }}-attempt-1
+          name: fresh-preview-inputs-${{ steps.admit.outputs.target_run_id }}-attempt-1
           path: ${{ runner.temp }}/fresh-preview-inputs/
           retention-days: 7
           if-no-files-found: error
 
+  refresh-owner-handoff:
+    name: Admit exact preview refresh owner handoff (no cloud credentials)
+    needs: validation-complete
+    if: ${{ github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'validate-deployed-preview' && github.event.pull_request.number == 182 && github.actor_id == '40179660' && github.run_attempt == 1 && needs.validation-complete.result == 'success' && !contains(github.event.pull_request.labels.*.name, 'deploy-preview') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      owner_binding_json: ${{ steps.admit.outputs.owner_binding_json }}
+      inputs_artifact_id: ${{ steps.admit.outputs.inputs_artifact_id }}
+      creator_run_id: ${{ steps.admit.outputs.creator_run_id }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Wait for one exact authenticated owner input
+        id: admit
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: await require('./.github/scripts/refreshed-preview-handoff.cjs').admitRefreshPr({github,context,core});
+
   preview-live-refresh:
     name: Refresh deployed Norton preview (read-only)
-    needs: prepare-preview-live-refresh
-    if: ${{ github.event_name == 'workflow_dispatch' && needs.prepare-preview-live-refresh.result == 'success' }}
+    needs: refresh-owner-handoff
+    if: ${{ github.event_name == 'pull_request' && needs.refresh-owner-handoff.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -1754,22 +1788,24 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/release-toolchain
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          artifact-ids: ${{ needs.prepare-preview-live-refresh.outputs.inputs_artifact_id }}
+          artifact-ids: ${{ needs.refresh-owner-handoff.outputs.inputs_artifact_id }}
+          run-id: ${{ needs.refresh-owner-handoff.outputs.creator_run_id }}
+          github-token: ${{ github.token }}
           path: ${{ runner.temp }}/fresh-preview-inputs
           merge-multiple: true
           digest-mismatch: error
       - name: Recheck the same owner event, ordinary CI and one-time marker
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
-          APPROVAL_JSON: ${{ inputs.preview_validate_existing_json }}
+          EXPECTED_OWNER_BINDING_JSON: ${{ needs.refresh-owner-handoff.outputs.owner_binding_json }}
         with:
-          script: await require('./.github/scripts/refreshed-preview-handoff.cjs').admitRefreshDispatch({github,context,core,phase:'execute'});
+          script: await require('./.github/scripts/refreshed-preview-handoff.cjs').admitRefreshPr({github,context,core,phase:'execute'});
       - name: Run fresh preview checks and identity verification without deployment
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

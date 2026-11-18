@@ -1,7 +1,9 @@
 import {afterEach,it,expect,vi} from 'vitest';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {createHash} from 'node:crypto';
-import {REFRESH,requireRefreshApproval,admitRefreshUsage,validateRefreshAudit,verifyRefreshReceipt,createRefreshControlApi,createRefreshFetch,refreshFailureReason,snapshotRefreshAssignments,executePreviewRefresh,type RefreshApproval,type RefreshSource,type RefreshInventory} from '../../../.github/scripts/refresh-norton-preview.js';
+import {REFRESH,requireRefreshApproval,requireRefreshOwnerContext,admitRefreshUsage,validateRefreshAudit,verifyRefreshReceipt,createRefreshControlApi,createRefreshFetch,refreshFailureReason,snapshotRefreshAssignments,executePreviewRefresh,type RefreshApproval,type RefreshSource,type RefreshInventory} from '../../../.github/scripts/refresh-norton-preview.js';
 const source:RefreshSource={commit:'a'.repeat(40),tree:'b'.repeat(40),branch:'codex/production-cooldown'};
 const now=Date.parse('2026-11-18T12:00:00Z'),inventory=JSON.parse(readFileSync('test/fixtures/norton-preview-live-refresh-checks.json','utf8')) as RefreshInventory;
 const hash=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
@@ -51,3 +53,15 @@ it('reduces external exceptions and lookalike refusal messages to a constant wit
  const net=createRefreshFetch((async()=>{throw Error(secret);}) as typeof fetch,()=>{},()=>10000,v=>events.push(v));let caught:unknown;try{await net(REFRESH.endpoint);}catch(error){caught=error;}
  expect(refreshFailureReason(caught)).toBe('external_unknown');expect(String(caught)).not.toContain(secret);expect(JSON.stringify(events)).not.toContain(secret);
 });
+
+function prContext(){const dir=mkdtempSync(join(tmpdir(),'refresh-pr-context-')),path=join(dir,'event.json');
+ const event={action:'labeled',label:{name:'validate-deployed-preview'},number:182,pull_request:{draft:false,number:182,head:{sha:source.commit,ref:source.branch,repo:{full_name:'TJ-Frederick/TheologAI'}},base:{sha:'24a6ba7516d40207eb07e246dd08d8e26e5100f1',ref:'main'}}};
+ const env:NodeJS.ProcessEnv={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:'TJ-Frederick/TheologAI',GITHUB_EVENT_NAME:'pull_request',GITHUB_SHA:'d'.repeat(40),GITHUB_REF:'refs/pull/182/merge',GITHUB_HEAD_REF:source.branch,GITHUB_RUN_ID:'123',GITHUB_RUN_ATTEMPT:'1',GITHUB_ACTOR_ID:'40179660',GITHUB_ACTOR:'owner-fixture',GITHUB_TRIGGERING_ACTOR:'owner-fixture',GITHUB_EVENT_PATH:path};
+ return{event,env,save:()=>writeFileSync(path,JSON.stringify(event)),cleanup:()=>rmSync(dir,{recursive:true,force:true})};}
+it('admits the exact owner PR182 merge event with separately bound source head and same-run validation',()=>{const fixture=prContext();try{fixture.save();const a={...approval(),validationRunId:'123'};expect(requireRefreshApproval(a,source,now)).toEqual(a);expect(fixture.env.GITHUB_SHA).not.toBe(source.commit);expect(requireRefreshOwnerContext(a,source,fixture.env)).toEqual({runId:'123',actor:40179660,triggeringActor:40179660});}finally{fixture.cleanup();}});
+it.each(['action','label','draft','pr','nested-pr','head','branch','repo','base','base-ref','ref','head-ref','event','attempt','actor','trigger','run','merge-sha','missing-event','malformed-event'])('rejects mismatched PR execution context %s',fault=>{const fixture=prContext();try{
+ if(fault==='action')fixture.event.action='synchronize';if(fault==='label')fixture.event.label.name='deploy';if(fault==='draft')fixture.event.pull_request.draft=true;
+ if(fault==='pr')fixture.event.number=183;if(fault==='nested-pr')fixture.event.pull_request.number=183;if(fault==='head')fixture.event.pull_request.head.sha='e'.repeat(40);if(fault==='branch')fixture.event.pull_request.head.ref='other';if(fault==='repo')fixture.event.pull_request.head.repo.full_name='other/TheologAI';if(fault==='base')fixture.event.pull_request.base.sha='e'.repeat(40);if(fault==='base-ref')fixture.event.pull_request.base.ref='other';
+ if(fault==='ref')fixture.env.GITHUB_REF='refs/heads/'+source.branch;if(fault==='head-ref')fixture.env.GITHUB_HEAD_REF='other';if(fault==='event')fixture.env.GITHUB_EVENT_NAME='workflow_dispatch';if(fault==='attempt')fixture.env.GITHUB_RUN_ATTEMPT='2';if(fault==='actor')fixture.env.GITHUB_ACTOR_ID='2';if(fault==='trigger')fixture.env.GITHUB_TRIGGERING_ACTOR='other';if(fault==='run')fixture.env.GITHUB_RUN_ID='999';if(fault==='merge-sha')fixture.env.GITHUB_SHA='not-a-sha';
+ fixture.save();if(fault==='missing-event')delete fixture.env.GITHUB_EVENT_PATH;if(fault==='malformed-event')writeFileSync(fixture.env.GITHUB_EVENT_PATH!,'{invalid');expect(()=>requireRefreshOwnerContext(approval(),source,fixture.env)).toThrow();
+ }finally{fixture.cleanup();}});
