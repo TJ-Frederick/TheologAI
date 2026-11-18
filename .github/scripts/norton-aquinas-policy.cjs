@@ -2,6 +2,8 @@
 const policy=({
   "policy": "norton-aquinas.v1",
   productionReleasePR: 181,
+  productionLiveRefreshPR: 182,
+  productionLiveRefreshBase: "24a6ba7516d40207eb07e246dd08d8e26e5100f1",
   productionPredecessorMerge: "ab3723349b978df670bed5309c9243304d31553e",
   productionLockBlob: "6629c9e44fd4dc5cd62effcab4622b1516c226c5",
   productionPackageBlob: "8b36f105e57710748c3af2a7f71d4796dc7f5dc5",

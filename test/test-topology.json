@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 317,
-    "activeVitest": 236,
+    "totalTestTypeScript": 319,
+    "activeVitest": 238,
     "support": 26,
     "manual": 4,
     "legacyOrphan": 50,
@@ -185,6 +185,7 @@
       "test/unit/scripts/nortonCapacityDecisionEvidence.test.ts",
       "test/unit/scripts/nortonOperatorCorpusProof.test.ts",
       "test/unit/scripts/nortonOperatorSuccessorFlow.test.ts",
+      "test/unit/scripts/nortonPreviewRefresh.test.ts",
       "test/unit/scripts/nortonProductionOperation.test.ts",
       "test/unit/scripts/nortonSourceRecovery.test.ts",
       "test/unit/scripts/operatorCorpusProof.test.ts",
@@ -206,6 +207,7 @@
       "test/unit/scripts/productionReleaseGuards.test.ts",
       "test/unit/scripts/productionRollbackRehearsal.test.ts",
       "test/unit/scripts/publicDomainHistoricalSources.test.ts",
+      "test/unit/scripts/refreshedPreviewHandoff.test.ts",
       "test/unit/scripts/releaseCorpusCapacity.test.ts",
       "test/unit/scripts/releaseProofPolicy.test.ts",
       "test/unit/scripts/resolveProductionReleaseContext.test.ts",

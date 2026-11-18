@@ -1446,7 +1446,7 @@ jobs:
       operation_id: ${{ steps['existing-inputs'].outputs.operation_id }}
       target_run_id: ${{ steps['existing-inputs'].outputs.target_run_id }}
     name: Verify deployed Norton candidate and distinct auditor (no cloud credentials)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_validate_existing_json != '' && inputs.preview_restore_json == '' && inputs.operator_authorization_json == '' && inputs.operator_proof_json == '' && github.actor_id == '40179660' && github.run_attempt == 1 }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_validate_existing_json != '' && inputs.preview_restore_json == '' && inputs.operator_authorization_json == '' && inputs.operator_proof_json == '' && github.actor_id == '40179660' && github.run_attempt == 1 && fromJSON(inputs.preview_validate_existing_json).schemaVersion != 'norton-preview-live-refresh-approval.v1' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1667,3 +1667,121 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
           overwrite: false
+
+
+  prepare-preview-live-refresh:
+    name: Prepare fresh preview live inputs (no cloud credentials)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_validate_existing_json != '' && fromJSON(inputs.preview_validate_existing_json).schemaVersion == 'norton-preview-live-refresh-approval.v1' && inputs.operator_authorization_json == '' && inputs.operator_proof_json == '' && inputs.preview_restore_json == '' && github.actor_id == '40179660' && github.run_attempt == 1 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      operation_id: ${{ steps.admit.outputs.operation_id }}
+      inputs_artifact_id: ${{ steps.inputs.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Authenticate one owner dispatch and its successful ordinary CI
+        id: admit
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          APPROVAL_JSON: ${{ inputs.preview_validate_existing_json }}
+        with:
+          script: await require('./.github/scripts/refreshed-preview-handoff.cjs').admitRefreshDispatch({github,context,core});
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-audit --fund=false
+      - run: npm rebuild better-sqlite3 --ignore-scripts=false
+      - run: npm run audit:dependencies:high
+      - run: npm audit --omit=dev
+      - name: Validate the closed normalized owner request without provider access
+        run: |
+          node --import tsx --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            import {requireRefreshApproval} from "./.github/scripts/refresh-norton-preview.ts";
+            const a=JSON.parse(readFileSync(process.env.RUNNER_TEMP+"/refresh-request.json","utf8"));
+            requireRefreshApproval(a,{commit:a.sourceCommit,tree:a.sourceTree,branch:a.headBranch});
+          '
+      - name: Rebuild the fixed local corpus and accepted Worker bytes
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          npm run build:db
+          mkdir -p "$RUNNER_TEMP/fresh-preview-inputs"
+          npx --no-install wrangler deploy --dry-run --env preview --env-file /dev/null --outdir "$RUNNER_TEMP/fresh-preview-worker"
+          cp data/theologai.db "$RUNNER_TEMP/fresh-preview-inputs/source.db"
+          cp "$RUNNER_TEMP/fresh-preview-worker/worker.js" "$RUNNER_TEMP/fresh-preview-inputs/worker.js"
+          cp "$RUNNER_TEMP/refresh-request.json" "$RUNNER_TEMP/refresh-template.json" "$RUNNER_TEMP/fresh-preview-inputs/"
+          printf '%s  %s\n' '882f7501271ed77097ad3b6967d0708dbbdbab9b03af85cff2476bb188132a84' "$RUNNER_TEMP/fresh-preview-inputs/worker.js" '3f8a53c37a585b5c42b2410d7f3167645f738bbf90b51d43b2c0378efb4f898c' "$RUNNER_TEMP/fresh-preview-inputs/source.db" | sha256sum --check
+      - name: Reserve this one live-refresh operation
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: norton-preview-live-refresh-ledger-${{ steps.admit.outputs.operation_id }}
+          path: ${{ runner.temp }}/refresh-request.json
+          retention-days: 7
+          if-no-files-found: error
+      - name: Retain exact fresh-preview inputs
+        id: inputs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: fresh-preview-inputs-${{ github.run_id }}-attempt-1
+          path: ${{ runner.temp }}/fresh-preview-inputs/
+          retention-days: 7
+          if-no-files-found: error
+
+  preview-live-refresh:
+    name: Refresh deployed Norton preview (read-only)
+    needs: prepare-preview-live-refresh
+    if: ${{ github.event_name == 'workflow_dispatch' && needs.prepare-preview-live-refresh.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: theologai-shared-preview-mutation
+      cancel-in-progress: false
+    environment: preview
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/release-toolchain
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          artifact-ids: ${{ needs.prepare-preview-live-refresh.outputs.inputs_artifact_id }}
+          path: ${{ runner.temp }}/fresh-preview-inputs
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Recheck the same owner event, ordinary CI and one-time marker
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          APPROVAL_JSON: ${{ inputs.preview_validate_existing_json }}
+        with:
+          script: await require('./.github/scripts/refreshed-preview-handoff.cjs').admitRefreshDispatch({github,context,core,phase:'execute'});
+      - name: Run fresh preview checks and identity verification without deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --no-install tsx .github/scripts/refresh-norton-preview.ts execute "$RUNNER_TEMP/fresh-preview-inputs/refresh-request.json" "$RUNNER_TEMP/fresh-preview-inputs/source.db" "$RUNNER_TEMP/fresh-preview-inputs/worker.js" "$RUNNER_TEMP/fresh-preview-results"
+          cp "$RUNNER_TEMP/fresh-preview-inputs/refresh-template.json" "$RUNNER_TEMP/fresh-preview-results/refresh-template.json"
+      - name: Retain fresh live-refresh evidence after success or stop
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: preview-live-refresh-${{ github.run_id }}-attempt-1
+          path: ${{ runner.temp }}/fresh-preview-results/
+          retention-days: 7
+          if-no-files-found: warn

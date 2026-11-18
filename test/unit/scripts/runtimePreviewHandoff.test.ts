@@ -65,12 +65,12 @@ it('checks actual current production authority and both captured assignments imm
  }finally{vi.useRealTimers();rmSync(directory,{recursive:true,force:true});}
 });
 
-it('selects the closed corpus route before any legacy artifact search and checks authority before secret mutation',()=>{const source=readFileSync('.github/workflows/deploy.yml','utf8');expect(source.indexOf("if (existingNortonAllowed)" )).toBeLessThan(source.indexOf('const artifactName = `preview-release-audit-'));expect(source.indexOf('Check accepted controls and current corpus authority at mutation boundary')).toBeLessThan(source.indexOf('name: Deploy to Cloudflare Workers'));expect(source).toContain('production-worker-predecessor-anchor.json');expect(source).toContain('verify-runtime-preview-handoff.ts boundary');});
+it('selects the closed corpus route before any legacy artifact search and checks authority before secret mutation',()=>{const source=readFileSync('.github/workflows/deploy.yml','utf8');expect(source.indexOf("if (existingNortonAllowed)" )).toBeLessThan(source.indexOf('const artifactName = `preview-release-audit-'));expect(source.indexOf('Check accepted controls and current corpus authority at mutation boundary')).toBeLessThan(source.indexOf('name: Deploy to Cloudflare Workers'));expect(source).toContain('production-worker-predecessor-anchor.json');expect(source).toContain('boundary_script=.github/scripts/verify-runtime-preview-handoff.ts');expect(source).toContain('tsx "$boundary_script" boundary');});
 
 it('checks authority again after secret synchronization and before sending the deployment',()=>{
  const workflow=readFileSync('.github/workflows/deploy.yml','utf8');
  const step=workflow.split('id: production-worker-deploy\n')[1]!.split('      - name:')[0]!;
- const sync=step.indexOf('secret put ESV_API_KEY'),check=step.indexOf('verify-runtime-preview-handoff.ts boundary'),deploy=step.indexOf('wrangler deploy --config');
+ const sync=step.indexOf('secret put ESV_API_KEY'),check=step.indexOf('tsx "$boundary_script" boundary'),deploy=step.indexOf('wrangler deploy --config');
  expect(sync).toBeGreaterThan(-1);expect(check).toBeGreaterThan(sync);expect(deploy).toBeGreaterThan(check);
 });
 
@@ -81,9 +81,10 @@ it.each(['association-disagreement','duplicate-association','wrong-job-ref','con
 it('preserves legacy selection and refuses unsupported Norton evidence before protected verification',()=>{
  const source=readFileSync('.github/workflows/deploy.yml','utf8'),{jobs}=parse(source);expect(source).toContain('if (pull.number === 176 || pull.number === 177 || pull.number === 178 || pull.number === 180 || pull.number === 181)');
  const step=jobs.deploy.steps.find((s:any)=>s.name==='Verify source-bound dual-era preview release receipt');expect(step.env.RELEASE_POLICY).toBe('${{ needs.build-worker.outputs.release_policy }}');
- const guard=step.run.slice(0,step.run.indexOf("if [ \"$EVIDENCE_KIND\" = 'norton-runtime-preview' ]; then"));
+ const guard=step.run.slice(0,step.run.indexOf("if [ \"$EVIDENCE_KIND\" = 'norton-preview-live-refresh' ]; then"));
  for(const kind of ['legacy','norton-existing-preview','unknown',''])expect(spawnSync('bash',['-c',guard],{env:{...process.env,RELEASE_POLICY:'norton-aquinas.v1',EVIDENCE_KIND:kind}}).status).toBe(1);
  expect(spawnSync('bash',['-c',guard],{env:{...process.env,RELEASE_POLICY:'norton-aquinas.v1',EVIDENCE_KIND:'norton-runtime-preview'}}).status).toBe(0);
+ expect(spawnSync('bash',['-c',guard],{env:{...process.env,RELEASE_POLICY:'norton-aquinas.v1',EVIDENCE_KIND:'norton-preview-live-refresh'}}).status).toBe(0);
  expect(spawnSync('bash',['-c',guard],{env:{...process.env,RELEASE_POLICY:'application-only',EVIDENCE_KIND:'legacy'}}).status).toBe(0);
 });
 

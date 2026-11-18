@@ -37,6 +37,8 @@
     ".github/scripts/reconstruct-norton-source.ts",
     ".github/scripts/rehearse-norton-source.ts",
     ".github/scripts/preview-runtime-reuse.ts",
-    ".github/scripts/verify-runtime-preview-handoff.ts"
+    ".github/scripts/verify-runtime-preview-handoff.ts",
+    ".github/scripts/refresh-norton-preview.ts",
+    ".github/scripts/verify-refreshed-norton-preview.ts"
   ]
 }
