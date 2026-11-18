@@ -240,6 +240,12 @@ export class CorpusProofTransport {
       this.metering.rowsRead += meta.rows_read; this.metering.rowsWritten += meta.rows_written;
       check(meta.rows_read <= query.readCeiling && meta.rows_written <= query.writeCeiling && meta.changes <= query.writeCeiling, 'measured query budget');
       const rows = list(result.results); this.event({ kind: 'result', label: query.label, sqlSha256: sha(query.sql), rowsRead: meta.rows_read, rowsWritten: meta.rows_written, changes: meta.changes, rowCount: rows.length });
+      // Start-to-start request spacing has already elapsed after a long physical
+      // scan. Leave a completion-based pause before production's final checks.
+      if (this.corpus && this.options.role === 'production' && query.kind === 'quick-check') {
+        this.event({ kind: 'physical-cooldown', milliseconds: 60_000 });
+        await new Promise(resolve => setTimeout(resolve, 60_000));
+      }
       this.current = null; return rows;
     } catch (error) {
       this.halted = true; this.metering.unknownAttempts++;

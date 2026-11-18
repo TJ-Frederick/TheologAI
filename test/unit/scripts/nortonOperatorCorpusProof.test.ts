@@ -165,7 +165,8 @@ describe('GitHub owner artifact provenance',()=>{
       git(['sparse-checkout','init','--cone']);git(['sparse-checkout','set','scripts','release','src','data','migrations','.github']);git(['checkout','--detach','HEAD']);
       for(const name of ['operator-corpus-proof.ts','application-corpus-check.ts','application-release-policy.mjs','corpus-proof-transport.ts'])copyFileSync(resolve('scripts',name),join(sourceRoot,'scripts',name));
       for(const name of ['operator-authorization.cjs'])copyFileSync(resolve('.github/scripts',name),join(sourceRoot,'.github/scripts',name));
-      git(['add','scripts','.github']);git(['-c','user.name=Operator proof test','-c','user.email=test@example.invalid','commit','--allow-empty','-m','Test exact operator proof source']);
+      copyFileSync(resolve('release/norton-aquinas.json'),join(sourceRoot,'release/norton-aquinas.json'));
+      git(['add','scripts','.github','release/norton-aquinas.json']);git(['-c','user.name=Operator proof test','-c','user.email=test@example.invalid','commit','--allow-empty','-m','Test exact operator proof source']);
       symlinkSync(resolve('node_modules'),join(sourceRoot,'node_modules'),'dir');
       writeFileSync(join(sourceRoot,'.git/info/exclude'),'\n/node_modules\n',{flag:'a'});
       const source=classifyApplicationRelease(sourceRoot);
@@ -533,5 +534,67 @@ describe('fresh parallel operator gate',()=>{
     const malformed=vi.fn(async()=>'{'),pause=vi.fn(async()=>{});await expect(readLiveOperatorMetadataAsync(OPERATOR_PROOF.repository,'/actions/runs/123',malformed,pause)).rejects.toThrow();expect(malformed).toHaveBeenCalledOnce();
     const unknown=vi.fn(async()=>{throw Error('synthetic timeout');});await expect(readLiveOperatorMetadataAsync(OPERATOR_PROOF.repository,'/actions/runs/123',unknown,pause)).rejects.toThrow('synthetic timeout');expect(unknown).toHaveBeenCalledOnce();
     for(const path of ['/d1/query','/actions/workflows/pr.yml/dispatches'])await expect(readLiveOperatorMetadataAsync(OPERATOR_PROOF.repository,path,malformed,pause)).rejects.toThrow('GET route');expect(malformed).toHaveBeenCalledOnce();expect(pause).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('production physical-check completion cooldown',()=>{
+  function setup(role:'preview'|'production',rejectPhysical=false){
+    vi.useFakeTimers({now:new Date(start)});
+    const directory=mkdtempSync(join(tmpdir(),'physical-cooldown-')),sql:{statement:string;at:number}[]=[];
+    let physicalCompleted=0;
+    const mock=corpusTransportFixture({role,advance:()=>vi.setSystemTime(Date.now()+500),query:statement=>{
+      sql.push({statement,at:Date.now()});
+      if(statement==='PRAGMA quick_check')vi.setSystemTime(Date.now()+9_000);
+      return {rows:statement==='PRAGMA quick_check'?[{quick_check:'ok'}]:[],rowsRead:statement==='PRAGMA quick_check'?1_692_668:1,rowsWritten:0};
+    }});
+    const fetcher=(async(input:any,init:any)=>{
+      if(String(input).endsWith('/query')&&JSON.parse(init.body).sql==='PRAGMA quick_check'){
+        const response=await mock.fetch(input,init);physicalCompleted=Date.now();
+        return rejectPhysical?Response.json({success:false,errors:[{code:7429}]},{status:429}):response;
+      }
+      return mock.fetch(input,init);
+    }) as typeof fetch;
+    const day=new Date(start).toISOString().slice(0,10),p=authorization('production',start,{notBefore:day+'T00:00:00Z',expiresAt:day+'T23:59:00Z',accountReadCeiling:4400000,accountReadCeilingDay:day});
+    const transport=new CorpusProofTransport({role,policy:'norton-aquinas.v1',token:'synthetic',readBudget:3560000,eventFile:join(directory,'events.jsonl'),fetch:fetcher,historicalExceptions:false,
+      ...(role==='production'?{productionAuthorization:{package:p,sourceCommit:p.authorization.sourceCommit,sourceTree:p.authorization.sourceTree,runId:p.authorization.targetRunId}}:{})});
+    const physical={kind:'quick-check' as const,label:'physical',sql:'PRAGMA quick_check',readCeiling:1_849_389,writeCeiling:0};
+    const catalog={kind:'select' as const,label:'catalog-after',sql:'SELECT name FROM sqlite_master',readCeiling:4096,writeCeiling:0};
+    return {transport,physical,catalog,sql,completed:()=>physicalCompleted,events:()=>readFileSync(join(directory,'events.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line)),close:()=>{vi.useRealTimers();rmSync(directory,{recursive:true,force:true});}};
+  }
+  it('waits sixty seconds from a long physical response before final catalog dispatch, retaining single execution and meters',async()=>{
+    const f=setup('production');try{
+      await f.transport.start();
+      const tail=f.transport.execute(f.physical).then(()=>f.transport.execute(f.catalog));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(f.completed()).toBeGreaterThan(f.sql[0].at+500);
+      expect(f.sql.map(q=>q.statement)).toEqual(['PRAGMA quick_check']);
+      await expect(f.transport.execute(f.catalog)).rejects.toThrow('concurrent or halted');
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect(f.sql).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);await tail;
+      expect(f.sql.map(q=>q.statement)).toEqual(['PRAGMA quick_check',f.catalog.sql]);
+      expect(f.sql[1].at-f.completed()).toBeGreaterThanOrEqual(60_000);
+      expect(f.transport.metering).toMatchObject({requests:2,rowsRead:1_692_669,rowsWritten:0,retries:0,unknownAttempts:0});
+      expect(f.events().filter(e=>e.kind==='physical-cooldown')).toEqual([expect.objectContaining({milliseconds:60_000})]);
+    }finally{f.close();}
+  });
+  it('refuses the final catalog when the transport window expires during the cooldown',async()=>{
+    const f=setup('production');try{
+      await f.transport.start();vi.setSystemTime(start+5_400_000-30_000);
+      const tail=f.transport.execute(f.physical).then(()=>f.transport.execute(f.catalog));
+      const refused=expect(tail).rejects.toThrow('halted, expired or UTC crossing');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(f.sql.map(q=>q.statement)).toEqual(['PRAGMA quick_check']);
+      await vi.advanceTimersByTimeAsync(60_000);await refused;
+      expect(f.sql.map(q=>q.statement)).toEqual(['PRAGMA quick_check']);
+      expect(f.transport.metering).toMatchObject({requests:1,rowsRead:1_692_668,rowsWritten:0,retries:0});
+    }finally{f.close();}
+  });
+  it('keeps preview physical requests on their existing schedule',async()=>{
+    const f=setup('preview');try{await f.transport.start();await f.transport.execute(f.physical);await f.transport.execute(f.catalog);expect(f.sql[1].at-f.completed()).toBeLessThan(60_000);expect(f.events().some(e=>e.kind==='physical-cooldown')).toBe(false);}finally{f.close();}
+  });
+  it('halts a rejected physical request immediately without cooldown or retry',async()=>{
+    const f=setup('production',true);try{await f.transport.start();await expect(f.transport.execute(f.physical)).rejects.toThrow('no retry or cleanup');await expect(f.transport.execute(f.catalog)).rejects.toThrow('concurrent or halted');expect(f.sql).toHaveLength(1);expect(f.transport.metering).toMatchObject({requests:1,retries:0,unknownAttempts:1});expect(f.events().some(e=>e.kind==='physical-cooldown')).toBe(false);}finally{f.close();}
   });
 });
