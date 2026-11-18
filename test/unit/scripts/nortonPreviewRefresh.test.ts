@@ -1,7 +1,7 @@
 import {afterEach,it,expect,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {REFRESH,requireRefreshApproval,admitRefreshUsage,validateRefreshAudit,verifyRefreshReceipt,createRefreshControlApi,createRefreshFetch,snapshotRefreshAssignments,executePreviewRefresh,type RefreshApproval,type RefreshSource,type RefreshInventory} from '../../../.github/scripts/refresh-norton-preview.js';
+import {REFRESH,requireRefreshApproval,admitRefreshUsage,validateRefreshAudit,verifyRefreshReceipt,createRefreshControlApi,createRefreshFetch,refreshFailureReason,snapshotRefreshAssignments,executePreviewRefresh,type RefreshApproval,type RefreshSource,type RefreshInventory} from '../../../.github/scripts/refresh-norton-preview.js';
 const source:RefreshSource={commit:'a'.repeat(40),tree:'b'.repeat(40),branch:'codex/production-cooldown'};
 const now=Date.parse('2026-11-18T12:00:00Z'),inventory=JSON.parse(readFileSync('test/fixtures/norton-preview-live-refresh-checks.json','utf8')) as RefreshInventory;
 const hash=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
@@ -27,3 +27,27 @@ it('control boundary admits only fixed metadata GET and exact usage GraphQL, wit
 it('rejects changed serving settings before any immutable-version acceptance',async()=>{vi.useFakeTimers();const calls=vi.fn(async(url:any)=>Response.json({success:true,errors:[],result:String(url).includes('/settings')?{bindings:[{type:'d1',name:'THEOLOGAI_DB',id:REFRESH.preview.databaseId}]}:String(url).includes('/deployments')?{deployments:[{id:REFRESH.production.deploymentId,versions:[{version_id:REFRESH.production.versionId,percentage:100}]}]}:{id:REFRESH.production.versionId,resources:{bindings:[{type:'d1',name:'THEOLOGAI_DB',id:REFRESH.production.databaseId}]}}}));const control=createRefreshControlApi({fetch:calls as typeof fetch,token:'synthetic',guard:()=>{}});const refusal=expect(snapshotRefreshAssignments(control.api)).rejects.toThrow('configured and active D1');await vi.runAllTimersAsync();await refusal;expect(calls).toHaveBeenCalledTimes(3);});
 
 it('rejects non-owner or retargeted hosted context before reading local artifacts or dispatching',async()=>{const fetch=vi.fn();await expect(executePreviewRefresh({root:process.cwd(),source,approvalBytes:Buffer.from(JSON.stringify(approval())),sourceDatabase:'/missing-local-fixture',workerJs:'/missing-local-worker',output:'/never-created',token:'synthetic',environment:{GITHUB_ACTIONS:'true',GITHUB_ACTOR_ID:'2'},fetch:fetch as typeof globalThis.fetch,now:()=>now})).rejects.toThrow('protected owner source run');expect(fetch).not.toHaveBeenCalled();});
+
+it.each([403,429])('records sanitized control HTTP %s metadata without provider prose or credentials',async status=>{
+ const events:unknown[]=[],secret='PRIVATE_TOKEN_OR_PROVIDER_BODY',path='/client/v4/accounts/'+REFRESH.account+'/workers/scripts/theologai/settings';
+ const calls=vi.fn(async()=>new Response(secret,{status,headers:{'x-private':secret}}));
+ const net=createRefreshFetch(calls as typeof fetch,()=>{},()=>10000,v=>events.push(v));
+ let refusal:unknown;try{await net('https://api.cloudflare.com'+path+'?secret='+secret,{method:'GET',headers:{authorization:'Bearer '+secret}});}catch(error){refusal=error;}
+ expect(events).toEqual([{kind:'control-http-failure',method:'GET',path,httpStatus:status}]);
+ expect(refreshFailureReason(refusal)).toBe('control response refused');expect(JSON.stringify(events)).not.toContain(secret);expect(String(refusal)).not.toContain(secret);
+ await expect(net(REFRESH.endpoint,{method:'POST'})).rejects.toThrow('first failure terminal');expect(calls).toHaveBeenCalledTimes(1);
+});
+it('retains only static local identity and budget refusal reasons, including through the fetch catch',async()=>{
+ let identity:unknown,budget:unknown;try{requireRefreshApproval({...approval(),sourceCommit:'c'.repeat(40)},source,now);}catch(error){identity=error;}
+ const u=usage();u.candidate.rowsRead=4000000;try{admitRefreshUsage(approval(),u,now);}catch(error){budget=error;}
+ expect(refreshFailureReason(identity)).toBe('exact source head tree and branch');expect(refreshFailureReason(budget)).toBe('fresh daily full-role headroom');
+ const net=createRefreshFetch((async()=>{throw budget;}) as typeof fetch,()=>{},()=>10000);let caught:unknown;try{await net(REFRESH.endpoint);}catch(error){caught=error;}
+ expect(refreshFailureReason(caught)).toBe('fresh daily full-role headroom');
+});
+it('reduces external exceptions and lookalike refusal messages to a constant without leaking secrets',async()=>{
+ const secret='PRIVATE_TOKEN_OR_PROVIDER_BODY',events:unknown[]=[];
+ let altered:any;try{requireRefreshApproval({...approval(),sourceCommit:'invalid'},source,now);}catch(error){altered=error;}altered.reason=secret;expect(refreshFailureReason(altered)).toBe('external_unknown');
+ for(const error of [Error(secret),Error('Preview live refresh refused: '+secret),{name:'RefreshRefusal',reason:secret},secret])expect(refreshFailureReason(error)).toBe('external_unknown');
+ const net=createRefreshFetch((async()=>{throw Error(secret);}) as typeof fetch,()=>{},()=>10000,v=>events.push(v));let caught:unknown;try{await net(REFRESH.endpoint);}catch(error){caught=error;}
+ expect(refreshFailureReason(caught)).toBe('external_unknown');expect(String(caught)).not.toContain(secret);expect(JSON.stringify(events)).not.toContain(secret);
+});
