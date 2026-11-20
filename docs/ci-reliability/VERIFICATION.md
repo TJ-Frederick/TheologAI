@@ -32,7 +32,7 @@ Core's conditional database skips are supplemented by the explicit generated-dat
 
 ## What the successor test proves
 
-[The real-CLI flow test](../../test/unit/scripts/operatorSuccessorFlow.test.ts) exercises the
+[The real-CLI flow test](https://github.com/TJ-Frederick/TheologAI/blob/24a6ba7516d40207eb07e246dd08d8e26e5100f1/test/unit/scripts/operatorSuccessorFlow.test.ts) exercises the
 actual owner-authorization uploader, native ZIP fixture, source admission, challenge CLI,
 ledger initialization, local integrity CLI, integrity uploader/finder, protected completion
 CLI and downstream acceptance CLI. It uses a different-branch PR, then a real Git merge
