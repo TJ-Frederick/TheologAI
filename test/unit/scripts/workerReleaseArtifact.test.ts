@@ -34,7 +34,8 @@ describe('source-bound prebuilt Worker handoff', () => {
     const { directory, digest } = fixture();
     expect(() => verifyManifest(root, directory, 'production', '')).toThrow('digest is required');
     expect(() => verifyManifest(root, directory, 'production', '0'.repeat(64))).toThrow('digest mismatch');
-    expect(() => verifyManifest(root, directory, 'preview', digest)).toThrow('target mismatch');
+    expect(verifyManifest(root, directory, 'preview', digest).target).toBe('theologai');
+    expect(() => verifyManifest(root, directory, 'coordinator', digest)).toThrow();
     writeFileSync(join(directory, 'worker.js'), 'altered');
     expect(() => verifyManifest(root, directory, 'production', digest)).toThrow('Bundle digest mismatch');
   });

@@ -4,7 +4,7 @@
     "moduleResolution": "Bundler",
     "rootDir": "../..",
     "types": [
-      "@cloudflare/vitest-pool-workers/types"
+      "@cloudflare/vitest-plugin/types"
     ]
   },
   "include": [

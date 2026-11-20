@@ -3,7 +3,7 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. The latest November 3 observation below supersedes the older assignment identities for current-state purposes. The August 31 release provenance and custody record is retained afterward as dated historical evidence. These are point-in-time observations, not a guarantee against later authorized activity.
+identity authority. Production was released on November 3. The November 20 preview observation below supersedes the preview control captured during that release. The August 31 release provenance and custody record is retained afterward as dated historical evidence. These are point-in-time observations, not a guarantee against later authorized activity.
 
 ## Latest completed production release — November 3, 2026 UTC
 
@@ -16,6 +16,10 @@ PR #172 merged as `701ab6295f033105ec306f7878a85e294cba0f6d`, preserving preview
 | Production — sole 100% assignment | `f6c9a995-0940-4758-a9a9-14f1389a9ab3` | `d2e2bd87-1213-4ba5-891d-e0f9b3293cb9` (#142) | `theologai-production-20260811-schema0009-a` / `9bc79346-338b-439e-a2a5-424f4418eb21` |
 
 ## Preview control
+
+On November 20 the protected preview verification observed deployment `62da1803-b313-4dc7-94bf-80d3394957b1`, Worker `8fb1be2c-72f7-4a4e-bbd6-117adfc30410` (#169), and D1 `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48`. The hosted check stopped at 222/370 with HTTP 503. The production assignment above continued serving. Its separately prepared candidate is D1 `74f456e2-6951-4003-bb6f-91951342bf8f`. [Protected preview run](https://github.com/TJ-Frederick/TheologAI/actions/runs/44791989825) · [Candidate and deployment procedure](NORTON-AQUINAS-RELEASE-CANDIDATE.md)
+
+### Preview control during the November 3 production release
 
 | Environment | Deployment | Worker | D1 |
 | --- | --- | --- | --- |

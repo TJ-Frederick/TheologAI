@@ -1,13 +1,13 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { proveCompleteCorpus, type CorpusProofSource, type ProofRow } from '../../../scripts/corpus-source-proof.js';
+import { PROVIDER_CATALOG, proveCompleteCorpus, type CorpusProofSource, type ProofRow } from '../../../scripts/corpus-source-proof.js';
 
 const captured = JSON.parse(readFileSync(new URL('../../fixtures/corpus-proof/preview-schema-line-comments.json', import.meta.url), 'utf8')) as {
   definitions: { source: ProofRow; remote: ProofRow }[];
 };
 const row = (sql: string, type = 'table'): ProofRow => ({ type, name: 'fixture', tbl_name: 'fixture', sql });
-const providers = ['_cf_KV', 'd1_migrations'].map(name => ({ type: 'table', name, tbl_name: name, sql: `CREATE TABLE ${name}(id INTEGER)` }));
+
 
 // Stop at the next independent gate; these tests cannot scan data or run FTS writes.
 async function schemaGate(source: ProofRow[], remote: ProofRow[]): Promise<void> {
@@ -15,7 +15,7 @@ async function schemaGate(source: ProofRow[], remote: ProofRow[]): Promise<void>
   const expected: CorpusProofSource = { catalog: source, tables: [], digests: {}, foreignKeyWitnessSha256: 'a'.repeat(64), schemaVersion: 'fixture', migrationNames: [], quickCheckReadCeiling: 1 };
   try {
     await proveCompleteCorpus(db, expected, async query => {
-      if (query.label === 'catalog-before') return [...remote, ...providers];
+      if (query.label === 'catalog-before') return [...remote, ...PROVIDER_CATALOG];
       expect(query.label).toBe('ledger-before');
       throw Error('reached independent migration ledger gate');
     });

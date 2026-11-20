@@ -1,7 +1,7 @@
 /** Bounded control collector reused from the existing release tooling; only the two corpus targets are selectable. */
 import { createHash } from 'node:crypto';
 import { canonicalJson } from './audit-historical-core-preview.js';
-import { TARGETS } from './norton-aquinas-release-policy.mjs';
+import { TARGETS } from './application-release-policy.mjs';
 export const CORPUS_ACCOUNT_ID = '0594ed1e4c9fe35ab7d9f47991e99f3e';
 export const CORPUS_CONTROL_LIMITS = Object.freeze({
     durationMs: 120000, requestMs: 30000, exchanges: 254,

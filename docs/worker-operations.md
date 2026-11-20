@@ -6,6 +6,8 @@ The [current release snapshot](CURRENT-RELEASE.md) is the designated current
 snapshot for this operations document. The dated records below retain release
 evidence and are not current identity authority.
 
+Use the [current deployment procedure](ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md) for preview, production and recovery. The dated release gates below document earlier operations.
+
 ## Released security posture
 
 SEC-01–05 are resolved in production through PR #170 / [run 41256928054](https://github.com/TJ-Frederick/TheologAI/actions/runs/41256928054). Input/diagnostic bounds, patched Node/dependencies, stable-IP limits and separated build/deployment trust are released. [Findings and residual risks](SECURITY-REVIEW-2026-10-22.md) are the security status register; [completed evidence](security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md) records verification. SEC-06 remains **open and paused**: existing account/permissions/bindings and normal preview → test → production gates stay in place. No new credential check, permission change, account migration or unconditional preview block is approved.

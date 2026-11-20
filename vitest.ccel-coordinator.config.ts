@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 process.env.WRANGLER_LOG_PATH ??= path.join(projectRoot, 'test-output', 'wrangler');
 
-const { cloudflareTest } = await import('@cloudflare/vitest-pool-workers');
+const { cloudflareTest } = await import('@cloudflare/vitest-plugin');
 
 export default defineConfig({
   plugins: [

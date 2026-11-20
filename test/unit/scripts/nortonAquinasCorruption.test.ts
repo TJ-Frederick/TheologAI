@@ -7,8 +7,7 @@ import { tmpdir } from 'node:os';
 import { Native } from '../../helpers/corpusNative.js';
 import {CorpusProofTransport} from '../../../scripts/corpus-proof-transport.js';
 import {ALL_FTS as FTS} from '../../../scripts/corpus-source-proof.js';
-import {POLICY} from '../../../scripts/norton-aquinas-release-policy.mjs';
-import {corpusTransportFixture} from '../../helpers/corpusTransportFixture.js';
+import {corpusGrant,corpusTransportFixture} from '../../helpers/corpusTransportFixture.js';
 it('rejects eleven missing/orphan/position/owned-content corruption controls using the actual rank-1 operation and halts each session', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'corpus-fts-')), native = new Native(join(dir, 'native')), source = new Database(':memory:');const manifest=JSON.parse(readFileSync('data/data-manifest.json','utf8'));for(const m of manifest.materializations.d1.migrations)source.exec(readFileSync(m.path,'utf8'));
     let controls = 0;
@@ -46,9 +45,9 @@ it('rejects eleven missing/orphan/position/owned-content corruption controls usi
                 await native.load(path);
                 vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-11-03T12:00:00Z'));
                 const fixture=corpusTransportFixture({role:'preview',advance:()=>vi.setSystemTime(Date.now()+1000),query:async(sql)=>native.exec(sql)});
-                const admission=new CorpusProofTransport({policy:POLICY.policy,role:'preview',token:'synthetic-reader',readBudget:3560000,eventFile:join(dir,'admit-'+controls+'.jsonl'),fetch:fixture.fetch,historicalExceptions:false});
+                const admission=new CorpusProofTransport({role:'preview',token:'synthetic-reader',readBudget:3560000,eventFile:join(dir,'admit-'+controls+'.jsonl'),fetch:fixture.fetch,authorization:corpusGrant()});
                 await admission.start();
-                const session=new CorpusProofTransport({policy:POLICY.policy,role:'preview',token:'synthetic-operator',readBudget:16384,eventFile:join(dir,'failure-'+controls+'.jsonl'),fetch:fixture.fetch,historicalExceptions:false});
+                const session=new CorpusProofTransport({role:'preview',token:'synthetic-operator',readBudget:16384,eventFile:join(dir,'failure-'+controls+'.jsonl'),fetch:fixture.fetch,authorization:corpusGrant()});
                 await session.startIntegrity(admission.protectedAdmission());
                 const query={kind:'fts-integrity' as const,label:'fts:'+table,sql:`INSERT INTO "${table}"("${table}",rank) VALUES('integrity-check',1)`,readCeiling:4096,writeCeiling:1};
                 await expect(session.execute(query),table+'/'+fault).rejects.toThrow();

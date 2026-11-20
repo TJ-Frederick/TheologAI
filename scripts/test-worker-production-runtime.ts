@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readD1Migrations } from '@cloudflare/vitest-pool-workers';
+import { readD1Migrations } from '@cloudflare/vitest-plugin';
 import { Log, LogLevel, Miniflare } from 'miniflare';
 import {
   assertMcpTransportContract,

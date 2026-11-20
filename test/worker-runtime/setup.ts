@@ -1,6 +1,6 @@
 import { beforeAll } from 'vitest';
 import { applyD1Migrations, env } from 'cloudflare:test';
-import type { D1Migration } from '@cloudflare/vitest-pool-workers';
+import type { D1Migration } from '@cloudflare/vitest-plugin';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../src/kernel/ubsParallelSource.js';
 import generatedUbsCorpus from '../../src/data/ubs-parallel-passages.generated.json';
 import { UBS_SEMANTIC_AGGREGATE_SOURCE_IDS } from '../../src/adapters/shared/UbsSemanticEvidenceBundleRepository.js';

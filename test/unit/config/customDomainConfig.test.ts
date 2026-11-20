@@ -63,74 +63,16 @@ describe('custom-domain infrastructure contract', () => {
     }
   });
 
-  it('publishes canonical deployment URLs and preserves release-context detector ordering', async () => {
-    const [productionWorkflow, previewWorkflow] = await Promise.all([
-      readProjectFile('.github/workflows/deploy.yml'),
-      readProjectFile('.github/workflows/pr.yml'),
-    ]);
-
-    expect(productionWorkflow).toContain('name: production');
-    expect(productionWorkflow).toContain('url: https://mcp.theologai.xyz/mcp');
-    const releaseContextStart = productionWorkflow.indexOf('- name: Resolve production release comparison context');
-    const releaseContextEnd = productionWorkflow.indexOf('- name: Download verified production deployment plan gate');
-    const detectorStart = productionWorkflow.indexOf('- name: Detect production custom-domain declaration change');
-    const prerequisiteStart = productionWorkflow.indexOf('- name: Require live website and audited preview custom domain');
-    const deployStart = productionWorkflow.indexOf('- name: Deploy to Cloudflare Workers');
-    expect(releaseContextStart).toBeGreaterThan(0);
-    expect(detectorStart).toBeGreaterThan(releaseContextStart);
-    expect(prerequisiteStart).toBeGreaterThan(detectorStart);
-    expect(prerequisiteStart).toBeGreaterThan(0);
-    expect(deployStart).toBeGreaterThan(prerequisiteStart);
-    expect(releaseContextEnd).toBeGreaterThan(releaseContextStart);
-    const workflow = parseYaml(productionWorkflow) as {
-      jobs: { deploy: { steps: Array<{ name?: string; env?: Record<string, string>; run?: string }> } };
-    };
-    const releaseContext = workflow.jobs.deploy.steps.find(step => step.name === 'Resolve production release comparison context');
-    expect(releaseContext).toBeDefined();
-    expect(releaseContext!.env).toEqual({
-      PRODUCTION_RELEASE_EVENT_NAME: '${{ github.event_name }}',
-      PRODUCTION_RELEASE_REF: '${{ github.ref }}',
-      PRODUCTION_RELEASE_HEAD: '${{ github.sha }}',
-    });
-    expect(releaseContext!.run).toContain('actual_head="$(git rev-parse HEAD)"');
-    expect(releaseContext!.run).toContain('test "$actual_head" = "$PRODUCTION_RELEASE_HEAD"');
-    expect(releaseContext!.run).toContain('PRODUCTION_RELEASE_FIRST_PARENT="$(git rev-parse HEAD^1)"');
-    expect(releaseContext!.run).toContain('resolve-production-release-context.mjs manual-context-output >> "$GITHUB_OUTPUT"');
-    expect(releaseContext!.run).toContain("grep -Eq '^[0-9a-f]{40}$'");
-    expect(releaseContext!.run).toContain('git cat-file -e "${before}^{commit}"');
-    expect(releaseContext!.run).toContain('git merge-base --is-ancestor "$before" HEAD');
-    expect(releaseContext!.run).not.toContain('PRODUCTION_RELEASE_PUSH_BEFORE');
-    expect(releaseContext!.run).not.toContain('JSON.parse');
-    const detector = productionWorkflow.slice(detectorStart, prerequisiteStart);
-    expect(detector).toContain('before="${{ steps.production-release-context.outputs.before }}"');
-    expect(detector).toContain('git cat-file -e "${before}^{commit}"');
-    expect(detector).toContain('git fetch --no-tags --depth=1 origin "$before"');
-    expect(detector).toContain('git show "${before}:wrangler.toml"');
-    expect(detector).toContain('scripts/detect-production-custom-domain-change.ts');
-    expect(detector).toContain('--github-output "$GITHUB_OUTPUT"');
-    expect(detector).toContain("if [ '${{ steps.production-release-context.outputs.custom_domain_required }}' = 'true' ]; then");
-    expect(detector).toContain("echo 'required=true' >> \"$GITHUB_OUTPUT\"");
-    const prerequisite = productionWorkflow.slice(prerequisiteStart, deployStart);
-    expect(prerequisite).toContain("if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.production-custom-domain-change.outputs.required == 'true') }}");
-    expect(prerequisite).toContain('https://theologai.xyz/');
-    expect(prerequisite).toContain('https://preview-mcp.theologai.xyz/mcp');
-    expect(prerequisite).toContain("%{url_effective}");
-    expect(prerequisite).toContain('test "$website_effective_url" = "https://theologai.xyz/"');
-    expect(prerequisite).toContain("--request OPTIONS");
-    expect(prerequisite).toContain("--header 'Origin: https://theologai.xyz'");
-    expect(prerequisite).toContain('access-control-allow-origin:[[:space:]]*https://theologai\\.xyz');
-    expect(prerequisite.match(/grep -Eiq/g)).toHaveLength(2);
-    expect(prerequisite).not.toContain('rg --ignore-case');
-    expect(prerequisite).toContain('npx --no-install tsx scripts/audit-parallel-passages-preview.ts');
-    expect(prerequisite).toContain('$RUNNER_TEMP/pre-production-preview-mcp-audit.json');
-    expect(prerequisite).toContain('test -s "$RUNNER_TEMP/pre-production-preview-mcp-audit.json"');
-    expect(prerequisite).toContain('$RUNNER_TEMP/theologai-website.html');
-    expect(prerequisite).toContain('$RUNNER_TEMP/preview-mcp-options.headers');
-
-    expect(previewWorkflow).toContain('name: preview');
-    expect(previewWorkflow).toContain('url: https://preview-mcp.theologai.xyz/mcp');
-    expect(previewWorkflow).toContain('**Canonical MCP Endpoint:** `https://preview-mcp.theologai.xyz/mcp`');
-    expect(previewWorkflow).toContain('**Compatibility MCP endpoint:** `https://theologai-preview.tjfrederick.workers.dev/mcp`');
+  it('restricts ordinary releases to their existing custom domain and legacy endpoint exposure', async () => {
+    const driver = await readProjectFile('.github/scripts/release-workers.sh');
+    for (const [role, file, hostname] of [
+      ['production', 'deploy.yml', 'mcp.theologai.xyz'], ['preview', 'pr.yml', 'preview-mcp.theologai.xyz'],
+    ]) {
+      expect(await readProjectFile('.github/workflows/' + file)).toContain('url: https://' + hostname + '/mcp');
+      expect(driver).toContain('domain=' + hostname);
+      expect(driver).toContain(role + ')');
+    }
+    expect(driver).toContain('.routes == [{pattern: $domain, custom_domain: true}] and .workers_dev == true');
   });
 
   it('keeps fallback origin behavior on the legacy Pages site during the staged cutover', () => {

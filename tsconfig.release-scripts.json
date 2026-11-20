@@ -12,7 +12,6 @@
     "scripts/verify-preview-worker-deployment.ts",
     "scripts/verify-production-worker-deployment.ts",
     "scripts/audit-dual-era-mcp-preview.ts",
-    "scripts/dual-era-preview-release-receipt.ts",
     "scripts/audit-original-language-v2-preview.ts",
     "scripts/audit-original-language-v2-production.ts",
     "scripts/audit-historical-core-preview.ts",
@@ -26,17 +25,11 @@
     "scripts/ccel-live-preview-canary.ts",
     "scripts/production-rollback-rehearsal.ts",
     "scripts/application-corpus-check.ts",
-    "scripts/preview-fts-diagnostic.ts",
+    "scripts/norton-aquinas-live.ts",
+    "scripts/norton-aquinas-preparation.ts",
     "scripts/operator-corpus-proof.ts",
+    "scripts/operator-proof-once.ts",
     ".github/scripts/verify-release-operation.ts",
-    ".github/scripts/restore-norton-preview.ts",
-    ".github/scripts/validate-existing-norton-preview.ts",
-    ".github/scripts/prepare-norton-production.ts",
-    ".github/scripts/retained-norton-inputs.ts",
-    ".github/scripts/norton-scoped-response-diagnostic.ts",
-    ".github/scripts/reconstruct-norton-source.ts",
-    ".github/scripts/rehearse-norton-source.ts",
-    ".github/scripts/preview-runtime-reuse.ts",
-    ".github/scripts/verify-runtime-preview-handoff.ts"
+    "scripts/release-acceptance.ts"
   ]
 }

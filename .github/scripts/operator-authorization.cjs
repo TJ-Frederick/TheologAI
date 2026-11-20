@@ -1,6 +1,6 @@
 // Authenticated owner handoff for one new operation. No cloud API or budget renewal.
 const fs = require('node:fs');
-const policy = require('./norton-aquinas-policy.cjs');
+const policy = require('./corpus-policy.cjs');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const { execFileSync } = require('node:child_process');
@@ -11,73 +11,68 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const check = (v, reason) => { if (!v) throw Error('Operator authorization refused: ' + reason); };
 const hex = (v, n) => typeof v === 'string' && new RegExp(`^[0-9a-f]{${n}}$`).test(v);
 const id = v => typeof v === 'string' && /^[1-9][0-9]{0,15}$/.test(v) && Number.isSafeInteger(Number(v));
-const applicationKeys = ['schemaVersion','scope','repository','ownerActorId','role','pullRequestNumber','headBranch','sourceCommit','sourceTree','baseCommit','sourcePlanSha256','targetRunId','targetRunAttempt','authorizationId','ledgerId','notBefore','expiresAt','reservedReads','hardReadCap','diagnosticCommands','maxWrites','previousReadsSpentOrReserved','previousWritesSpentOrReserved','previousDiagnosticCommands','outstandingPriorReservationsAccepted'];
-const corpusKeys=[...applicationKeys,'exclusiveDataWritesDuringWindow','candidateWriteJobsPaused','liveControlReserve','expectedLedgerSha256','releasePolicy'];
+const keys = ['schemaVersion','scope','repository','ownerActorId','role','pullRequestNumber','headBranch','sourceCommit','sourceTree','baseCommit','sourcePlanSha256','targetRunId','targetRunAttempt','authorizationId','ledgerId','notBefore','expiresAt','reservedReads','hardReadCap','diagnosticCommands','maxWrites','previousReadsSpentOrReserved','previousWritesSpentOrReserved','previousDiagnosticCommands','outstandingPriorReservationsAccepted','exclusiveDataWritesDuringWindow','candidateWriteJobsPaused','liveControlReserve','expectedLedgerSha256','releasePolicy','databaseId','assignments','accountReadCeiling','accountReadCeilingDay','accountReadsHeld','accountWritesHeld'];
+function authorizationDraft(expected) {
+  const databaseId = policy.serving().targets[expected.role]?.databaseId;
+  check(databaseId && id(expected.targetRunId) && expected.targetRunAttempt === 1, 'draft target run');
+  check(['sourceCommit','sourceTree','baseCommit'].every(key => hex(expected[key],40)) && hex(expected.sourcePlanSha256,64), 'draft source identity');
+  const assignment = () => ({databaseId:null,deploymentId:null,versionId:null});
+  const values = {
+    schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',repository,ownerActorId,
+    role:expected.role,pullRequestNumber:expected.pullRequestNumber,headBranch:expected.headBranch,
+    sourceCommit:expected.sourceCommit,sourceTree:expected.sourceTree,baseCommit:expected.baseCommit,
+    sourcePlanSha256:expected.sourcePlanSha256,targetRunId:expected.targetRunId,targetRunAttempt:expected.targetRunAttempt,
+    diagnosticCommands:4,maxWrites:4,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,
+    releasePolicy:policy.policy,databaseId,assignments:{preview:assignment(),production:assignment()},
+  };
+  return Object.fromEntries(keys.map(key => [key,values[key] ?? null]));
+}
+
 function requireAuthorization(a, expected = {}, now = Date.now()) {
-  const corpus=a?.releasePolicy===policy.policy;
-  const extended=a&&('accountReadCeiling'in a||'accountReadCeilingDay'in a);
-  const bound=Object.hasOwn(a??{},'boundPreview');
-  const keys=[...(bound?['boundPreview','cumulativeTask']:[]),...(corpus?corpusKeys:applicationKeys),...(extended?['accountReadCeiling','accountReadCeilingDay']:[])];
   check(a && Object.keys(a).sort().join(',') === [...keys].sort().join(','), 'shape');
-  check(a.schemaVersion === 'theologai-operator-authorization.v1' && a.scope === 'new-additional-operation' && (!corpus || a.exclusiveDataWritesDuringWindow===true && a.candidateWriteJobsPaused===true && hex(a.expectedLedgerSha256,64))
-    && a.repository === repository && a.ownerActorId === ownerActorId, 'explicit new owner scope');
-  check(['preview','production'].includes(a.role) && Number.isSafeInteger(a.pullRequestNumber) && a.pullRequestNumber > 170,
-    'successor role and PR');
-  check(typeof a.headBranch === 'string' && a.headBranch.length <= 240 && /^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(a.headBranch)
+  check(a.schemaVersion === 'theologai-operator-authorization.v1' && a.scope === 'new-additional-operation'
+    && a.releasePolicy === policy.policy && a.repository === repository && a.ownerActorId === ownerActorId
+    && a.exclusiveDataWritesDuringWindow === true && a.candidateWriteJobsPaused === true && hex(a.expectedLedgerSha256,64), 'explicit new owner scope');
+  check(['preview','production'].includes(a.role) && Number.isSafeInteger(a.pullRequestNumber) && a.pullRequestNumber > 0, 'role and PR');
+  check(typeof a.headBranch === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,239}$/.test(a.headBranch)
     && (a.role === 'production' ? a.headBranch === 'main' : a.headBranch !== 'main'), 'branch');
   check(['sourceCommit','sourceTree','baseCommit'].every(k => hex(a[k],40)) && hex(a.sourcePlanSha256,64)
     && id(a.targetRunId) && a.targetRunAttempt === 1, 'source and run');
+  const {targets} = policy.serving();
+  check(a.databaseId === targets[a.role].databaseId, 'reviewed target');
+  check(a.assignments && Object.keys(a.assignments).sort().join(',') === 'preview,production', 'serving assignments');
+  for (const role of ['preview','production']) {
+    const assignment = a.assignments[role];
+    check(assignment && Object.keys(assignment).sort().join(',') === 'databaseId,deploymentId,versionId'
+      && Object.values(assignment).every(value=>typeof value==='string' && policy.uuid.test(value)), 'assignment identity');
+  }
+  check(a.assignments.production.databaseId !== a.databaseId && a.assignments.preview.databaseId !== a.assignments.production.databaseId
+    && (a.role === 'preview' || a.assignments.preview.databaseId !== a.databaseId), 'isolated target');
   check(/^operation-[a-z0-9-]{8,80}$/.test(a.authorizationId || '') && a.ledgerId === a.authorizationId, 'single operation ledger');
-  check(a.reservedReads === (corpus?policy.reservedReads:3510997) && a.hardReadCap === (corpus?policy.hardReadCap:3800000) && a.diagnosticCommands === 4 && a.maxWrites === 4 && (!corpus || a.liveControlReserve === policy.liveControlReserve(a.role))
+  check(Number.isSafeInteger(a.reservedReads) && a.reservedReads > 0 && a.reservedReads <= a.hardReadCap
+    && Number.isSafeInteger(a.hardReadCap) && a.hardReadCap <= policy.hardReadCap
+    && a.diagnosticCommands === 4 && a.maxWrites === 4
+    && Number.isSafeInteger(a.liveControlReserve) && a.liveControlReserve > policy.controlReads
     && a.previousReadsSpentOrReserved === 0 && a.previousWritesSpentOrReserved === 0 && a.previousDiagnosticCommands === 0
     && a.outstandingPriorReservationsAccepted === true, 'new allowance and retained prior reservations');
-  if(bound) {
-    check(corpus && a.role==='preview' && !extended,'bound preview scope');
-    requireBoundPreview(a.boundPreview); requireCumulativeTask(a.cumulativeTask);
-  }
-  if(extended)check(corpus&&a.role==='production'&&a.accountReadCeiling===4400000&&typeof a.accountReadCeilingDay==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(a.accountReadCeilingDay)&&new Date(now).toISOString().slice(0,10)===a.accountReadCeilingDay&&typeof a.notBefore==='string'&&a.notBefore.slice(0,10)===a.accountReadCeilingDay&&Date.parse(a.expiresAt)<=Date.parse(a.accountReadCeilingDay+'T00:00:00Z')+86400000,'explicit dated production account ceiling');
   const start = Date.parse(a.notBefore), end = Date.parse(a.expiresAt);
-  check(Number.isFinite(start) && Number.isFinite(end) && start <= now && end > now && end - start <= 86400000, 'authorization window');
+  const day = new Date(now).toISOString().slice(0,10), midnight = Date.parse(day+'T00:00:00Z');
+  check(Number.isSafeInteger(a.accountReadCeiling) && a.accountReadCeiling <= policy.accountReadCeiling
+    && Number.isSafeInteger(a.accountReadsHeld) && a.accountReadsHeld >= 0
+    && Number.isSafeInteger(a.accountWritesHeld) && a.accountWritesHeld >= 0 && a.accountWritesHeld+a.maxWrites <= 80_000
+    && a.accountReadsHeld+a.reservedReads+a.liveControlReserve+policy.uncertaintyMargin <= a.accountReadCeiling
+    && a.accountReadCeilingDay === day && start >= midnight && start <= now && end > now && end <= midnight+86400000, 'authorized UTC window and account ceiling');
   for (const [k,v] of Object.entries(expected)) check(a[k] === v, 'expected ' + k);
   return a;
 }
-// This fixed mode grants no authority itself: callers must verify the complete
-// authenticated owner package against their source, plan and target run.
-function requireBoundPreview(v) {
-  const expected={mode:'already-bound-preview.v1',databaseId:policy.targets.preview.databaseId,
-    previewDeploymentId:'aad541f2-7102-41ee-8da1-d8efce7fcf97',previewVersionId:'eb16fe17-764d-4ccc-8a95-a2098470372c',
-    productionDatabaseId:policy.rollback.databaseId,productionVersionId:'d2e2bd87-1213-4ba5-891d-e0f9b3293cb9',productionDeploymentId:'f6c9a995-0940-4758-a9a9-14f1389a9ab3'};
-  // Production deployment is also owner pinned, rather than inferred from a version.
-  check(v && Object.keys(v).sort().join(',')===Object.keys(expected).sort().join(','),'bound preview shape');
-  for(const [key,value] of Object.entries(expected)) check(v[key]===value,'bound preview '+key);
-  check(typeof v.productionDeploymentId==='string' && /^[0-9a-f-]{36}$/.test(v.productionDeploymentId),'bound production deployment');
-  return v;
-}
-function requireCumulativeTask(v) {
-  const expected={previousReadsHeld:4200000,previousDiagnosticWritesActual:7,previousDiagnosticWritesHeld:8,
-    newProofReads:3560000,newLiveReads:90000,newControlReads:10000,newDiagnosticWritesHeld:4,
-    totalReadsHeld:7860000,uncertaintyMargin:200000,cumulativeReadCeiling:8060000,totalDiagnosticWritesHeld:12};
-  check(v && Object.keys(v).sort().join(',')===Object.keys(expected).sort().join(','),'cumulative task shape');
-  for(const [key,value] of Object.entries(expected))check(v[key]===value,'cumulative task '+key);
-  return v;
-}
-function boundPreviewForPackage(p,context,now=Date.now()) {
-  const a=requirePackage(p,{role:'preview',releasePolicy:policy.policy,sourceCommit:context.sourceCommit,
-    sourceTree:context.sourceTree,targetRunId:context.runId,targetRunAttempt:1},now).authorization;
-  check(a.boundPreview,'explicit bound preview authority');
-  requireCumulativeTask(a.cumulativeTask);
-  return requireBoundPreview(a.boundPreview);
-}
-function requireBoundPreviewAnchors(p,preview,production,now=Date.now()) {
-  const a=requirePackage(p,{},now).authorization;
-  if(!a.boundPreview)return;
-  const pins=boundPreviewForPackage(p,{sourceCommit:a.sourceCommit,sourceTree:a.sourceTree,runId:a.targetRunId},now);
-  check(preview?.worker==='theologai-preview' && preview.predecessorDeploymentId===pins.previewDeploymentId
-    && preview.predecessorVersionId===pins.previewVersionId && preview.predecessorD1?.databaseId===pins.databaseId
-    && preview.candidateD1?.databaseId===pins.databaseId && preview.d1Changed===false,'bound preview predecessor drift');
-  check(production?.worker==='theologai' && production.deploymentId===pins.productionDeploymentId
-    && production.workerVersionId===pins.productionVersionId && production.d1?.databaseId===pins.productionDatabaseId
-    && production.configuredD1?.databaseId===pins.productionDatabaseId,'bound production control drift');
+
+function boundPreviewForPackage(p, context, now = Date.now()) {
+  const a = requirePackage(p, {sourceCommit:context.sourceCommit,sourceTree:context.sourceTree,targetRunId:context.runId}, now).authorization;
+  const {preview, production} = a.assignments;
+  if (a.role !== 'preview' || preview.databaseId !== a.databaseId) return;
+  return {mode:'already-bound-preview.v1', databaseId:a.databaseId,
+    previewDeploymentId:preview.deploymentId, previewVersionId:preview.versionId,
+    productionDatabaseId:production.databaseId, productionDeploymentId:production.deploymentId, productionVersionId:production.versionId};
 }
 function requirePackage(p, expected = {}, now = Date.now()) {
   check(p && Object.keys(p).sort().join(',') === 'authorization,provenance', 'package shape');
@@ -137,21 +132,18 @@ async function requireLedgerMarker({github,package:p,now=Date.now()}) {
   const {data:bytes}=await github.rest.actions.downloadArtifact({...repo,artifact_id:marker.id,archive_format:'zip'});
   check(JSON.stringify(readArchive(Buffer.from(bytes),marker.digest))===JSON.stringify(p.authorization),'ledger marker content');
 }
-async function waitForAuthorization({github,expected,revalidate,core,runtimeReuse,expectedPurpose,environment=process.env,now=Date.now,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),wait=environment.OPERATOR_WAIT_AUTHORIZATION==='true'}) {
-  // Preparation and cutover occupy separate quota days in the same production run.
-  const preparationWait = wait && environment.OPERATOR_PRODUCTION_PREPARATION_WAIT === 'true';
-  if (preparationWait) check(expected.role === 'production' && expected.pullRequestNumber === policy.productionReleasePR && expected.baseCommit === policy.productionPredecessorMerge && expected.headBranch === 'main' && environment.GITHUB_REF === 'refs/heads/main' && environment.GITHUB_EVENT_NAME === 'workflow_dispatch' && environment.GITHUB_RUN_ATTEMPT === '1', 'production preparation wait context');
-  const end = now() + (wait ? (preparationWait ? 14400000 : 3600000) : 0);
-  if (core?.summary) await core.summary.addHeading('Explicit operator authorization required').addRaw(JSON.stringify(expected)).write();
+async function waitForAuthorization({github,expected,revalidate,core,environment=process.env,now=Date.now,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)),wait=environment.OPERATOR_WAIT_AUTHORIZATION==='true'}) {
+  const end = now() + (wait ? 3600000 : 0);
+  if (wait) {
+    const guidance = 'Operator grant draft only. Complete every null from the separately approved operation and current observed assignments. The zero counters start this new operation; review and include prior same-day held reads and writes in the account floors.';
+    const draft = JSON.stringify(authorizationDraft(expected),null,2);
+    // The live step log is copyable before authorization. The summary remains available with the run.
+    core?.info?.(`${guidance}\n${draft}`);
+    if (core?.summary) await core.summary.addHeading('Operator grant draft').addRaw(guidance,true).addCodeBlock(draft,'json').write();
+  }
   do {
     await revalidate();
     const p = await findAuthorization({github,expected,now:now()});
-    const other=runtimeReuse?await runtimeReuse():null;
-    check(!other||['runtime-reuse','runtime-reuse-pending'].includes(other.mode),'closed runtime reuse purpose');
-    check(!expectedPurpose||['full-proof','runtime-reuse'].includes(expectedPurpose),'closed expected purpose');
-    check(!(p&&expectedPurpose==='runtime-reuse')&&!(other&&expectedPurpose==='full-proof'),'expected operator purpose');
-    check(!(p&&other),'conflicting operator purposes');
-    if(other&&other.mode==='runtime-reuse'){await revalidate();return other;}
     if (p) {
       await revalidate(); requirePackage(p,expected,now());
       const text = JSON.stringify(p,null,2)+'\n';
@@ -159,7 +151,7 @@ async function waitForAuthorization({github,expected,revalidate,core,runtimeReus
       core.setOutput('authorization_sha256',hash(text)); return p;
     }
     if (now() >= end) break;
-    await pause(preparationWait ? 60000 : 15000);
+    await pause(15000);
   } while (now() < end);
   throw Error('Operator authorization refused: no explicit owner authorization within admission window');
 }
@@ -197,5 +189,4 @@ async function requireLiveSource({github,authorization:a}) {
   const {data:commit}=await github.rest.git.getCommit({...repo,commit_sha:a.sourceCommit});
   check(commit.tree.sha===a.sourceTree && (a.role!=='production' || commit.parents?.[0]?.sha===a.baseCommit),'live source tree and base');
 }
-function productionAccountCeiling(p,context,now=Date.now()){const a=requirePackage(p,{role:'production',releasePolicy:policy.policy,sourceCommit:context.sourceCommit,sourceTree:context.sourceTree,targetRunId:context.runId,targetRunAttempt:1},now).authorization;check(a.accountReadCeiling===4400000&&a.accountReadCeilingDay===new Date(now).toISOString().slice(0,10),'approved production ceiling context');return a.accountReadCeiling;}
-module.exports={requireBoundPreviewAnchors,boundPreviewForPackage,requireBoundPreview,requireCumulativeTask,productionAccountCeiling,requireAuthorization,requirePackage,requireProvenance,findAuthorization,waitForAuthorization,uploadAuthorization,requireLiveCandidate,requireLiveSource,requireLedgerMarker,readArchive,readArchiveFile,hash};
+module.exports={boundPreviewForPackage,requireAuthorization,requirePackage,requireProvenance,findAuthorization,waitForAuthorization,uploadAuthorization,requireLiveCandidate,requireLiveSource,requireLedgerMarker,readArchive,readArchiveFile,hash};

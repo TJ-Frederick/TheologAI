@@ -11,7 +11,7 @@ export type ProofExecute = (query: ProofQuery) => Promise<ProofRow[]>;
 const EXTERNAL_FTS = ['sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts'];
 export const ALL_FTS = ['strongs_fts', ...EXTERNAL_FTS] as const;
 export const CATALOG_SQL = "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name";
-export const LEDGER_SQL = 'SELECT id,name,applied_at FROM d1_migrations ORDER BY id LIMIT 11';
+export const LEDGER_SQL = 'SELECT id,name,applied_at FROM d1_migrations ORDER BY id LIMIT 513';
 export const PROVIDER_CATALOG: ProofRow[] = [
     { type: 'table', name: '_cf_KV', tbl_name: '_cf_KV', sql: 'CREATE TABLE _cf_KV (\n        key TEXT PRIMARY KEY,\n        value BLOB\n      ) WITHOUT ROWID' },
     { type: 'table', name: 'd1_migrations', tbl_name: 'd1_migrations', sql: 'CREATE TABLE "d1_migrations"(\n\t\tid         INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tname       TEXT UNIQUE,\n\t\tapplied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n)' }
@@ -79,6 +79,7 @@ export function buildCorpusProofSource(root: string, source: Database.Database) 
     for (const sql of migrations) replay.exec(sql.toString());
     const catalog = source.prepare(CATALOG_SQL).all() as ProofRow[];
     same(catalog, replay.prepare(CATALOG_SQL).all(), 'source schema differs from independent raw migrations');
+    same(catalog.filter(r => typeof r.sql === 'string' && /CREATE VIRTUAL TABLE.+USING fts5/i.test(r.sql)).map(r=>r.name).sort(), [...ALL_FTS].sort(), 'rank-one FTS inventory changed');
     same(source.prepare('PRAGMA foreign_key_check').all(), [], 'source foreign keys');
     same(source.prepare('PRAGMA quick_check').all(), [{ quick_check: 'ok' }], 'source physical integrity');
     const tables = Object.keys(manifest.expectedCounts).filter(t => !EXTERNAL_FTS.includes(t)).sort();
@@ -166,31 +167,32 @@ export async function proveCompleteCorpus(source: Database.Database, expected: C
   const application = catalogBefore.filter(r => r.name !== '_cf_KV' && r.name !== 'd1_migrations');
   same(comparableSchema(application), comparableSchema(expected.catalog), 'remote schema differs from source');
   const providers = catalogBefore.filter(r => r.name === '_cf_KV' || r.name === 'd1_migrations');
-  if(expected.schemaVersion==='0010_active_aquinas_hierarchy_publication') same(providers,PROVIDER_CATALOG,'exact reviewed provider schema differs');
+  same(providers, PROVIDER_CATALOG, 'exact reviewed provider schema differs');
   check(providers.length === 2 && providers.every(r => r.type === 'table' && r.tbl_name === r.name && typeof r.sql === 'string'), 'provider schema unavailable');
-  const ledger = await execute({ kind: 'select', label: 'ledger-before', sql: LEDGER_SQL, readCeiling: 128, writeCeiling: 0 });
+  const ledger = await execute({ kind: 'select', label: 'ledger-before', sql: LEDGER_SQL, readCeiling: 1024, writeCeiling: 0 });
   same(ledger.map(r => r.name), expected.migrationNames, 'migration ledger source mismatch');
-  if(expected.schemaVersion==='0010_active_aquinas_hierarchy_publication'){
-    check(typeof expectedLedgerSha256==='string' && /^[a-f0-9]{64}$/.test(expectedLedgerSha256),'reviewed original ledger witness required');
-    same(sha(JSON.stringify(ledger)),expectedLedgerSha256,'reviewed original provider ledger changed');
-    check(ledger.length===10 && ledger.every((r,i)=>r.id===i+1 && typeof r.applied_at==='string' && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(r.applied_at)),'original provider ledger shape');
-  }
-  check(ledger.every((r, i) => Number.isSafeInteger(r.id) && (r.id as number) > 0 && (!i || (r.id as number) > (ledger[i - 1]!.id as number)) && typeof r.applied_at === 'string'), 'migration ledger shape');
+  check(typeof expectedLedgerSha256 === 'string' && /^[a-f0-9]{64}$/.test(expectedLedgerSha256), 'reviewed original ledger witness required');
+  same(sha(JSON.stringify(ledger)), expectedLedgerSha256, 'reviewed original provider ledger changed');
+  check(ledger.length <= 512 && ledger.every((r,i)=>r.id===i+1 && typeof r.applied_at==='string'
+    && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(r.applied_at)), 'original provider ledger shape');
   // Fail a wrong corpus identity before scanning content, even on the same schema.
   if (expected.tables.includes('theologai_metadata')) {
     const sql = 'SELECT key,value FROM theologai_metadata ORDER BY key LIMIT 32';
     same(await execute({ kind: 'select', label: 'corpus-identity', sql, readCeiling: 128, writeCeiling: 0 }), source.prepare(sql).all(), 'remote corpus identity differs');
   }
-  const tables: Record<string, { rows: number; sha256: string }> = {};
-  for (const table of expected.tables) tables[table] = await compareTable(source, expected, table, execute);
+  // Meter the one expensive physical query first. Every subsequent bounded
+  // read then uses its actual charge when checking remaining account headroom.
   const quick = await execute({ kind: 'quick-check', label: 'physical', sql: 'PRAGMA quick_check', readCeiling: expected.quickCheckReadCeiling, writeCeiling: 0 });
   same(quick, [{ quick_check: 'ok' }], 'physical integrity failure');
+  same(await execute({ kind: 'select', label: 'catalog-after-physical', sql: CATALOG_SQL, readCeiling: 4096, writeCeiling: 0 }), catalogBefore, 'catalog changed after physical integrity check');
+  const tables: Record<string, { rows: number; sha256: string }> = {};
+  for (const table of expected.tables) tables[table] = await compareTable(source, expected, table, execute);
   for (const table of ALL_FTS) {
     const rows = await execute({ kind: 'fts-integrity', label: `fts:${table}`, sql: `INSERT INTO ${id(table)}(${id(table)},rank) VALUES('integrity-check',1)`, readCeiling: 4096, writeCeiling: 1 });
     same(rows, [], 'FTS integrity response');
   }
   same(await execute({ kind: 'select', label: 'catalog-after', sql: CATALOG_SQL, readCeiling: 4096, writeCeiling: 0 }), catalogBefore, 'catalog changed during proof');
-  same(await execute({ kind: 'select', label: 'ledger-after', sql: LEDGER_SQL, readCeiling: 128, writeCeiling: 0 }), ledger, 'ledger changed during proof');
+  same(await execute({ kind: 'select', label: 'ledger-after', sql: LEDGER_SQL, readCeiling: 1024, writeCeiling: 0 }), ledger, 'ledger changed during proof');
   return { method: 'fresh_complete_cells_physical_and_rank1_fts.v1' as const, tables, catalogSha256: sha(JSON.stringify(catalogBefore)), ledgerSha256: sha(JSON.stringify(ledger)),
     foreignKeys: { method: 'local_clean_raw_schema_plus_all_child_parent_cells' as const, witnessSha256: expected.foreignKeyWitnessSha256 }, quickCheck: 'ok' as const, ftsIntegrity: [...ALL_FTS], sourceRows: Object.values(tables).reduce((n, t) => n + t.rows, 0) };
 }

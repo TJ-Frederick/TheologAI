@@ -1,5 +1,23 @@
 # Norton/Aquinas successor candidate
 
+## Local deployment cleanup and next release decision
+
+The [release procedure](ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md) replaces the one-off preview and promotion routes. Keep the existing prepared Norton/Aquinas database. Preview and production each passed 370/370 on local Workerd with Worker SHA-256 `882f7501271ed77097ad3b6967d0708dbbdbab9b03af85cff2476bb188132a84`. The locally rebuilt SQLite file and the retained proof source have matching canonical digests for all 39 tables and 1,635,226 rows. The eight Wesley citations resolved to the expected text in both protocols. The original 503 remains a hosted failure.
+
+The rollout rehearsal exercised 13 cases through the same shell used by GitHub Actions, including a lost deployment response, wrong database, changed build, expired grant and stale production assignment. Reproduce it with `python3 test/fixtures/release-workers/replay.py`. Local source preparation, migration from the previous production corpus and fresh seed import into Workerd passed. The source-plan digest is computed anew for the actual protected run. The [November 20 hosted failure](https://github.com/TJ-Frederick/TheologAI/actions/runs/44791989825) remains the most recent hosted result.
+
+For the first protected release, preview targets `62b871a6-5b4d-4d9b-8f52-301f6c878f48`. Production would move from `9bc79346-338b-439e-a2a5-424f4418eb21` to prepared candidate `74f456e2-6951-4003-bb6f-91951342bf8f`. The documented rollback pair is Worker `d2e2bd87-1213-4ba5-891d-e0f9b3293cb9` and database `9bc79346-338b-439e-a2a5-424f4418eb21`. Fresh observations must confirm that pair before an actual switch.
+
+Tyler approved one protected preview using 3,750,000 reads transferred from the unused production allowance on the superseded release. The cumulative cap remains 18,130,000 including its 200,000 margin. Retain every prior charge and unresolved reservation. Production requires separate approval. No further candidate preparation is planned.
+
+The daily operating ceiling for corpus verification is 4,600,000 reads. For preview reserve 3,450,000 for proof, 300,000 for live checks and controls, and the existing 200,000 margin. This leaves at most 650,000 for current account usage, outstanding same-day holds and projected live traffic through reset. The allowance includes up to four diagnostic writes. At 20:07 UTC on November 20 the account reported 424,978 reads and zero writes. Counting another 130,000 for earlier reservations and 75,000 for projected traffic gave a total of 4,579,978 against the 5,000,000 Free limit. Recheck usage at admission. The measured local complete proof used 3,332,786 reads. The previous production attempt recorded 3,330,377 before its closing read failed. Do not start if the budget or approved window cannot fit. The strict audit currently needs zero exceptions after the dev-only Workers testing package update. Its existing November 22 exception expiry remains in force for older revisions.
+
+## November 20 deployment process review
+
+The [November 10 hosted preview](https://github.com/TJ-Frederick/TheologAI/actions/runs/42927858781) passed all 370 checks. Production candidate preparation completed November 13. On November 16, all 39 table comparisons and integrity checks passed before D1 rejected the closing schema read. On November 18, the protected preview verifier rejected `server/discover` locally after 185 checks. Its rehearsal had bypassed the method filter. Production traffic still served the previous release at the last recorded stop. [Production proof attempt](https://github.com/TJ-Frederick/TheologAI/actions/runs/44006096199) · [Preview verifier attempt](https://github.com/TJ-Frederick/TheologAI/actions/runs/44361280695)
+
+On November 20 the corrected verifier passed local review and CI. The [hosted preview](https://github.com/TJ-Frederick/TheologAI/actions/runs/44791989825/job/136487457530) completed 222 checks before the Wesley search returned HTTP 503. Production did not switch. Preserve the prepared candidate and all reservations. The [release plan](ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md) requires completing and verifying both workflow paths and retiring the one-off release machinery before deploying Norton and Aquinas. The historical attempt grants no retry.
+
 ## Active local pacing follow-up — November 10
 
 The authorized preview attempt deployed the optimized ed80 runtime, then stopped
@@ -141,6 +159,8 @@ Invalidate receipts on changed source/tree/plan/database bytes/schema/canonical 
 Preview rollback is the freshly captured preceding Worker with unchanged 74f, using the existing protected reviewed rollback procedure under separate authority. Do not prepare 74f until preview is accepted: preparing it invalidates that old preview rollback pair. Production rollback preserves freshly captured production Worker with 9bc; no database restore is included. Unknown routing outcome requires read-only reconciliation, not blind deployment replay.
 
 Unresolved remote inputs: current token/Pages capability, operator credential availability, account usage and workflow exclusivity, present assignments/unbound target metadata, original remote ledgers, owner custody and actual remote timing/metering. All remain explicit approval/admission inputs, not local-test claims. No Cloudflare, credential, quota, SQL, binding or deployment operations occurred during the November3 local rebaseline.
+
+The following November 3 selector and post-release cleanup plan is historical. The [current deployment procedure](ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md) completes both paths before this release.
 
 ## Preserve application releases and finish the release operationally
 

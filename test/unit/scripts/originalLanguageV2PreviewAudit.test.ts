@@ -22,7 +22,6 @@ import { finalizeOriginalLanguageStudyV2Output } from '../../../src/presenters/o
 const root = new URL('../../../', import.meta.url);
 const fixtureUrl = new URL('test/fixtures/original-language-v2-preview-audit.json', root);
 const runnerUrl = new URL('scripts/audit-original-language-v2-preview.ts', root);
-const workflowUrl = new URL('.github/workflows/pr.yml', root);
 const marker = '\n### Added Hebrew semantic layer';
 const artifactIdentity = 'bd19fb99f7bbfd13ad68f2184aaded4a6e5587196ad76b68b0c22bf971fc90f6';
 
@@ -66,7 +65,7 @@ describe('original-language v2 preview audit contract', () => {
   });
 
   it('keeps the runner fixed to preview, with bounded no-retry release-gate semantics', async () => {
-    const [runner, workflow] = await Promise.all([readFile(runnerUrl, 'utf8'), readFile(workflowUrl, 'utf8')]);
+    const runner = await readFile(runnerUrl, 'utf8');
 
     expect(runner).toContain("const PREVIEW_ENDPOINT = 'https://preview-mcp.theologai.xyz/mcp';");
     expect(runner).toContain('const MAX_LOGICAL_OPERATIONS = 13;');
@@ -77,20 +76,7 @@ describe('original-language v2 preview audit contract', () => {
     expect(runner).not.toMatch(/--(?:url|endpoint|fixture)/);
     expect(runner).not.toContain('theologai.tjfrederick.workers.dev');
 
-    const deploy = workflow.indexOf('- name: Deploy to Cloudflare Workers (preview)');
-    const preAuditIdentity = workflow.indexOf('- name: Verify exact active preview Worker version (read-only)');
-    const audit = workflow.indexOf('- name: Audit the corpus release in both protocol eras');
-    const postAuditIdentity = workflow.indexOf('- name: Verify preview Worker remained active through audit (read-only)');
-    const comment = workflow.indexOf('- name: Comment preview URL on PR');
-    expect(deploy).toBeGreaterThan(-1);
-    expect(preAuditIdentity).toBeGreaterThan(deploy);
-    expect(audit).toBeGreaterThan(preAuditIdentity);
-    expect(postAuditIdentity).toBeGreaterThan(audit);
-    expect(comment).toBeGreaterThan(postAuditIdentity);
-    expect(workflow).toContain('group: theologai-shared-preview-mutation');
-    expect(workflow).toContain('Verify exact active preview Worker version (read-only)');
-    expect(workflow).toContain('wrangler --config "$RUNNER_TEMP/corpus-wrangler.toml" deployments list --env preview --json > "$RUNNER_TEMP/preview-worker-deployments-post-audit.json"');
-    expect(workflow).toContain('Upload protected preview audit evidence');
+
   });
 
   it('runs the fixed 14-exchange protocol through a representative fake transport without retaining private bodies or cursors', async () => {

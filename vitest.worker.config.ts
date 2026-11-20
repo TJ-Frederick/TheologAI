@@ -10,7 +10,7 @@ process.env.WRANGLER_LOG_PATH ??= path.join(projectRoot, 'test-output', 'wrangle
 const {
   cloudflareTest,
   readD1Migrations,
-} = await import('@cloudflare/vitest-pool-workers');
+} = await import('@cloudflare/vitest-plugin');
 const migrations = await readD1Migrations(path.join(projectRoot, 'migrations'));
 
 export default defineConfig({

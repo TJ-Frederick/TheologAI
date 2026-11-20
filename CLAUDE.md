@@ -13,7 +13,7 @@ The checked-out local release candidate provides twelve tools, six prompts, eigh
 
 ## Working Agreements
 
-- Read the root `README.md` and the architecture sections relevant to the task. For release work, read `docs/CURRENT-RELEASE.md` and the applicable release runbook; dated identities below do not establish current state.
+- Read the root `README.md` and the architecture sections relevant to the task. For release work, read `docs/CURRENT-RELEASE.md` and the [deployment procedure](docs/ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md); dated identities below do not establish current state.
 - Tyler owns product behavior/design, spending, publishing, and production decisions. The current task owner handles technical implementation and verification within the authorized scope, including routine corrections.
 - Infer the quality bar from the task; ask one focused question when an unresolved tradeoff would materially change the work.
 - Trace persistent failures to their first incorrect step and revisit assumptions before adding more tuning, release machinery, or safeguards. Explain what each diagnostic or experiment establishes.

@@ -1,6 +1,6 @@
 /** Fixed-account transport, derived from the existing bounded release API. No credential discovery or retries. */
 import { CORPUS_ACCOUNT_ID, CORPUS_USAGE_QUERY, type CorpusControlApi } from './corpus-release-control.js';
-import { TARGETS } from './norton-aquinas-release-policy.mjs';
+import { TARGETS } from './application-release-policy.mjs';
 function check(value: unknown, message: string): asserts value { if (!value) throw Error('Corpus API refused: '+message); }
 export function createCorpusApi(role: 'preview' | 'production', readToken: () => Promise<string>, fetchImpl: typeof fetch = fetch, observe?: (event:unknown)=>void): CorpusControlApi & {
     authorizedFetch: typeof fetch;

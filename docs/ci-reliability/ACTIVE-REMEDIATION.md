@@ -1,5 +1,9 @@
 # CI/release reliability — current task status
 
+For the November 20 deployment cleanup and the next Norton/Aquinas decision, use the [candidate record](../NORTON-AQUINAS-RELEASE-CANDIDATE.md) and [deployment procedure](SIMPLER-DEPLOYMENT-PLAN.md).
+
+## November 3 completion
+
 Implementation and the separately owner-approved preview/production release are complete through PR #172. [Completion and accounting](PRODUCTION-COMPLETE-2026-11-03.md) links the native proof, deployment and live-audit evidence; [CURRENT-RELEASE](../CURRENT-RELEASE.md) is the sole current assignment authority. Independent final review accepted all 56 production completion hashes and both phase journals. This docs-only follow-up completes release-record reconciliation; it does not dispatch production.
 
 The delivered slice shares all five exact PR validation contexts and early source/history/audit checks; authenticates explicit single-operation successor admission and separate production authority; preserves consumed whole-phase reservations and prior costs; reuses only the capacity verifier's fresh same-job database; and verifies independent operator Git/runtime/locked-toolchain/artifact readiness before dispatch/approval. [Design](DESIGN.md), [verification](VERIFICATION.md), [capacity evidence](CAPACITY-REUSE.md), [readiness and invalidation](READINESS-AND-REUSE.md) and the completed [three-dispatch zero-authority rehearsal](HANDOFF-REHEARSAL.md) retain implementation evidence. Actual protected preview and production admission subsequently passed; no further rehearsal is authorized.
