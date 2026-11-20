@@ -1,0 +1,27 @@
+{
+  "productionSource": "701ab6295f033105ec306f7878a85e294cba0f6d",
+  "targets": {
+    "preview": {
+      "databaseName": "theologai-preview-20260728-transform11-a",
+      "databaseId": "62b871a6-5b4d-4d9b-8f52-301f6c878f48"
+    },
+    "production": {
+      "databaseName": "theologai-preview-20260811-schema0009-a",
+      "databaseId": "74f456e2-6951-4003-bb6f-91951342bf8f"
+    }
+  },
+  "predecessors": {
+    "preview": {
+      "databaseName": "theologai-preview-20260728-transform11-a",
+      "databaseId": "62b871a6-5b4d-4d9b-8f52-301f6c878f48",
+      "deploymentId": "62da1803-b313-4dc7-94bf-80d3394957b1",
+      "versionId": "8fb1be2c-72f7-4a4e-bbd6-117adfc30410"
+    },
+    "production": {
+      "databaseName": "theologai-production-20260811-schema0009-a",
+      "databaseId": "9bc79346-338b-439e-a2a5-424f4418eb21",
+      "deploymentId": "f6c9a995-0940-4758-a9a9-14f1389a9ab3",
+      "versionId": "d2e2bd87-1213-4ba5-891d-e0f9b3293cb9"
+    }
+  }
+}

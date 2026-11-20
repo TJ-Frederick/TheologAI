@@ -1,5 +1,5 @@
 /** Source-bound prebuilt Worker handoff. Never imports or executes the bundle. */
-import {TARGETS as CORPUS_TARGETS,classifyApplicationRelease as classifyCorpusRelease} from './norton-aquinas-release-policy.mjs';
+import { readReleaseConfiguration } from './release-promotion.mjs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -26,7 +26,8 @@ function targetFor(target) {
 function identity(root, target) {
   const { config } = targetFor(target);
   return {
-    schemaVersion: 'theologai-worker-artifact.v1', target,
+    schemaVersion: target === 'coordinator' ? 'theologai-worker-artifact.v1' : 'theologai-worker-artifact.v2',
+    target: target === 'coordinator' ? 'coordinator' : 'theologai',
     sourceCommit: git(root, 'HEAD'), sourceTree: git(root, 'HEAD^{tree}'),
     configSha256: sha256(fileBytes(join(root, config))),
     lockSha256: sha256(fileBytes(join(root, 'package-lock.json'))),
@@ -47,6 +48,18 @@ export function verifyManifest(root, directory, target, expectedHash) {
   const expected = identity(root, target);
   if (JSON.stringify(Object.keys(manifest).sort()) !== JSON.stringify([...Object.keys(expected), 'files'].sort())) {
     throw new Error('Unexpected release manifest fields');
+  }
+  // GitHub gives the preview and merged commits different IDs even when their trees match.
+  // The protected handoff separately verifies both commits belong to the same merged PR.
+  if (target !== 'coordinator' && manifest.sourceCommit !== expected.sourceCommit) {
+    let producerTree;
+    if (/^[0-9a-f]{40}$/.test(manifest.sourceCommit)) {
+      try { producerTree = git(root, manifest.sourceCommit + '^{tree}'); } catch { /* Unknown producer. */ }
+    }
+    if (producerTree !== expected.sourceTree) {
+      throw new Error('Release artifact sourceCommit mismatch');
+    }
+    expected.sourceCommit = manifest.sourceCommit;
   }
   for (const [key, value] of Object.entries(expected)) {
     if (manifest[key] !== value) throw new Error(`Release artifact ${key} mismatch`);
@@ -76,11 +89,14 @@ export async function renderDeploymentConfig(root, directory, target, expectedHa
   }
   delete selected.env;
   delete selected.$schema;
-  if((target==='preview'||target==='production')&&execFileSync('git',['ls-tree','--name-only','HEAD','--','release/norton-aquinas.json'],{cwd:root,encoding:'utf8'}).trim()==='release/norton-aquinas.json'){
-    classifyCorpusRelease(root);
-    const candidate=CORPUS_TARGETS[target];
-    if(selected.d1_databases?.length!==1||selected.d1_databases[0].binding!=='THEOLOGAI_DB')throw Error('Corpus release requires exact D1 binding');
-    selected.d1_databases[0]={...selected.d1_databases[0],database_name:candidate.databaseName,database_id:candidate.databaseId};
+  if (target !== 'coordinator') {
+    const candidate = readReleaseConfiguration(root).targets[target];
+    if (selected.d1_databases?.length !== 1 || selected.d1_databases[0].binding !== 'THEOLOGAI_DB') {
+      throw new Error('Release requires exactly one THEOLOGAI_DB binding');
+    }
+    selected.d1_databases[0] = {
+      ...selected.d1_databases[0], database_name: candidate.databaseName, database_id: candidate.databaseId,
+    };
   }
   selected.main = resolve(directory, entry);
   selected.no_bundle = true;

@@ -21,9 +21,12 @@ function preflight(env = process.env, cwd = process.cwd()) {
     check(['workflow_dispatch', 'schedule'].includes(env.CI_EVENT_NAME), 'event');
     baseline = commit(parents[1]);
     if (env.CI_LINEAGE_BEFORE) {
-      // Production uses the canonical plan's first parent, never an ancestor substitute.
-      check(baseline === commit(env.CI_LINEAGE_BEFORE), 'canonical first parent');
+      // A release can include several merges since the last production assignment.
       check(env.CI_REF === 'refs/heads/main', 'production main');
+      const record = JSON.parse(git('show', head + ':release/serving.json'));
+      baseline = commit(env.CI_LINEAGE_BEFORE);
+      git('merge-base', '--is-ancestor', commit(record.productionSource), baseline);
+      check(git('rev-list', '--first-parent', head).split('\n').includes(baseline), 'accepted main release');
     }
   }
   if (['core', 'data'].includes(env.CI_SUITE)) {

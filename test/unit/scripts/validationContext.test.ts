@@ -14,7 +14,7 @@ function fixture() {
   git('init', '-b', 'main'); git('config', 'user.name', 'Fixture'); git('config', 'user.email', 'fixture@example.invalid');
   writeFileSync(join(cwd, 'base'), 'base'); git('add', '.'); git('commit', '-m', 'base');
   const base = git('rev-parse', 'HEAD');
-  git('checkout', '-b', 'different-successor'); writeFileSync(join(cwd, 'candidate-file'), 'head'); git('add', '.'); git('commit', '-m', 'head');
+  git('checkout', '-b', 'different-successor'); mkdirSync(join(cwd, 'release')); writeFileSync(join(cwd, 'release/serving.json'), JSON.stringify({productionSource:base})); writeFileSync(join(cwd, 'candidate-file'), 'head'); git('add', '.'); git('commit', '-m', 'head');
   const head = git('rev-parse', 'HEAD'); git('checkout', 'main'); git('merge', '--no-ff', 'different-successor', '-m', 'merge');
   const merge = git('rev-parse', 'HEAD');
   const env = { ...process.env, CI_SUITE: 'worker', CI_EXPECTED_HEAD: merge, CI_EVENT_NAME: 'pull_request', CI_PR_HEAD: head, CI_REF: 'refs/pull/172/merge', CI_LINEAGE_BEFORE: '' };
@@ -29,7 +29,7 @@ describe('validation checkout CLI', () => {
       expect(readFileSync(output, 'utf8')).toBe(`baseline=${f.base}\n`);
     } finally { rmSync(f.cwd, { recursive: true, force: true }); }
   });
-  it('validates actual production checkout and canonical first parent, never merely ancestry', () => {
+  it('validates actual production checkout and recorded serving source, rejecting a substituted ancestor', () => {
     const f = fixture(); try {
       const env = { CI_EVENT_NAME: 'workflow_dispatch', CI_REF: 'refs/heads/main', CI_LINEAGE_BEFORE: f.base };
       expect(f.run(env).status).toBe(0);

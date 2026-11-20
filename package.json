@@ -139,7 +139,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260722.1",
-    "@cloudflare/vitest-pool-workers": "^0.18.8",
+    "@cloudflare/vitest-plugin": "1.9.0",
     "@modelcontextprotocol/client": "2.3.1",
     "@modelcontextprotocol/conformance": "0.1.16",
     "@modelcontextprotocol/conformance-modern": "npm:@modelcontextprotocol/conformance@0.2.0-alpha.12",

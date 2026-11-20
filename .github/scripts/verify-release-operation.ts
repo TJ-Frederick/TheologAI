@@ -12,10 +12,12 @@ const selected=selectReleaseProofPolicy(process.cwd());verifySourcePlanPolicy(pr
 const plan=json(join(directory,'plan.json'));
 const p=authority.requirePackage(json(authorizationFile),{sourceCommit:selected.classification.sourceCommit,sourceTree:selected.classification.sourceTree,sourcePlanSha256:digest});
 requireSameReleasePolicy(selected,p.authorization.releasePolicy);
+if(!Number.isSafeInteger(plan.readBudget) || p.authorization.reservedReads>plan.readBudget || p.authorization.reservedReads<Math.max(16_384,plan.expected.quickCheckReadCeiling) || p.authorization.databaseId!==selected.classification.targets[p.authorization.role as 'preview'|'production']?.databaseId)throw Error('Release operation refused: owner-bound target and full read reservation');
 if(mode==='complete'){
  const challenge=requireOperatorChallenge(json(challengeFile!));
  requireSameReleasePolicy(selected,challenge.releasePolicy);
  if(JSON.stringify(challenge.authorization)!==JSON.stringify(p))throw Error('Release operation refused: independently admitted authorization');
  verifyOperatorEnvelope(json(envelopeFile!),challenge,plan);
+ if(Date.parse(challenge.expiresAt)-Date.now()<15*60_000)throw Error('Release operation refused: full live verification window required');
 }
 process.stdout.write(selected.id+'\n');

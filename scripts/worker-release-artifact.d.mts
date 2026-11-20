@@ -1,7 +1,7 @@
 export type WorkerReleaseTarget = 'production' | 'preview' | 'coordinator';
 export interface WorkerReleaseManifest {
   schemaVersion: string;
-  target: WorkerReleaseTarget;
+  target: 'theologai' | 'coordinator';
   sourceCommit: string;
   sourceTree: string;
   configSha256: string;

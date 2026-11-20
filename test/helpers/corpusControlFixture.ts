@@ -1,6 +1,6 @@
 import { CORPUS_ACCOUNT_ID } from '../../scripts/corpus-release-control.js';
-import { TARGETS as targets, POLICY } from '../../scripts/norton-aquinas-release-policy.mjs';
-const TARGETS={preview:{id:targets.preview.databaseId,name:targets.preview.databaseName},rollback:{id:POLICY.rollback.databaseId}};
+import { TARGETS as targets, POLICY } from '../../scripts/application-release-policy.mjs';
+const TARGETS={preview:{id:targets.preview.databaseId,name:targets.preview.databaseName},rollback:{id:POLICY.serving().predecessors.production.databaseId}};
 export function corpusControlFixture(now = Date.parse('2026-10-28T12:00:00Z')) {
     let bound = false;
     const version = '11111111-1111-4111-8111-111111111111', deployment = '22222222-2222-4222-8222-222222222222';

@@ -345,10 +345,11 @@ describe('published project contract', () => {
       readProjectFile('.github/workflows/pr.yml'),
       readProjectProse('docs/PREVIEW-RELEASE-RECONCILIATION.md'),
     ]);
-    expect(workflow).toContain('scripts/production-release-reconciliation.ts capture-control');
-    expect(workflow).toContain('scripts/production-release-reconciliation.ts verify-control');
-    expect(workflow).toContain('production-control-after.outcome == \'success\'');
-    expect(workflow).toContain('production_control_post_audit_sha256');
+    const driver = await readProjectFile('.github/scripts/release-workers.sh');
+    expect(workflow).toContain('release-workers.sh finish preview');
+    expect(driver).toContain('control predecessor');
+    expect(driver).toContain('control final');
+    expect(driver).toContain('verify-control');
     expect(reconciliation).toContain('checked-in production name/UUID and a fresh read-only D1 inventory');
     expect(reconciliation).toContain('again after every fixed preview audit and the final preview Worker identity check');
   });

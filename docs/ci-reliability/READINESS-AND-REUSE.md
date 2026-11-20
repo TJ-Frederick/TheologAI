@@ -1,7 +1,6 @@
 # Offline preparation and evidence invalidation
 
-This maps remaining work from the original audit. It changes no release gate or operational
-authority. The narrow current reuse is the capacity verifier's fresh output within one Data
+This is historical evidence from the original audit. The former standalone readiness helper was retired. Follow the [current operator procedure](../OPERATOR-CORPUS-PROOF.md) for local preparation and challenge handoff. This record changes no release gate or operational authority. The narrow current reuse is the capacity verifier's fresh output within one Data
 job; it does not admit a previous run's database or receipt.
 
 ## Preparation gap
@@ -13,8 +12,7 @@ instructions to prepare its independent checkout and separately locked release t
 Discovering missing history or native SQLite/runtime incompatibility inside the short
 challenge window wastes an approved operation opportunity.
 
-The local verification command is
-[`operator-readiness.cjs`](../../.github/scripts/operator-readiness.cjs). It checks an already
+The former local verification command was `operator-readiness.cjs`. It checks an already
 prepared independent clone and isolated toolchain before dispatch/approval, without fetching,
 installing, auditing online, repairing Git, authenticating or invoking cloud operations.
 Installation is a separate preparation step using the existing approved-base release action's

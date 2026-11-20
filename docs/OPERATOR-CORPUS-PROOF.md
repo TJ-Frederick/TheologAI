@@ -1,82 +1,88 @@
 # Complete operator corpus proof
 
-The reviewed successor admission implementation is authorized for branch publication,
-a draft PR and ordinary hosted PR CI. This document and its fixtures authorize no real
-operation, quota spend, preview label, manual workflow dispatch or deployment.
-The [CI/release task](ci-reliability/ACTIVE-REMEDIATION.md) and
-[reviewed design](ci-reliability/DESIGN.md) record the implementation scope.
+Start with the [deployment procedure](ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md).
+Use the following checklist for each separately authorized preview or production
+operation. Prior authorizations, spending and incomplete attempts remain in their
+original records.
 
-## Successor operation sequence
+## Prepare before approving the protected job
 
-Normal PR validation tests the exact synthetic merge; the independent Worker/corpus source
-artifacts describe the exact source head. The operator source gate verifies every unique,
-successful normal CI job and source artifact, then waits up to 60 minutes without cloud
-credentials or a protected environment. It exposes the candidate identity and target run
-in its summary. Missing authorization times out before protected approval or cloud inventory.
-Prepare the clean exact-source checkout and isolated release toolchain before approval.
-Run the credential-free [offline readiness command](ci-reliability/READINESS-AND-REUSE.md)
-from an independent operator clone before dispatch/approval. It verifies local history and
-runtime readiness only; a successful summary grants no operation and replaces no live check.
+1. Check out the exact source commit in an independent clean clone with complete
+   history. Use Node from the protected base's `.nvmrc`. Install that base's
+   `.github/release-toolchain/package.json` and lockfile into a separate prefix
+   following the existing release action. Only the approved SQLite native build
+   runs install code. Link the checkout's `node_modules` to that prefix.
+   [Release action](../.github/actions/release-toolchain/action.yml)
+2. Use the waiting GitHub run's source artifact and reported plan SHA-256. For
+   preview, download `corpus-source-RUN_ID-attempt-1` from **PR Checks**. For
+   production, download `corpus-source-production-RUN_ID` from **Deploy Production**.
+   Keep the artifact outside the checkout. It contains `plan.json` and
+   `source.db`.
+3. Open the waiting authorization job's live step log and copy its **Operator
+   grant draft**. The finished job summary retains the same JSON. The draft
+   fills in the run, repository, source, tree, base, plan hash and intended
+   database. Replace every `null` using the reviewed operation. Supply both
+   current serving assignments, the approved migration ledger digest, a unique
+   `operation-…` ID shared by `authorizationId` and `ledgerId`, the UTC window,
+   caps, same-day account holds and affirmative custody decisions. The zero
+   counters describe the new operation. Include outstanding same-day holds in
+   the account floors.
 
-A real successor requires a separate explicit owner grant for ONE new operation. Its strict
-`theologai-operator-authorization.v1` manifest binds role, repository, owner 40179660, PR number,
-same-repository branch/head, base, tree, source-plan digest, target run/attempt, unique
-`operation-...` authorization/ledger identity, not-before/expiry and fixed bounds. Preview
-requires `refs/pull/<number>/merge`; production requires the actual main dispatch and first
-parent. The normal complete proof reserves 3,510,997 reads, caps at 3.8M reads and four total
-rank-1 FTS diagnostics/at most four writes. The normal 200K uncertainty margin and 4M account
-operating ceiling apply. No historical PR170 date exception activates for successors.
+   Submit the completed JSON as `operator_authorization_json` in **PR Checks
+   → Run workflow** at the exact preview source branch or production main.
+   Keep the exact submitted JSON locally. Reserve the full 90 minutes from
+   challenge creation within the same UTC day and the approved window. The
+   retained production proof spent about 32 minutes on the read phase. The
+   balance also covers authorization handoff, validation, cutover and live
+   checks. Use the approved proof reserve within the source plan maximum and
+   the 4,000,000-read account ceiling.
+4. Use the existing authenticated GitHub owner session and the existing
+   Wrangler OAuth grant. Supply the grant to the process as
+   `CLOUDFLARE_API_TOKEN` through the approved local credential supply.
+   The helper holds it in memory and excludes it from GitHub commands. Create
+   a private directory for this operation's evidence and ledger.
 
-After an actual separate owner decision, the existing pr.yml manual input
-`operator_authorization_json` receives that grant at the exact source branch (production:
-main). Owner and triggering-owner metadata, attempt1, live source/run, native ZIP SHA-256,
-strict JSON, unique authorization artifact and matching ledger-marker artifact authenticate
-it. Candidate JSON alone grants nothing. Metadata-only submissions use distinct skipped
-validation names so they cannot supersede the five substantive PR check contexts. The separate
-[zero-authority hosted rehearsal](ci-reliability/HANDOFF-REHEARSAL.md) passed transport,
-downloaded-byte and payload-expiry checks; protected preview and production admission subsequently passed in PR #172; see the [dated completion](ci-reliability/PRODUCTION-COMPLETE-2026-11-03.md).
-
-After source admission, the existing protected operator job asks for its normal approval,
-revalidates native authority and issues one v2 challenge for that exact run. The full
-90-minute window must fit the same UTC day and the owner's authorization window. No SQL
-is retried. Local challenge admission and every diagnostic gate verify both native archives'
-bytes/content, live source/run/approval and marker uniqueness before cloud work.
-
-Initialize the persistent per-operation ledger deliberately from the authenticated challenge:
+From the prepared checkout, start this command **before** approving the job.
+`OWNER_AUTHORIZATION_JSON` is the path to the exact JSON submitted in step 3.
+`SOURCE_DIRECTORY` contains the two files from step 2.
+`EVIDENCE_DIRECTORY` is a new private directory owned by the operator.
 
 ```bash
-npx --no-install tsx scripts/operator-corpus-proof.ts init-ledger CHALLENGE LEDGER
+THEOLOGAI_OPERATOR_AUTH_CONFIRMED=existing-wrangler-oauth \
+  "$PINNED_NODE" --import tsx scripts/operator-proof-once.ts \
+  "$OWNER_AUTHORIZATION_JSON" "$SOURCE_DIRECTORY" "$EVIDENCE_DIRECTORY"
 ```
 
-Then use the existing `run CHALLENGE SOURCE_DIRECTORY PLAN_SHA256 OUTPUT LEDGER` command
-with the exact `operatorApproval(challenge)`, existing local OAuth grant held only in memory,
-and the SAME ledger. Never recreate it to recover allowance. A missing ledger is rejected.
-The ledger is consumed and retains the WHOLE both-phase reservation before the first
-command; replay, existing attempts, inherited counters and mismatched authorization fail.
-Only the four exact FTS diagnostics use operator access. The existing protected read token
-then performs every complete-cell/schema/FK/physical read, with no permission expansion.
-The owner submits only the sanitized integrity envelope in `operator_proof_json` at the exact
-branch. The two manual inputs are mutually exclusive.
+Approve the protected job when the helper reports that it is waiting.
+It checks the prepared database before waiting, accepts only the exact run's
+native challenge and verifies its ZIP digest and owner scope. The existing
+operator proof authenticates live authority, creates and consumes the original
+ledger, checks authority before each of the four integrity commands and submits
+only the sanitized envelope in `operator_proof_json` on the approved branch.
+The protected job verifies the receipt and performs the complete read with its
+existing read-only token.
 
-Keep the local ledger, operator journal, protected read journal, metering and native artifacts.
-An incomplete/cancelled protected phase or missing/ambiguous terminal evidence leaves the
-FULL operation reservation outstanding, including both operator and reader costs and unmatched
-intents. Zero inherited counters in a new operation do not erase older costs. This slice
-supports NO automatic continuation, cross-run recovery, reconstructed lower counters or
-remote-proof reuse. Another operation needs an explicit additional owner scope that accepts
-all unresolved prior reservations. Production has its OWN authorization/ledger and fresh proof;
-a successful matching preview receipt remains an independent prerequisite.
+The four local commands and their terminal control checks must finish within
+50 seconds of the **earlier** protected inventory or usage observation, which
+precedes challenge publication. The pre-staged helper removes the manual
+download and launch from that interval. The earlier successful handoff
+finished 35.348 seconds after challenge creation. GitHub and D1 latency still
+consume the remaining time. [Earlier measurement](ci-reliability/PRODUCTION-COMPLETE-2026-11-03.md)
 
-Deploy Preview receives the admitted package only from the exact same-run protected artifact,
-checks its hash against original source admission and the full envelope hash against the
-protected producer, and rechecks expiry/source/live PR/main/tree before cloud inventory.
-It retains its existing contents:read / pull-requests:write permissions and separate approval.
-The isolated protected-base release toolchain and unchanged deployment/live-audit gates remain.
+Keep the challenge, ledger, journals, envelope and workflow artifacts. A stale
+challenge or uncertain diagnostic leaves the existing reservation in force.
+If envelope submission has an unknown outcome, check the workflow history
+before taking further action. The helper makes one submission attempt and
+leaves the envelope available for reconciliation.
 
-This is not a globally append-only ledger: retained native artifacts provide finite replay
-checks; expired/missing evidence stops recovery, and deliberate local ledger reconstruction
-cannot be cryptographically distinguished from a fresh file. Preserve original evidence.
-No account, token, secret, permission, binding, billing or corpus change is authorized here.
+A known provider interruption of the schema read after the physical check
+can be reconciled within the same protected process. For the D1 HTTP 429 with
+provider code 7429, the verifier honors a numeric `Retry-After`, with a
+300-second fallback. It reserves the unknown reads, rechecks authority,
+custody, assignments and available budget, then retries that read once.
+The complete canonical scan and independent closing checks still run. A lost
+process or a diagnostic write with an unknown outcome requires reconciliation
+before any further operation.
 
 ## Historical PR #170 authorization and completed evidence
 

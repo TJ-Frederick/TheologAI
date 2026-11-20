@@ -14,6 +14,13 @@ remains open and paused, with the remaining risks recorded below. The completed
 temporary diagnostic was removed from the runnable PR workflow; its sanitized
 evidence remains historical assessment material.
 
+The current local candidate uses Cloudflare's dev-only `@cloudflare/vitest-plugin`
+1.9.0 with Zod 4.6.6. The current npm audit reports zero findings and grants
+zero exceptions. Production dependencies and the isolated release toolchain
+keep their existing locks. The exception and November 22 UTC expiry below
+remain in the strict gate for prior dependency trees.
+[Cloudflare package migration](https://developers.cloudflare.com/changelog/post/2026-08-19-vitest-plugin/) · [Zod advisory](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)
+
 ## Remaining risks and explicit limits
 
 | Risk | Current disposition |

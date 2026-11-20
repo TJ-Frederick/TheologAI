@@ -15,6 +15,33 @@ type FailureCategory=typeof CORPUS_LIVE_FAILURE_CATEGORIES[number];
 type FailureStage='initialize'|'contract'|'probe'|'assertion'|'parity'|'cleanup';
 class AuditFault extends Error {constructor(readonly category:FailureCategory,readonly reason:string=category){super('Corpus live audit failed');}}
 function check(v:unknown,message:string):asserts v {if(!v)throw new AuditFault(message==='live_http_time_budget'?'transport_budget':'assertion',message);}
+// Both local Workerd and the protected HTTP jobs pass through this same dispatch boundary.
+export function releaseReadFetch(endpoint: string, mode: 'corpus' | 'application', send: typeof fetch): typeof fetch {
+    const methods = new Set(['server/discover', 'initialize', 'notifications/initialized', 'tools/list',
+        'resources/read', 'tools/call', ...(mode === 'corpus' ? ['prompts/list','prompts/get','resources/list','resources/templates/list'] : [])]);
+    const tools = new Set(mode === 'corpus'
+        ? ['classic_text_lookup', 'primary_source_search', 'historical_hierarchy_lookup', 'original_language_study']
+        : ['bible_verse_morphology','primary_source_search']);
+    return async (input, init) => {
+        const url = input instanceof Request ? input.url : String(input);
+        const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        if (url !== endpoint || headers.has('authorization') || headers.has('cookie') || headers.has('proxy-authorization')) {
+            throw new AuditFault('guard', 'mcp_request_scope');
+        }
+        if (method === 'POST') {
+            let rpc;
+            try { rpc = JSON.parse(typeof init?.body === 'string' ? init.body : ''); } catch { /* refuse below */ }
+            if (rpc?.jsonrpc !== '2.0' || !methods.has(rpc.method) || (rpc.method === 'tools/call' && !tools.has(rpc.params?.name))) {
+                throw new AuditFault('guard', 'mcp_read_method');
+            }
+        } else if (method !== 'GET') {
+            throw new AuditFault('guard', 'mcp_http_method');
+        }
+        return send(input, {...init, redirect: 'error'});
+    };
+}
+
 const categoryForStage=(stage:FailureStage):FailureCategory=>stage==='initialize'||stage==='probe'||stage==='contract'?'protocol':stage==='assertion'||stage==='parity'?'assertion':'unknown';
 const sdkErrorCodeFor=(error:unknown):string|null=>error instanceof SdkError?Object.entries(SdkErrorCode).find(([name,value])=>value===error.code&&/^[A-Za-z][A-Za-z0-9]{0,80}$/.test(name))?.[0]??null:null;
 const trustedId=(id:string)=>/^[A-Za-z0-9:._-]{1,200}$/.test(id)?id:'unavailable';

@@ -6,7 +6,7 @@ module.exports = async ({ github, context, core, environment = process.env }) =>
   const source = context.payload?.pull_request?.head?.sha;
   const number = context.payload?.pull_request?.number;
   const branch = context.payload?.pull_request?.head?.ref;
-  check(context.eventName === 'pull_request' && Number.isSafeInteger(number) && number > 170
+  check(context.eventName === 'pull_request' && Number.isSafeInteger(number) && number > 0
     && environment.GITHUB_REF === `refs/pull/${number}/merge`, 'existing protected PR ref');
   check(environment.GITHUB_RUN_ATTEMPT === '1', 'single attempt');
   check(/^[1-9][0-9]{0,15}$/.test(environment.OPERATOR_SOURCE_RUN_ID || ''), 'source run');
@@ -29,8 +29,8 @@ module.exports = async ({ github, context, core, environment = process.env }) =>
     check(jobs.length === 1 && jobs[0].status === 'completed' && jobs[0].conclusion === 'success', 'required CI: ' + name);
   }
   const { data: files } = await github.rest.actions.listWorkflowRunArtifacts({ ...repo, run_id: runId, per_page: 100 });
-  for (const kind of ['corpus', 'worker']) {
-    const artifacts = files.artifacts.filter(a => a.name === `${kind}-preview-${runId}-attempt-1`);
+  for (const name of [`corpus-source-${runId}-attempt-1`, `release-worker-${runId}`]) {
+    const artifacts = files.artifacts.filter(a => a.name === name);
     check(artifacts.length === 1, 'artifact identity');
     const a = artifacts[0];
     check(!a.expired && Date.parse(a.expires_at) > Date.now() + 600_000 && a.workflow_run.head_sha === source
@@ -41,23 +41,8 @@ module.exports = async ({ github, context, core, environment = process.env }) =>
   const authority = require('./operator-authorization.cjs');
   const expected = {role:'preview',pullRequestNumber:number,headBranch:branch,sourceCommit:source,sourceTree:commit.tree.sha,
     baseCommit:pr.base.sha,sourcePlanSha256:environment.OPERATOR_SOURCE_PLAN_SHA256,targetRunId:String(runId),targetRunAttempt:1};
-  const purpose=await authority.waitForAuthorization({github,expected,core,environment,
-    expectedPurpose:environment.RUNTIME_REUSE_EXPECTED_PURPOSE||undefined,
-    runtimeReuse:number===176&&environment.RUNTIME_REUSE_ENABLED==='true'?async()=>{
-      const {tsImport}=require('tsx/esm/api');
-      const reuse=await tsImport('./preview-runtime-reuse.ts',require('node:url').pathToFileURL(__filename).href);
-      let calls=0;
-      const api=async(route,binary=false)=>{check(++calls<=96,'bounded reuse metadata');if(binary)return reuse.readReuseMarkerZip(route,environment.GITHUB_TOKEN);return(await github.request('GET /repos/{owner}/{repo}'+route,repo)).data;};
-      const handoff=await reuse.findReuseHandoff({commit:source,tree:commit.tree.sha},api,environment);
-      if(!handoff||handoff.mode==='runtime-reuse-pending')return handoff;
-      const text=JSON.stringify(handoff,null,2)+'\n';
-      if(environment.RUNTIME_REUSE_EXPECTED_HANDOFF_SHA256)check(authority.hash(text)===environment.RUNTIME_REUSE_EXPECTED_HANDOFF_SHA256,'same authenticated reuse handoff');
-      require('node:fs').writeFileSync(environment.RUNNER_TEMP+'/runtime-reuse-handoff.json',text,{mode:0o600});
-      core.setOutput('mode','runtime-reuse');core.setOutput('reuse_handoff_sha256',authority.hash(text));
-      core.setOutput('reuse_input_artifact_id',String(handoff.inputs.id));core.setOutput('reuse_input_artifact_digest',handoff.inputs.digest);core.setOutput('reuse_producer_run_id',String(handoff.inputs.runId));return handoff;
-    }:undefined,
-    revalidate:async()=>authority.requireLiveCandidate({github,authorization:{...expected,repository:'TJ-Frederick/TheologAI'}})});
-  if(purpose.mode!=='runtime-reuse'){check(!environment.RUNTIME_REUSE_EXPECTED_HANDOFF_SHA256,'expected runtime reuse purpose');core.setOutput('mode','full-proof');}
-  if(purpose.mode!=='runtime-reuse'&&environment.OPERATOR_EXPECTED_AUTHORIZATION_SHA256) check(authority.hash(require('node:fs').readFileSync(environment.RUNNER_TEMP+'/operator-authorization.json'))===environment.OPERATOR_EXPECTED_AUTHORIZATION_SHA256,'same admitted owner authorization');
+  await authority.waitForAuthorization({github,expected,core,environment,
+    revalidate:()=>authority.requireLiveCandidate({github,authorization:expected})});
+  if(environment.OPERATOR_EXPECTED_AUTHORIZATION_SHA256) check(authority.hash(require('node:fs').readFileSync(environment.RUNNER_TEMP+'/operator-authorization.json'))===environment.OPERATOR_EXPECTED_AUTHORIZATION_SHA256,'same admitted owner authorization');
   core.setOutput('source', source); core.setOutput('tree', commit.tree.sha); core.setOutput('base', pr.base.sha);
 };

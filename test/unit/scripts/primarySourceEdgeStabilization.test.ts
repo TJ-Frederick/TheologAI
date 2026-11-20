@@ -257,21 +257,5 @@ describe('primary-source edge-stabilization gate', () => {
     expect(evidence.attempts).toEqual([expect.objectContaining({ outcome: 'transport_failure', requestCount: 1, responseBytes: 0 })]);
   });
 
-  it('wires explicit preview evidence and a strict gate before either protected preview audit', async () => {
-    const workflow = await readFile(new URL('.github/workflows/pr.yml', root), 'utf8');
-    const stabilize = workflow.indexOf('Stabilize preview release registrations at edge (read-only)');
-    const upload = workflow.indexOf('Upload preview edge-stabilization evidence');
-    const gate = workflow.indexOf('Require stable preview release registrations before audits');
-    const language = workflow.indexOf('Audit the corpus release in both protocol eras');
-    const historical = workflow.indexOf('Audit the corpus release in both protocol eras');
-    expect(stabilize).toBeGreaterThan(-1);
-    expect(upload).toBeGreaterThan(stabilize);
-    expect(gate).toBeGreaterThan(upload);
-    expect(language).toBeGreaterThan(gate);
-    expect(historical).toBe(language);
-    expect(workflow).toContain('continue-on-error: true');
-    expect(workflow).toContain("if: ${{ (steps.release-operation.outputs.release_policy == 'application-only' || steps.release-operation.outputs.release_policy == 'norton-aquinas.v1') && (steps.preview-worker-candidate-cutover.outcome == 'success') }}");
-    expect(workflow).toContain('edge_stabilization_sha256');
-    expect(workflow).toContain('preview-primary-source-edge-stabilization.json');
-  });
+
 });

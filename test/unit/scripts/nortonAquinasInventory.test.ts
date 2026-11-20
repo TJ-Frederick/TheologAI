@@ -1,8 +1,8 @@
 import {it,expect} from 'vitest';
 import {captureUnboundCorpusControl} from '../../../scripts/corpus-release-control.js';
-import {TARGETS as targets,POLICY} from '../../../scripts/norton-aquinas-release-policy.mjs';
+import {TARGETS as targets,POLICY} from '../../../scripts/application-release-policy.mjs';
 import {corpusControlFixture,corpusPagesControlFixture} from '../../helpers/corpusControlFixture.js';
-const TARGETS={preview:{id:targets.preview.databaseId},rollback:{id:POLICY.rollback.databaseId}};
+const TARGETS={preview:{id:targets.preview.databaseId},rollback:{id:POLICY.serving().predecessors.production.databaseId}};
 const NOW=Date.parse('2026-10-28T12:00:00Z');
 it('covers every post-database Pages deployment with an unambiguous D1-free version witness', async () => {
     const fixture = corpusPagesControlFixture();
@@ -49,27 +49,26 @@ import {tmpdir} from 'node:os';
 import {vi} from 'vitest';
 import {CorpusProofTransport} from '../../../scripts/corpus-proof-transport.js';
 import { LEDGER_SQL } from '../../../scripts/corpus-source-proof.js';
-import {corpusTransportFixture} from '../../helpers/corpusTransportFixture.js';
+import {corpusGrant,corpusTransportFixture} from '../../helpers/corpusTransportFixture.js';
 it.each(['pages403','wrong-assignment','failed-pages-page'])('stops the actual protected transport before SQL for %s',async fault=>{
  const dir=mkdtempSync(join(tmpdir(),'corpus-inventory-refusal-')),file=join(dir,'events.jsonl');let time=NOW,calls=0,sql=0,verify=0;
- const clock=vi.spyOn(Date,'now').mockImplementation(()=>time);
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(time);
  try{
-  const f=corpusTransportFixture({role:'preview',drift:fault==='wrong-assignment',advance:()=>{time+=1000;},query:()=>{sql++;throw Error('SQL forbidden');}});
+  const f=corpusTransportFixture({role:'preview',drift:fault==='wrong-assignment',advance:()=>{time+=1000;vi.setSystemTime(time);},query:()=>{sql++;throw Error('SQL forbidden');}});
   const fetchImpl=(async(input:any,init:any)=>{
    calls++;const url=String(input);
-   if(url.includes('/tokens/verify')){verify++;time+=1000;return new Response('',{status:403});}
-   if(url.includes('/pages/projects?')){time+=1000;if(fault==='pages403')return Response.json({success:false,errors:[{code:10000,message:'private-provider-message'}]},{status:403});if(fault==='failed-pages-page')return Response.json({success:false,errors:[{code:10000}]});}
+   if(url.includes('/tokens/verify')){verify++;time+=1000;vi.setSystemTime(time);return new Response('',{status:403});}
+   if(url.includes('/pages/projects?')){time+=1000;vi.setSystemTime(time);if(fault==='pages403')return Response.json({success:false,errors:[{code:10000,message:'private-provider-message'}]},{status:403});if(fault==='failed-pages-page')return Response.json({success:false,errors:[{code:10000}]});}
    return f.fetch(input,init);
   }) as typeof fetch;
-  const transport=new CorpusProofTransport({policy:'norton-aquinas.v1',role:'preview',token:'private-token-sentinel',readBudget:3560000,eventFile:file,fetch:fetchImpl,historicalExceptions:false});
+  const transport=new CorpusProofTransport({role:'preview',token:'private-token-sentinel',readBudget:3560000,eventFile:file,fetch:fetchImpl,authorization:corpusGrant({now:time})});
   await expect(transport.start()).rejects.toThrow();expect(sql).toBe(0);expect(calls).toBeLessThanOrEqual(256);expect(verify).toBeLessThanOrEqual(2);
   expect(readFileSync(file,'utf8')).not.toMatch(/private-token-sentinel|private-provider-message/);
- }finally{clock.mockRestore();rmSync(dir,{recursive:true,force:true});}
+ }finally{vi.useRealTimers();rmSync(dir,{recursive:true,force:true});}
 });
 
-it.each([['norton-aquinas.v1', 500, 3_560_000], ['application-only', 300, 3_510_997]] as const)(
-  'spaces immediate direct SQL responses for %s without changing the existing application pace',
-  async (policy, minimum, readBudget) => {
+it('spaces immediate direct SQL responses', async () => {
+    const minimum = 500, readBudget = 3_560_000;
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-11-04T12:00:00Z'));
     const directory = mkdtempSync(join(tmpdir(), 'corpus-sql-spacing-'));
@@ -86,8 +85,8 @@ it.each([['norton-aquinas.v1', 500, 3_560_000], ['application-only', 300, 3_510_
         return fixture.fetch(input, init);
       }) as typeof fetch;
       const transport = new CorpusProofTransport({
-        policy, role: 'preview', token: 'synthetic-token', readBudget,
-        eventFile: join(directory, 'events.jsonl'), fetch: immediateFetch, historicalExceptions: false,
+        role: 'preview', token: 'synthetic-token', readBudget,
+        eventFile: join(directory, 'events.jsonl'), fetch: immediateFetch, authorization: corpusGrant(),
       });
       const admission = transport.start();
       await vi.runAllTimersAsync();

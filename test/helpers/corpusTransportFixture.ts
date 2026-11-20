@@ -1,19 +1,19 @@
+import {createHash} from 'node:crypto';
 /** Complete synthetic control plane for local operator/read transport tests. Never performs network IO. */
-import {boundPreview} from './boundPreviewFixture.js';
-import {ACCOUNT,POLICY,TARGETS} from '../../scripts/norton-aquinas-release-policy.mjs';
+import {ACCOUNT,POLICY,TARGETS} from '../../scripts/application-release-policy.mjs';
 import {CORPUS_USAGE_QUERY} from '../../scripts/corpus-release-control.js';
 type Result={rows:Record<string,unknown>[];rowsRead:number;rowsWritten:number};
-export function corpusTransportFixture(options:{role:'preview'|'production';activated?:boolean;boundPreview?:boolean;drift?:boolean;query?:(sql:string,credential:string)=>Promise<Result>|Result;record?:(path:string,method:string)=>void;advance?:()=>void}){
+export function corpusTransportFixture(options:{role:'preview'|'production';activated?:boolean;boundPreview?:boolean;drift?:boolean;query?:(sql:string,credential:string)=>Promise<Result|Response>|Result|Response;record?:(path:string,method:string)=>void;advance?:()=>void}){
  let reads=100,writes=0;
- const versions={preview:'11111111-1111-4111-8111-111111111111',production:'22222222-2222-4222-8222-222222222222'};
- if(options.boundPreview){versions.preview=boundPreview.previewVersionId;versions.production=boundPreview.productionVersionId;}
- const deployments={preview:'33333333-3333-4333-8333-333333333333',production:'44444444-4444-4444-8444-444444444444'};
- if(options.boundPreview){deployments.preview=boundPreview.previewDeploymentId;deployments.production=boundPreview.productionDeploymentId;}
- if(options.role==='production'){
-  versions.preview=POLICY.predecessors.preview.versionId;deployments.preview=POLICY.predecessors.preview.deploymentId;
-  if(!options.activated){versions.production=POLICY.predecessors.production.versionId;deployments.production=POLICY.predecessors.production.deploymentId;}
- }
- const binding=(role:'preview'|'production')=>role==='production'?(options.role==='production'&&options.activated?TARGETS.production.databaseId:POLICY.rollback.databaseId):(options.role==='preview'&&!options.activated&&!options.boundPreview?TARGETS.production.databaseId:TARGETS.preview.databaseId);
+ const {predecessors} = POLICY.serving();
+ const assignments = {
+   preview: {databaseId:options.role==='preview'&&!options.boundPreview?TARGETS.production.databaseId:TARGETS.preview.databaseId,
+     versionId:predecessors.preview.versionId,deploymentId:predecessors.preview.deploymentId},
+   production:{databaseId:predecessors.production.databaseId,versionId:predecessors.production.versionId,deploymentId:predecessors.production.deploymentId},
+ };
+ const versions = {preview:assignments.preview.versionId, production:assignments.production.versionId};
+ const deployments = {preview:assignments.preview.deploymentId, production:assignments.production.deploymentId};
+ const binding=(role:'preview'|'production')=>options.activated && role === options.role ? TARGETS[role].databaseId : assignments[role].databaseId;
  const envelope=(result:unknown,info?:unknown)=>Response.json({success:true,errors:[],messages:[],result,...(info?{result_info:info}:{})});
  const fetchImpl=(async(input:any,init:any={})=>{
   const url=new URL(String(input)),path=url.pathname,method=init.method??'GET';options.record?.(path,method);
@@ -26,8 +26,9 @@ export function corpusTransportFixture(options:{role:'preview'|'production';acti
    else response=Response.json({data:{viewer:{accounts:[{accountTag:ACCOUNT,d1AnalyticsAdaptiveGroups:[{sum:{rowsRead:reads,rowsWritten:writes},avg:{sampleInterval:1}}]}]}}});
   }else if(path===account+'/d1/database/'+TARGETS[options.role].databaseId+'/query'){
    if(!options.query)throw Error('SQL forbidden in metadata-only fixture');
-   const r=await options.query(body.sql,new Headers(init.headers).get('authorization')??'');reads+=r.rowsRead;writes+=r.rowsWritten;
-   response=envelope([{success:true,results:r.rows,meta:{rows_read:r.rowsRead,rows_written:r.rowsWritten,changes:r.rowsWritten,total_attempts:1,served_by_primary:true}}]);
+   const r=await options.query(body.sql,new Headers(init.headers).get('authorization')??'');
+   if (r instanceof Response) {options.advance?.();return r;}
+   reads+=r.rowsRead;writes+=r.rowsWritten;response=envelope([{success:true,results:r.rows,meta:{rows_read:r.rowsRead,rows_written:r.rowsWritten,changes:r.rowsWritten,total_attempts:1,served_by_primary:true}}]);
   }else if(path===account+'/d1/database/'+TARGETS[options.role].databaseId)response=envelope({uuid:TARGETS[options.role].databaseId,name:TARGETS[options.role].databaseName,file_size:348463104,created_at:'2026-07-28T00:00:00Z'});
   else if(path===account+'/workers/scripts')response=envelope([{id:'theologai'},{id:'theologai-preview'}]);
   else if(path===account+'/pages/projects')response=envelope([],{page:1,per_page:10,count:0,total_count:0,total_pages:0});
@@ -42,5 +43,24 @@ export function corpusTransportFixture(options:{role:'preview'|'production';acti
   }
   options.advance?.();return response;
  }) as typeof fetch;
- return {fetch:fetchImpl,versions,deployments};
+ return {fetch:fetchImpl,versions,deployments,assignments};
+}
+
+export function corpusGrant(options:{role?:'preview'|'production'; now?:number; boundPreview?:boolean; overrides?:Record<string,unknown>}={}) {
+ const role=options.role ?? 'preview', now=options.now ?? Date.now();
+ const day = new Date(now).toISOString().slice(0,10);
+ const authorization={schemaVersion:'theologai-operator-authorization.v1',scope:'new-additional-operation',
+  exclusiveDataWritesDuringWindow:true,candidateWriteJobsPaused:true,releasePolicy:POLICY.policy,
+  databaseId:TARGETS[role].databaseId,assignments:corpusTransportFixture({role,boundPreview:options.boundPreview}).assignments,
+  accountReadCeiling:4_000_000,accountReadCeilingDay:day,accountReadsHeld:0,accountWritesHeld:0,liveControlReserve:100_000,
+  expectedLedgerSha256:'1'.repeat(64),repository:'TJ-Frederick/TheologAI',ownerActorId:40179660,
+  role,pullRequestNumber:172,headBranch:role==='preview'?'ci/different-successor':'main',
+  sourceCommit:'a'.repeat(40),sourceTree:'b'.repeat(40),baseCommit:'c'.repeat(40),sourcePlanSha256:'d'.repeat(64),
+  targetRunId:'123',targetRunAttempt:1,authorizationId:'operation-successor-fixture',ledgerId:'operation-successor-fixture',
+  notBefore:day+'T00:00:00Z',expiresAt:day+'T23:59:59Z',reservedReads:3_560_000,hardReadCap:3_560_000,
+  diagnosticCommands:4,maxWrites:4,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,previousDiagnosticCommands:0,
+  outstandingPriorReservationsAccepted:true,...options.overrides};
+ return {package:{authorization,provenance:{runId:'321',artifactId:'654',digest:'sha256:'+'9'.repeat(64),
+   contentSha256:createHash('sha256').update(JSON.stringify(authorization)).digest('hex')}},
+   sourceCommit:authorization.sourceCommit,sourceTree:authorization.sourceTree,runId:authorization.targetRunId};
 }

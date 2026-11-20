@@ -1,5 +1,5 @@
 /** Two fixed self-verification GETs at most. No token listing, value retention, mutation or retry. */
-import {ACCOUNT} from './norton-aquinas-release-policy.mjs';
+import {ACCOUNT} from './application-release-policy.mjs';
 export async function identifyProtectedPreviewToken(token:string,fetchImpl:typeof fetch=fetch,deadline=Date.now()+30000){
  const routes=[['user','https://api.cloudflare.com/client/v4/user/tokens/verify'],['account',`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/tokens/verify`]] as const;
  for(const [owner,url]of routes){

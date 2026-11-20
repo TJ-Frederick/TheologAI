@@ -23,6 +23,8 @@ current snapshot for this entry document and the named reconciliation documents.
 The historical release records below preserve point-in-time evidence; they are
 not current identity authority.
 
+For an application update or a corpus change, follow the [deployment procedure](docs/ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md).
+
 ## Public website and remote endpoints
 
 The public website is [theologai.xyz](https://theologai.xyz). The hosted

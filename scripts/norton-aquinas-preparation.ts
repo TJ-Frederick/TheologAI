@@ -7,9 +7,9 @@ import {unstable_splitSqlQuery as split} from 'wrangler';
 import {canonicalJson} from './audit-historical-core-preview.js';
 import {parseDataManifest,verifyD1Migrations} from './d1-corpus-identity.js';
 import {canonicalTableDigest,PROVIDER_CATALOG,comparableSchema} from './corpus-source-proof.js';
-import {POLICY} from './norton-aquinas-release-policy.mjs';
+import {ACCOUNT, TARGETS as candidates} from './application-release-policy.mjs';
 import {CORPUS_INSERT_TABLES,deriveLocalHistoricalAdditions,digestLocalDeltaTable,verifyExactInsertRows,type Row,type ExactInsertRows,type ProofReader} from './corpus-release-data.js';
-export const TARGETS={production:{id:POLICY.targets.production.databaseId,name:POLICY.targets.production.databaseName}};
+export const TARGETS={production:{id:candidates.production.databaseId,name:candidates.production.databaseName}};
 const FTS=['strongs_fts','sections_fts','historical_edition_sections_fts','historical_edition_hierarchy_bodies_fts'] as const;
 const CATALOG_SQL="SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name;";
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
@@ -197,7 +197,7 @@ export function createPreparationExecutor(authorizedFetch:typeof fetch):Preparat
  return Object.assign(async(sql:string)=>{
   const statements=split(sql);check(Buffer.byteLength(sql)<=100000&&statements.length>0&&statements.length<=25,'bounded preparation statement batch');
   try{
-   const response=await authorizedFetch(`https://api.cloudflare.com/client/v4/accounts/${POLICY.account}/d1/database/${TARGETS.production.id}/query`,{method:'POST',redirect:'error',signal:AbortSignal.timeout(30000),headers:{'content-type':'application/json'},body:JSON.stringify({sql,params:[]})});
+   const response=await authorizedFetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/d1/database/${TARGETS.production.id}/query`,{method:'POST',redirect:'error',signal:AbortSignal.timeout(30000),headers:{'content-type':'application/json'},body:JSON.stringify({sql,params:[]})});
    check(response.status===200&&!response.redirected&&response.body,'unknown preparation response');
    const reader=response.body.getReader(),chunks:Uint8Array[]=[];let bytes=0;
    try{for(;;){const item=await reader.read();if(item.done)break;bytes+=item.value.byteLength;check(bytes<=1048576,'preparation response bound');chunks.push(item.value);}}finally{await reader.cancel().catch(()=>{});}
