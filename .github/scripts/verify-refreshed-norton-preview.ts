@@ -55,7 +55,7 @@ with zipfile.ZipFile(archive) as z:
  return{kind:'norton-preview-live-refresh-acceptance',consumerSource:source,producerSource:b.acceptedSource,nativePreviewRun:b.run.id,nativeArtifactId:a.id,nativeArtifactDigest:a.digest,previewAcceptedAt:receipt.completedAt,checks:370,freshPreviewProof:false,previewRowsReproven:false,historicalProofAuthorityExtended:false,productionAuthorized:false,expectedLiveControls:[REFRESH.production,REFRESH.preview],receiptSha256:sha(JSON.stringify(receipt)),hostedReadAttributionUnresolved:true};
 }
 export function requireFreshProductionDeadline(challenge:any,now=Date.now()){
- check(now<Date.parse(REFRESH.cutoff)&&Number.isFinite(Date.parse(challenge?.authorization?.authorization?.expiresAt))&&Date.parse(challenge.authorization.authorization.expiresAt)<=Date.parse(REFRESH.cutoff),'one-time production owner deadline');
+ check(now>=Date.parse(REFRESH.productionNotBefore)&&now<Date.parse(REFRESH.cutoff)&&Number.isFinite(Date.parse(challenge?.authorization?.authorization?.expiresAt))&&Date.parse(challenge.authorization.authorization.expiresAt)<=Date.parse(REFRESH.cutoff),'one-time production owner deadline');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  try{

@@ -10,10 +10,10 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 319,
+    "totalTestTypeScript": 320,
     "activeVitest": 238,
     "support": 26,
-    "manual": 4,
+    "manual": 5,
     "legacyOrphan": 50,
     "conformance": 1
   },
@@ -287,6 +287,7 @@
       "test/worker-runtime/setup.ts"
     ],
     "manual": [
+      "test/manual/previewRefreshExecutorReplay.ts",
       "test/scripts/bible-lookup-17-tests-detailed.ts",
       "test/scripts/bible-lookup-17-tests.ts",
       "test/scripts/build-stepbible.test.ts",

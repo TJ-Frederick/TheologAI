@@ -145,6 +145,7 @@ describe('test topology manifest', () => {
     );
     expect(manifest.partitions.support).toEqual(expectedSupport);
     expect(manifest.partitions.manual).toEqual([
+      'test/manual/previewRefreshExecutorReplay.ts',
       'test/scripts/bible-lookup-17-tests-detailed.ts',
       'test/scripts/bible-lookup-17-tests.ts',
       'test/scripts/build-stepbible.test.ts',
