@@ -35,7 +35,8 @@ original records.
    retained production proof spent about 32 minutes on the read phase. The
    balance also covers authorization handoff, validation, cutover and live
    checks. Use the approved proof reserve within the source plan maximum and
-   the 4,000,000-read account ceiling.
+   the 4,600,000-read daily operating ceiling. An owner grant may set a lower
+   ceiling. Include expected live traffic through the UTC reset in the allowance.
 4. Use the existing authenticated GitHub owner session and the existing
    Wrangler OAuth grant. Supply the grant to the process as
    `CLOUDFLARE_API_TOKEN` through the approved local credential supply.

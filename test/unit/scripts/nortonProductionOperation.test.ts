@@ -10,7 +10,7 @@ const authority=createRequire(import.meta.url)('../../../.github/scripts/operato
 const start=Date.parse('2026-11-06T00:05:00Z');
 
 it.each([
-  {accountReadCeilingDay:'2026-11-07'},{accountReadCeiling:4_000_001},{accountReadsHeld:50_001},{accountWritesHeld:79_997},
+  {accountReadCeilingDay:'2026-11-07'},{accountReadCeiling:4_600_001},{accountReadsHeld:50_001},{accountWritesHeld:79_997},
   {databaseId:'wrong'},{candidateWriteJobsPaused:false},{outstandingPriorReservationsAccepted:false},
   {expiresAt:'2026-11-07T01:00:00Z'},{expiresAt:'2026-11-06T00:04:59Z'},
 ])('requires a valid native budget and isolated target for %j',patch=>{
@@ -21,7 +21,9 @@ it.each([
 it('includes the held floor, entire proof, live reservation and uncertainty in the approval',()=>{
   expect(()=>admitCorpusBudget(100,3_450_000,50_000,0,4_000_000,300_000)).not.toThrow();
   expect(()=>admitCorpusBudget(100,3_450_000,50_001,0,4_000_000,300_000)).toThrow('headroom');
-  expect(()=>admitCorpusBudget(100,3_450_000,100,0,4_000_001,300_000)).toThrow('policy');
+  expect(()=>admitCorpusBudget(100,3_450_000,650_000,0,4_600_000,300_000)).not.toThrow();
+  expect(()=>admitCorpusBudget(100,3_450_000,650_001,0,4_600_000,300_000)).toThrow('headroom');
+  expect(()=>admitCorpusBudget(100,3_450_000,100,0,4_600_001,300_000)).toThrow('policy');
 });
 
 it('threads account floors through production admission and rejects detached claims',async()=>{
