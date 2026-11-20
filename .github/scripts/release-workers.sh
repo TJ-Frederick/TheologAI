@@ -25,7 +25,7 @@ refuse() {
   exit 1
 }
 wrangler() {
-  npx --no-install wrangler --config "$config" --env-file /dev/null "$@"
+  npx --no-install wrangler "$@" --config "$config" --env-file /dev/null
 }
 reconcile() {
   local target="$1"

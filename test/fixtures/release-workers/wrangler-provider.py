@@ -4,6 +4,9 @@ args=sys.argv[1:]
 if 'wrangler' not in args:
     args[2]=str(pathlib.Path(args[2]).resolve())
     os.execv(os.environ['REAL_NPX'], [os.environ['REAL_NPX'], *args])
+command = args[args.index('wrangler') + 1:]
+if not command or command[0] not in {'d1', 'deployments', 'versions', 'deploy'}:
+    sys.exit('Wrangler requires the release command before the multi-value --env-file option')
 root=pathlib.Path(os.environ['RUNNER_TEMP'])
 p=json.loads((root/'provider.json').read_text())
 with (root/'provider.log').open('a') as f:
