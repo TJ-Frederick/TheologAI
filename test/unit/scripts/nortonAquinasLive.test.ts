@@ -1,4 +1,3 @@
-import {withCorpusAuditClock} from '../../helpers/corpusAuditClock.js';
 import { existsSync } from 'node:fs';
 import { it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -6,7 +5,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Native } from '../../helpers/corpusNative.js';
 import { corpusMcp } from '../../helpers/corpusMcp.js';
-import { runCorpusAcceptance } from '../../../scripts/release-acceptance.js';
+import { runCorpusAcceptance, type AcceptanceOptions } from '../../../scripts/release-acceptance.js';
+// These probes use real asynchronous SQLite I/O. The fault fixture injects one
+// HTTP response at a known probe. Keep its real request deadlines independent
+// of CI load. The release workflow rehearses the default pacing on real Workerd.
+const localFixturePace: NonNullable<AcceptanceOptions['pace']> = async (signal, guard, dispatch) => {
+    signal.throwIfAborted();
+    guard();
+    return dispatch();
+};
+
 for (const role of ['preview', 'production'] as const)
     it.skipIf(!existsSync('data/theologai.db'))(`checks actual ${role} MCP calls in both eras against exact corpus bodies and fixed language assertions`, async () => {
         const dir = mkdtempSync(join(tmpdir(), 'corpus-live-')), native = new Native(dir);
@@ -16,7 +24,7 @@ for (const role of ['preview', 'production'] as const)
         }[] = [];
         try {
             await native.load('data/theologai.db');
-            const receipt = await withCorpusAuditClock(()=>runCorpusAcceptance({ guard: () => {}, role, endpoint: 'https://local.test/mcp', serverVersion: role === 'preview' ? '3.6.0-preview' : '3.6.0', databasePath: 'data/theologai.db', root: process.cwd(), fetch: corpusMcp(native, role === 'preview', (sql, reads) => queries.push({ sql, reads })) }));
+            const receipt = await runCorpusAcceptance({ pace: localFixturePace, guard: () => {}, role, endpoint: 'https://local.test/mcp', serverVersion: role === 'preview' ? '3.6.0-preview' : '3.6.0', databasePath: 'data/theologai.db', root: process.cwd(), fetch: corpusMcp(native, role === 'preview', (sql, reads) => queries.push({ sql, reads })) });
             expect(receipt.failure).toBeUndefined();
             expect(receipt.checks).toHaveLength(370);
             const reads = queries.reduce((n, r) => n + r.reads, 0);
@@ -52,10 +60,11 @@ it.skipIf(!existsSync('data/theologai.db'))('replays the modern Wesley HTTP 503 
             }
             return localFetch(input, init);
         };
-        const receipt = await withCorpusAuditClock(() => runCorpusAcceptance({
+        const receipt = await runCorpusAcceptance({
+            pace: localFixturePace,
             role: 'preview', endpoint, serverVersion: '3.6.0-preview', databasePath, fetch: replay, guard: () => {},
-        }));
-        expect(receipt).toMatchObject({ passed: false, failure: {
+        });
+        expect(receipt, JSON.stringify(receipt.failure)).toMatchObject({ passed: false, failure: {
             category: 'http_status', era: '2026-07-28', probeId: 'search:wesley-standard-sermons',
             lastHttpStatus: 503, completedChecks: 222, lastCompletedProbe: 'global-search-body:wesley-standard-sermons',
         } });
