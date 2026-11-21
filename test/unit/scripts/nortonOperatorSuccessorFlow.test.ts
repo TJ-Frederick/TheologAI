@@ -44,12 +44,12 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
         INSERT INTO strongs_fts VALUES('G25','agape','agape','love');`);
       for(const t of ALL_FTS.slice(1))db.exec(`INSERT INTO ${t}(${t}) VALUES('rebuild')`);
       const tables=['documents','document_sections','historical_edition_sections','historical_edition_hierarchy_bodies','strongs_fts'];
-      for(let n=0;n<34;n++){const t='fixture_'+String(n).padStart(2,'0');db.exec(`CREATE TABLE ${t}(id INTEGER PRIMARY KEY,value TEXT);INSERT INTO ${t} VALUES(1,'fixture')`);tables.push(t);}
+      for(let n=0;n<34;n++){const t=n===0?'cross_references':'fixture_'+String(n).padStart(2,'0');db.exec(`CREATE TABLE ${t}(id INTEGER PRIMARY KEY,value TEXT);INSERT INTO ${t} VALUES(1,'fixture')`);tables.push(t);}
       tables.sort();
       const expected={tables,catalog:db.prepare(CATALOG_SQL).all(),digests:Object.fromEntries(tables.map(t=>[t,canonicalTableDigest(db,t)])),foreignKeyWitnessSha256:'a'.repeat(64),schemaVersion:'bounded-fixture',migrationNames:['0001.sql'],quickCheckReadCeiling:5000};
       db.close();const sourceHash=sha(readFileSync(join(directory,'source.db')));
       let priorPreview:any;
-      for(const phase of ['preview','production','bound-preview','failed-read','failed-physical','closing-read-recovery','closing-read-drift','low-cap'] as const) {
+      for(const phase of ['preview','production','bound-preview','failed-read','failed-physical','canonical-read-recovery','closing-read-recovery','closing-read-drift','low-cap'] as const) {
         const role=phase==='production'?'production':'preview',work=join(directory,phase);mkdirSync(work);
         if(role==='production') {
           const merge=execFileSync('git',['-c','user.name=Flow fixture','-c','user.email=fixture@example.invalid','commit-tree',tree,'-p',base,'-p',previewSource],{cwd:root,input:'Exact same-tree production merge\n',encoding:'utf8'}).trim();
@@ -70,7 +70,7 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
         }
         const target=join(work,'target.db');copyFileSync(join(directory,'source.db'),target);const remote=new Database(target);for(const row of PROVIDER_CATALOG)remote.exec(String(row.sql));remote.exec("INSERT INTO d1_migrations VALUES(1,'0001.sql','2026-11-01 00:00:00')");remote.close();
         const day=new Date(Date.now()+86400000).toISOString().slice(0,10),now=Date.parse(day+'T00:05:00Z');
-        const runId=role==='production'?'124':phase==='preview'?'123':String(125+['bound-preview','failed-read','failed-physical','closing-read-recovery','closing-read-drift','low-cap'].indexOf(phase)),branch=role==='production'?'main':'ci/different-successor-flow';
+        const runId=role==='production'?'124':phase==='preview'?'123':String(125+['bound-preview','failed-read','failed-physical','canonical-read-recovery','closing-read-recovery','closing-read-drift','low-cap'].indexOf(phase)),branch=role==='production'?'main':'ci/different-successor-flow';
         const liveControlReserve=300000, reservedReads=phase==='low-cap'?17_000:3_450_000;
         const a=corpusGrant({role,now,boundPreview:phase==='bound-preview',overrides:{
           expectedLedgerSha256:sha(JSON.stringify([{id:1,name:'0001.sql',applied_at:'2026-11-01 00:00:00'}])),
@@ -105,8 +105,12 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
         writeFileSync(preload,`import Database from ${JSON.stringify(resolve('node_modules/better-sqlite3/lib/index.js'))};import{appendFileSync}from'node:fs';
           import{corpusTransportFixture}from ${JSON.stringify(resolve('test/helpers/corpusTransportFixture.ts'))};
           const N=Date;const now=Number(process.env.FIXTURE_NOW);globalThis.Date=class extends N{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}};const timeout=globalThis.setTimeout;globalThis.setTimeout=(fn,ms,...args)=>timeout(fn,ms<3000?0:ms,...args);
-          let catalogReads=0, closingInterrupted=false;const db=new Database(${JSON.stringify(target)});const fetcher=corpusTransportFixture({role:${JSON.stringify(role)},boundPreview:${phase==='bound-preview'},record:()=>appendFileSync(${JSON.stringify(network)},'request\\n'),query:(sql,token)=>{
-          const write=sql.startsWith('INSERT');appendFileSync(${JSON.stringify(log)},JSON.stringify({kind:write?'diagnostic':'read',credential:token.includes('integrity')?'operator':'reader'})+'\\n');if(write&&!token.includes('integrity'))throw Error('reader attempted write');if(process.env.FAIL_READ==='true'&&!write)throw Error('ambiguous read fixture');if(process.env.FAIL_PHYSICAL==='true'&&sql==='PRAGMA quick_check')throw new DOMException('synthetic physical interruption','TimeoutError');if(process.env.FAIL_CLOSING==='true'&&sql===${JSON.stringify(CATALOG_SQL)}&&++catalogReads===2){closingInterrupted=true;return Response.json({success:false,errors:[{code:7429}]},{status:429,headers:{'Retry-After':'2'}});}const rows=write?(db.prepare(sql).run(),[]):db.prepare(sql).all();return{rows,rowsRead:process.env.LOW_CAP==='true'&&sql==='PRAGMA quick_check'?14_000:Math.max(rows.length,1),rowsWritten:write?1:0};}}).fetch;
+          let catalogReads=0, closingInterrupted=false, canonicalInterrupted=false;const db=new Database(${JSON.stringify(target)});const fetcher=corpusTransportFixture({role:${JSON.stringify(role)},boundPreview:${phase==='bound-preview'},record:()=>appendFileSync(${JSON.stringify(network)},'request\\n'),query:(sql,token)=>{
+          const write=sql.startsWith('INSERT');appendFileSync(${JSON.stringify(log)},JSON.stringify({kind:write?'diagnostic':'read',credential:token.includes('integrity')?'operator':'reader'})+'\\n');if(write&&!token.includes('integrity'))throw Error('reader attempted write');if(process.env.FAIL_READ==='true'&&!write)throw Error('ambiguous read fixture');if(process.env.FAIL_PHYSICAL==='true'&&sql==='PRAGMA quick_check')throw new DOMException('synthetic physical interruption','TimeoutError');if(process.env.FAIL_CLOSING==='true'&&sql===${JSON.stringify(CATALOG_SQL)}&&++catalogReads===2){closingInterrupted=true;return Response.json({success:false,errors:[{code:7429}]},{status:429,headers:{'Retry-After':'2'}});}
+          if (process.env.FAIL_CANONICAL==='true' && !canonicalInterrupted && sql.includes(' FROM "cross_references" b ORDER BY ')) {
+            canonicalInterrupted=true;return Response.json({success:false,errors:[{code:7429}]},{status:429,headers:{'Retry-After':'2'}});
+          }
+          const rows=write?(db.prepare(sql).run(),[]):db.prepare(sql).all();return{rows,rowsRead:process.env.LOW_CAP==='true'&&sql==='PRAGMA quick_check'?14_000:Math.max(rows.length,1),rowsWritten:write?1:0};}}).fetch;
           globalThis.fetch=async(...args)=>{const response=await fetcher(...args);if(process.env.DRIFT_AFTER_CLOSING==='true'&&closingInterrupted&&String(args[0]).endsWith('/settings')){const body=await response.json();body.result.bindings[0].id='wrong';return Response.json(body);}return response;};`);
         const invoke=(args:string[],extra:Record<string,string>={})=>spawnSync(process.execPath,['--import','tsx','--import',preload,'scripts/operator-corpus-proof.ts',...args],{cwd:root,encoding:'utf8',timeout:45000,env:{...env,PATH:join(work,'bin')+':'+process.env.PATH,FIXTURE_NOW:String(now+1000),CLOUDFLARE_ACCOUNT_ID:ACCOUNT,CLOUDFLARE_API_TOKEN:'synthetic-reader',...extra}});
         const challenge=join(work,'challenge.json');let result=invoke(['challenge',role,work,digest,challenge]);expect(result.status,result.stderr).toBe(0);
@@ -137,7 +141,7 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
         expect(invoke(['run',challenge,work,digest,join(work,'replay.json'),ledger],operatorEnv).status).toBe(1);expect(readFileSync(log,'utf8').trim().split('\n')).toHaveLength(4);
         // A cancelled/missing protected phase leaves the whole reservation outstanding.
         expect(existsSync(join(work,'complete.json'))).toBe(false);expect(JSON.parse(readFileSync(ledger,'utf8')).outstandingReservation.reads).toBe(reservedReads);
-        const complete=join(work,'complete.json');result=invoke(['complete',challenge,join(proofUpload,'operator-proof-envelope.json'),work,digest,complete],{FIXTURE_NOW:String(now+3000),...(phase==='failed-read'?{FAIL_READ:'true'}:{}),...(phase==='failed-physical'?{FAIL_PHYSICAL:'true'}:{}),...(phase==='low-cap'?{LOW_CAP:'true'}:{}),...(phase.startsWith('closing-read-')?{FAIL_CLOSING:'true',DRIFT_AFTER_CLOSING:String(phase==='closing-read-drift')}:{})});
+        const complete=join(work,'complete.json');result=invoke(['complete',challenge,join(proofUpload,'operator-proof-envelope.json'),work,digest,complete],{FIXTURE_NOW:String(now+3000),FAIL_CANONICAL:String(phase==='canonical-read-recovery'),...(phase==='failed-read'?{FAIL_READ:'true'}:{}),...(phase==='failed-physical'?{FAIL_PHYSICAL:'true'}:{}),...(phase==='low-cap'?{LOW_CAP:'true'}:{}),...(phase.startsWith('closing-read-')?{FAIL_CLOSING:'true',DRIFT_AFTER_CLOSING:String(phase==='closing-read-drift')}:{})});
         if(phase.startsWith('failed-')||phase==='closing-read-drift'||phase==='low-cap') {
           expect(result.status).toBe(1);expect(existsSync(complete)).toBe(false);
           const journal=readFileSync(complete+'.events.jsonl','utf8');expect(journal).not.toContain('closing-read-resumed');
@@ -145,6 +149,16 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
           const costs=JSON.parse(readFileSync(complete+'.budget.json','utf8'));expect(costs.reader.readsSpentOrReserved).toBeGreaterThanOrEqual(4096);expect(costs.integrity.cumulativeDiagnosticCommands).toBe(4);expect(JSON.parse(readFileSync(ledger,'utf8')).outstandingReservation.reads).toBe(reservedReads);continue;
         }
         expect(result.status,result.stderr).toBe(0);const receipt=JSON.parse(readFileSync(complete,'utf8'));expect(Object.keys(receipt.proof.tables)).toHaveLength(39);expect(receipt.metering.integrityCommands).toBe(4);expect(receipt.metering.rowsWritten).toBe(4);expect(receipt.readBudget).toBe(reservedReads);
+        if (phase==='canonical-read-recovery') {
+          const events=readFileSync(complete+'.events.jsonl','utf8').trim().split('\n').map(line=>JSON.parse(line));
+          expect(receipt.metering).toMatchObject({retries:1,unknownAttempts:1});
+          expect(events.filter(e=>e.kind==='intent'&&e.label==='physical')).toHaveLength(1);
+          const attempts=events.filter(e=>e.kind==='intent'&&e.label==='canonical:cross_references');
+          expect(attempts).toHaveLength(3);
+          expect(attempts[0].sqlSha256).toBe(attempts[1].sqlSha256);
+          expect(attempts[2].sqlSha256).not.toBe(attempts[1].sqlSha256);
+          expect(events).toContainEqual(expect.objectContaining({kind:'closing-read-interrupted',label:'canonical:cross_references',cooldownMs:2000,reservedUnknownReads:2304}));
+        }
         if(phase==='closing-read-recovery') {
           expect(receipt.metering).toMatchObject({retries:1,unknownAttempts:1});
           expect(receipt.metering.rowsRead).toBeGreaterThan(4096);
