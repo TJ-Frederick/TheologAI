@@ -46,8 +46,8 @@ export function admitCorpusBudget(usage: number, reserved: number, localKnownRea
   check([usage, reserved, localKnownReads, next].every(count) && Math.max(usage, localKnownReads) + uncertaintyReadMargin + reserved + next + liveAuditReserve <= accountCeiling, 'insufficient account headroom');
 }
 
-class ClosingReadUnavailable extends Error {
-  constructor(readonly cooldownMs = 0) { super('closing catalog read unavailable'); }
+class ProofReadUnavailable extends Error {
+  constructor(readonly cooldownMs = 0) { super('proof read temporarily unavailable'); }
 }
 export class CorpusProofTransport {
   private readonly targets:typeof TARGETS;
@@ -104,12 +104,14 @@ export class CorpusProofTransport {
     const databasePath = `${prefix}/d1/database/${this.targets[this.options.role].databaseId}`;
     check(path === '/graphql' && method === 'POST' || path === databasePath + '/query' && method === 'POST'
       || method === 'GET' && new RegExp(`^${prefix}/workers/scripts/(?:theologai|theologai-preview)/(?:settings|deployments\\?page=1&per_page=1|versions/[0-9a-f-]{36})$`).test(path), 'network route');
+    const query = method === 'POST' && path === databasePath + '/query' ? this.current : null;
+    const catalogRead = query !== null && this.recoverableCatalogRead(query);
     const remaining = Math.max(0, this.lastDispatch + 500 - Date.now()); if (remaining) await new Promise(resolve => setTimeout(resolve, remaining));
     this.grant();
     this.lastDispatch = Date.now();
     const transientClosing = (cause: unknown): never => {
-      if (method === 'POST' && this.current !== null && this.recoverableCatalogRead(this.current) && cause instanceof Error
-        && ['AbortError','TimeoutError','TypeError'].includes(cause.name)) throw new ClosingReadUnavailable();
+      if (catalogRead && cause instanceof Error
+        && ['AbortError','TimeoutError','TypeError'].includes(cause.name)) throw new ProofReadUnavailable();
       throw cause;
     };
     const response = await (this.options.fetch ?? fetch)(`https://api.cloudflare.com/client/v4${path}`, {
@@ -118,9 +120,9 @@ export class CorpusProofTransport {
     const jsonContentType = /^application\/json/.test(response.headers.get('content-type') ?? '');
     const accepted = response.status === 200 && !response.redirected && jsonContentType;
     if (!accepted || !response.body) this.event({ kind: 'rejected-response', method, path, httpStatus: response.status, redirected: response.redirected, jsonContentType, emptyBody: !response.body });
-    if (method === 'POST' && this.current !== null && this.recoverableCatalogRead(this.current) && [502, 503, 504].includes(response.status)) {
+    if (catalogRead && [502, 503, 504].includes(response.status)) {
       await response.body?.cancel().catch(() => undefined);
-      throw new ClosingReadUnavailable();
+      throw new ProofReadUnavailable();
     }
     check(response.body, 'empty response'); const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
     try { for (;;) { const part = await reader.read().catch(transientClosing); if (part.done) break; size += part.value.byteLength; this.bytes += part.value.byteLength;
@@ -136,12 +138,13 @@ export class CorpusProofTransport {
     if (!accepted || value.success === false || Array.isArray(value.errors) && value.errors.length) {
       this.event({ kind: 'provider-error', method, path, httpStatus: response.status, errorCodes: errorCodes(value.errors), errorKinds: errorKinds(value.errors), responseSha256: sha(text), bytes: size });
     }
-    if (method === 'POST' && this.current !== null && this.recoverableCatalogRead(this.current) && response.status === 429 && !response.redirected
+    const canonicalPage = this.physicalCheckPassed && query?.kind === 'select' && query.writeCeiling === 0 && query.label.startsWith('canonical:');
+    if ((catalogRead || canonicalPage) && response.status === 429 && !response.redirected
       && jsonContentType && value.success === false && errorCodes(value.errors).includes(7429)) {
       // For a missing usable Retry-After, wait the documented global rate-limit window.
       const retryAfter = response.headers.get('retry-after') ?? '';
       const seconds = /^\d{1,6}$/.test(retryAfter) ? Number(retryAfter) : 300;
-      throw new ClosingReadUnavailable(Math.max(1, seconds) * 1_000);
+      throw new ProofReadUnavailable(Math.max(1, seconds) * 1_000);
     }
     check(accepted, 'HTTP/redirect/content type');
     this.event({ kind: 'API', method, path, responseSha256: sha(text), bytes: size }); return value as ApiResult;
@@ -263,7 +266,7 @@ export class CorpusProofTransport {
       return rows;
     } catch (error) {
       this.metering.unknownAttempts++;
-      if (this.recoverableCatalogRead(query) && error instanceof ClosingReadUnavailable
+      if (error instanceof ProofReadUnavailable
         && this.metering.retries === 0 && this.options.recheckAuthority) {
         this.metering.rowsRead += query.readCeiling;
         this.current = null;
@@ -271,12 +274,12 @@ export class CorpusProofTransport {
         try {
           await this.options.recheckAuthority();
           if (error.cooldownMs > 0) {
-            check(Date.now()+error.cooldownMs < Date.parse(this.grant().expiresAt), 'closing read cooldown exceeds authorization');
+            check(Date.now()+error.cooldownMs < Date.parse(this.grant().expiresAt), 'proof read cooldown exceeds authorization');
             await new Promise(resolve => setTimeout(resolve, error.cooldownMs));
             await this.options.recheckAuthority();
           }
           await this.captureCandidate();
-          check(JSON.stringify(await this.snapshot()) === JSON.stringify(this.controls), 'closing read controls changed');
+          check(JSON.stringify(await this.snapshot()) === JSON.stringify(this.controls), 'proof read controls changed');
           await this.usage();
           await this.options.recheckAuthority();
           this.metering.retries++;
@@ -285,7 +288,7 @@ export class CorpusProofTransport {
         } catch {
           this.halted = true;
           this.event({kind:'closing-read-recovery-stopped', label:query.label});
-          throw Error('Corpus transport refused: closing read recovery stopped');
+          throw Error('Corpus transport refused: proof read recovery stopped');
         }
       }
       this.halted = true;

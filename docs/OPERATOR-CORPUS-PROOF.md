@@ -76,11 +76,13 @@ If envelope submission has an unknown outcome, check the workflow history
 before taking further action. The helper makes one submission attempt and
 leaves the envelope available for reconciliation.
 
-A known provider interruption of the schema read after the physical check
-can be reconciled within the same protected process. For the D1 HTTP 429 with
-provider code 7429, the verifier honors a numeric `Retry-After`, with a
-300-second fallback. It reserves the unknown reads, rechecks authority,
-custody, assignments and available budget, then retries that read once.
+After the physical check passes, a D1 HTTP 429 with provider code 7429 on
+a schema read or a page of corpus data can be recovered in the same process.
+The verifier reserves the uncertain reads, waits for the numeric `Retry-After`
+(or 300 seconds if absent), rechecks authority, custody, assignments and
+budget, then repeats the identical read. One retry is available across the
+entire proof. Only schema reads can also recover from a transport timeout,
+connection failure or HTTP 502, 503 or 504.
 The complete canonical scan and independent closing checks still run. A lost
 process or a diagnostic write with an unknown outcome requires reconciliation
 before any further operation.
