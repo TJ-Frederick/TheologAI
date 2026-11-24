@@ -116,6 +116,7 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
 
   const morphologyRepository: IMorphologyRepository = {
     getVerseMorphology: () => [],
+    getExpandedVerseMorphology: () => [],
     expandMorphCode: () => undefined,
     getAvailableBooks: () => [],
     hasVerse: () => false,

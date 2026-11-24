@@ -7,6 +7,7 @@
 
 import type {
   IMorphologyRepository,
+  ExpandedMorphWord,
   MorphWord,
   WordOccurrence,
   BookDistribution,
@@ -18,6 +19,11 @@ import type {
   TokenOccurrencePage,
 } from '../../kernel/repositories.js';
 import { expandHebrewMorphCode } from '../shared/hebrewMorphExpander.js';
+import {
+  EXPANDED_VERSE_MORPHOLOGY_SQL,
+  mapExpandedMorphologyRow,
+  type ExpandedMorphologyDatabaseRow,
+} from '../shared/morphologyExpansion.js';
 import { CANONICAL_BOOK_ORDER_SQL, sortByCanonicalBook } from '../shared/repositoryUtils.js';
 import { parseStrongsIdentity } from '../../kernel/strongs.js';
 import {
@@ -36,6 +42,12 @@ export class D1MorphologyRepository implements IMorphologyRepository {
       'SELECT position, word_text, lemma, strongs_number, morph_code, gloss FROM morphology WHERE book = ? AND chapter = ? AND verse = ? ORDER BY position'
     ).bind(book, chapter, verse).all<MorphWord>();
     return results;
+  }
+
+  async getExpandedVerseMorphology(book: string, chapter: number, verse: number): Promise<ExpandedMorphWord[]> {
+    const { results } = await this.db.prepare(EXPANDED_VERSE_MORPHOLOGY_SQL)
+      .bind(book, chapter, verse).all<ExpandedMorphologyDatabaseRow>();
+    return results.map(mapExpandedMorphologyRow);
   }
 
   async expandMorphCode(code: string): Promise<string | undefined> {
