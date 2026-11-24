@@ -159,6 +159,52 @@ describe('BibleService', () => {
       }]);
     });
 
+    it('preserves ordered successes and distinguishes provider selection from retrieval failures', async () => {
+      const unconfigured = makeAdapter({ supportedTranslations: ['WEB'], isConfigured: () => false });
+      const notFound = new NotFoundError('passage', 'John 3:16');
+      const comparison = new BibleService([
+        esvAdapter,
+        unconfigured,
+        makeAdapter({ supportedTranslations: ['NET'], getPassage: vi.fn().mockRejectedValue(notFound) }),
+        makeAdapter({
+          supportedTranslations: ['BSB'],
+          getPassage: vi.fn().mockResolvedValue({ reference: 'John 1:1', translation: 'BSB', text: 'Wrong verse' }),
+        }),
+        makeAdapter({
+          supportedTranslations: ['ASV'],
+          getPassage: vi.fn().mockResolvedValue({ reference: 'John 3:16', translation: 'YLT', text: 'Wrong translation' }),
+        }),
+        kjvAdapter,
+      ]);
+
+      const response = await comparison.lookupMultiple('jn 3:16', ['kjv', 'NIV', 'WEB', 'NET', 'BSB', 'ASV', 'esv']);
+
+      expect(response.reference).toBe('John 3:16');
+      expect(response.results.map(result => result.translation)).toEqual(['KJV', 'ESV']);
+      expect(response.failures).toEqual([
+        { translation: 'NIV', reason: 'Translation is not supported by this server.' },
+        { translation: 'WEB', reason: 'Translation provider is not configured.' },
+        { translation: 'NET', reason: 'Translation could not be retrieved.' },
+        { translation: 'BSB', reason: 'Translation could not be retrieved.' },
+        { translation: 'ASV', reason: 'Translation could not be retrieved.' },
+      ]);
+      expect(unconfigured.getPassage).not.toHaveBeenCalled();
+      await expect(comparison.lookup({ reference: 'John 3:16', translation: 'NET' })).rejects.toBe(notFound);
+    });
+
+    it('rejects the whole comparison if checking provider configuration throws', async () => {
+      const error = new Error('configuration check failed');
+      const adapter = makeAdapter({
+        supportedTranslations: ['NET'],
+        isConfigured() { throw error; },
+      });
+      const comparison = new BibleService([esvAdapter, adapter, kjvAdapter]);
+      await expect(comparison.lookupMultiple('John 3:16', ['ESV', 'NET', 'KJV'])).rejects.toBe(error);
+      expect(esvAdapter.getPassage).toHaveBeenCalledOnce();
+      expect(adapter.getPassage).not.toHaveBeenCalled();
+      expect(kjvAdapter.getPassage).not.toHaveBeenCalled();
+    });
+
     it('returns results in order', async () => {
       const response = await service.lookupMultiple('John 3:16', ['ESV', 'KJV']);
       expect(response.results[0].translation).toBe('ESV');
@@ -207,6 +253,11 @@ describe('BibleService', () => {
 
       await expect(singleChapterService.lookup({ reference: 'Jude 3', translation: 'ESV' }))
         .resolves.toMatchObject({ reference: 'Jude 1:3', translation: 'ESV' });
+      await expect(singleChapterService.lookupMultiple('Jude 3', ['ESV']))
+        .resolves.toMatchObject({
+          results: [{ reference: 'Jude 1:3', translation: 'ESV' }],
+          failures: [],
+        });
     });
   });
 });
