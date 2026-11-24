@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 307,
-    "activeVitest": 226,
+    "totalTestTypeScript": 308,
+    "activeVitest": 227,
     "support": 26,
     "manual": 4,
     "legacyOrphan": 50,
@@ -190,6 +190,7 @@
       "test/unit/scripts/originalLanguageV2PreviewAudit.test.ts",
       "test/unit/scripts/parallelPassagePaginationGuards.test.ts",
       "test/unit/scripts/parallelPassagesPreviewAudit.test.ts",
+      "test/unit/scripts/prReleaseEligibility.test.ts",
       "test/unit/scripts/preparePreviewD1Candidate.test.ts",
       "test/unit/scripts/prepareProductionD1Candidate.test.ts",
       "test/unit/scripts/previewReleaseReconciliation.test.ts",
