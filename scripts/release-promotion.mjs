@@ -15,6 +15,7 @@ const releaseBookkeeping = new Set([
   '.github/scripts/production-baseline.cjs',
   'scripts/release-promotion.mjs',
   'test/fixtures/release-workers/replay.py',
+  'test/helpers/corpusTransportFixture.ts',
   'test/unit/scripts/releasePromotion.test.ts',
 ]);
 const json = path => JSON.parse(readFileSync(path, 'utf8'));

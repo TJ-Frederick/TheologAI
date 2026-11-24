@@ -9,7 +9,9 @@ export function corpusTransportFixture(options:{role:'preview'|'production';acti
  const assignments = {
    preview: {databaseId:options.role==='preview'&&!options.boundPreview?TARGETS.production.databaseId:TARGETS.preview.databaseId,
      versionId:predecessors.preview.versionId,deploymentId:predecessors.preview.deploymentId},
-   production:{databaseId:predecessors.production.databaseId,versionId:predecessors.production.versionId,deploymentId:predecessors.production.deploymentId},
+   // These scenarios prepare a candidate while a distinct database serves production.
+   // A reviewed production cutover must not make the fixture's candidate already active.
+   production:{databaseId:'9bc79346-338b-439e-a2a5-424f4418eb21',versionId:predecessors.production.versionId,deploymentId:predecessors.production.deploymentId},
  };
  const versions = {preview:assignments.preview.versionId, production:assignments.production.versionId};
  const deployments = {preview:assignments.preview.deploymentId, production:assignments.production.deploymentId};
