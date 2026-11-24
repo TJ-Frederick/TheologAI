@@ -12,7 +12,8 @@ const strongsRepo = {
 
 function morphology(overrides: Partial<IMorphologyRepository> = {}): IMorphologyRepository {
   return {
-    getVerseMorphology: () => [], expandMorphCode: () => undefined, getAvailableBooks: () => [],
+    getVerseMorphology: () => [], getExpandedVerseMorphology: () => [],
+    expandMorphCode: () => undefined, getAvailableBooks: () => [],
     hasVerse: () => false, getOccurrences: () => [], getDistribution: () => [],
     getUsageStats: () => undefined, getBookUsage: () => [], getFormUsage: () => [],
     getTokenOccurrences: () => ({ occurrences: [] }),

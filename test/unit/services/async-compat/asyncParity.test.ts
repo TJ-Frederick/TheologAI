@@ -107,6 +107,7 @@ describe('Async/Sync Repository Parity', () => {
     it('works with sync repo (mockReturnValue — better-sqlite3 pattern)', async () => {
       const repo: IMorphologyRepository = {
         getVerseMorphology: vi.fn().mockReturnValue(morphWords),
+        getExpandedVerseMorphology: vi.fn().mockReturnValue([]),
         expandMorphCode: vi.fn().mockReturnValue('Preposition'),
         getAvailableBooks: vi.fn().mockReturnValue(['John']),
         hasVerse: vi.fn().mockReturnValue(true),
@@ -126,6 +127,7 @@ describe('Async/Sync Repository Parity', () => {
     it('works with async repo (mockResolvedValue — D1 pattern)', async () => {
       const repo: IMorphologyRepository = {
         getVerseMorphology: vi.fn().mockResolvedValue(morphWords),
+        getExpandedVerseMorphology: vi.fn().mockResolvedValue([]),
         expandMorphCode: vi.fn().mockResolvedValue('Preposition'),
         getAvailableBooks: vi.fn().mockResolvedValue(['John']),
         hasVerse: vi.fn().mockResolvedValue(true),
