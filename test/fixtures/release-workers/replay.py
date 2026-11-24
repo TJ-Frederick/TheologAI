@@ -1,7 +1,9 @@
 """Replay the protected Worker shell against fixture Wrangler responses.
 
 Run directly with python3 test/fixtures/release-workers/replay.py.
+CI runs each group with its own wall-clock deadline.
 """
+import argparse
 import datetime
 import hashlib
 import json
@@ -22,7 +24,7 @@ read_ceiling = int(subprocess.check_output(
 def j(path, value):
     path.write_text(json.dumps(value, separators=(",", ":")) + "\n")
 
-def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=False, expired=False, wrong_route=False, tagged=False, wrong_tag=False, stale_deployment=False, stale_database=False):
+def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=False, expired=False, wrong_route=False, tagged=False, wrong_tag=False, stale_deployment=False, stale_database=False, rebaseline=False):
     other = "production" if role == "preview" else "preview"
     with tempfile.TemporaryDirectory(prefix="theologai-release-replay-") as run:
         root = pathlib.Path(run).resolve()
@@ -35,6 +37,15 @@ def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=F
         }
         if role == "production" and mode == "corpus":
             config["predecessors"]["production"] = previous_production
+        later_production = {
+            **config["predecessors"]["production"],
+            "deploymentId": "bbc8d4b1-a8bc-4af9-8adf-cf4e07669afb",
+            "versionId": "3a74b8d2-03aa-4667-bffa-f18be5c850af",
+        }
+        if rebaseline:
+            config["productionSource"] = "1" * 40
+            config["productionRunNumber"] += 1
+            config["predecessors"]["production"] = later_production
         if mode == "application":
             for r in ("preview", "production"):
                 config["targets"][r] = {k: config["predecessors"][r][k] for k in ("databaseName", "databaseId")}
@@ -58,7 +69,10 @@ def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=F
             assignments[r] = {k: target[k] for k in ("databaseId","versionId","deploymentId")}
         if role == "production":
             assignments["preview"]["databaseId"] = bindings["preview"]["databaseId"]
-        if stale or tagged:
+        accepted_production = later_production if tagged else config["predecessors"]["production"]
+        if tagged:
+            assignments["production"].update({k: accepted_production[k] for k in ("versionId", "deploymentId")})
+        if stale:
             assignments["production"]["versionId"] = previous_production["versionId"]
         if stale_deployment:
             assignments["production"]["deploymentId"] = previous_production["deploymentId"]
@@ -69,6 +83,7 @@ def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=F
         j(root / "production-baseline.json", {
             "productionSource": baseline_source,
             "requireVersionTag": tagged,
+            "productionAssignment": accepted_production,
             "targets": {r: {k: config["predecessors"][r][k] for k in ("databaseName", "databaseId")}
                         for r in ("production", "preview")},
         })
@@ -128,8 +143,11 @@ def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=F
         env.pop("CLOUDFLARE_API_TOKEN",None)
         env.pop("CLOUDFLARE_ACCOUNT_ID",None)
         def execute(phase, expect_ok=True):
-            result = subprocess.run(["bash", str(repo/".github/scripts/release-workers.sh"), phase,role,mode],
-                cwd=root, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+            try:
+                result = subprocess.run(["bash", str(repo/".github/scripts/release-workers.sh"), phase,role,mode],
+                    cwd=root, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+            except subprocess.TimeoutExpired as error:
+                raise RuntimeError(f"{case} {phase}: exceeded the 30-second phase timeout") from error
             assert (result.returncode == 0) == expect_ok, f"{case} {phase}: {result.returncode} {result.stdout}"
         bad_preflight = wrong or stale or wrong_route or wrong_tag or stale_deployment or stale_database
         bad_mutation = tamper or expired or ambiguous
@@ -172,20 +190,38 @@ def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=F
         assert all(" d1 " not in request or " d1 list " in request for request in requests)
         print(f"{case}: PASS {len(requests)} provider operations, {len(deploys)} deployment attempts",flush=True)
 
-replay("application preview", "preview", "application")
-replay("application production", "production", "application")
-replay("corpus preview prepared and already bound", "preview", "corpus")
-replay("corpus production candidate cutover", "production", "corpus")
-replay("wrong D1 refused", "production", "application", wrong=True)
-replay("ambiguous successful cutover reconciled without a second mutation", "production", "corpus", ambiguous=True)
+def replay_cutover():
+    replay("application preview", "preview", "application")
+    replay("application production", "production", "application")
+    replay("corpus preview prepared and already bound", "preview", "corpus")
+    replay("corpus production candidate cutover", "production", "corpus")
+    replay("wrong D1 refused", "production", "application", wrong=True)
+    replay("ambiguous successful cutover reconciled without a second mutation", "production", "corpus", ambiguous=True)
+    replay("stale production control refused during preview", "preview", "application", stale=True)
+    replay("stale production predecessor refused in production", "production", "application", stale=True)
+    replay("unexpected custom domain refused before provider access", "preview", "application", wrong_route=True)
+    replay("tampered bundle refused before mutation", "production", "application", tamper=True)
+    replay("expired approval refused at mutation boundary", "production", "corpus", expired=True)
 
-replay("stale production control refused during preview", "preview", "application", stale=True)
-replay("stale production predecessor refused in production", "production", "application", stale=True)
-replay("unexpected custom domain refused before provider access", "preview", "application", wrong_route=True)
-replay("tampered bundle refused before mutation", "production", "application", tamper=True)
-replay("expired approval refused at mutation boundary", "production", "corpus", expired=True)
 
-replay("routine release after a tagged production release", "production", "application", tagged=True)
-replay("wrong accepted production tag refused", "preview", "application", tagged=True, wrong_tag=True)
-replay("stale production deployment refused during preview", "preview", "application", stale_deployment=True)
-replay("stale production D1 refused during preview", "preview", "application", stale_database=True)
+def replay_baseline():
+    replay("routine release after a tagged production release", "production", "application", tagged=True)
+    replay("preview after a tagged production release", "preview", "application", tagged=True)
+    replay("wrong accepted production tag refused", "preview", "application", tagged=True, wrong_tag=True)
+    replay("stale production deployment refused during preview", "preview", "application", stale_deployment=True)
+    replay("stale production D1 refused during preview", "preview", "application", stale_database=True)
+    replay("tagged production Worker mismatch refused during preview", "preview", "application", tagged=True, stale=True)
+    replay("tagged production deployment mismatch refused during preview", "preview", "application", tagged=True, stale_deployment=True)
+    replay("tagged production Worker mismatch refused during promotion", "production", "application", tagged=True, stale=True)
+    replay("tagged production deployment mismatch refused during promotion", "production", "application", tagged=True, stale_deployment=True)
+    replay("reviewed rebaseline verified as initial assignment", "production", "application", rebaseline=True)
+
+
+if __name__ == "__main__":
+    groups = {"cutover": replay_cutover, "baseline": replay_baseline}
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--group", choices=groups)
+    group = parser.parse_args().group
+    for name, run in groups.items():
+        if group is None or name == group:
+            run()

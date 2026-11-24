@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
@@ -136,6 +137,7 @@ export async function rehearseHostedRecovery(input: {
   });
   write(join(work, 'production-baseline.json'), {
     productionSource: baselineSource, requireVersionTag: true, targets: { preview: TARGETS.preview, production: previous },
+    productionAssignment: { ...previous, versionId: assignments.production.versionId, deploymentId: assignments.production.deploymentId },
   });
   write(join(work, 'verified-preview.json'), assignments.preview);
   const config = (role: 'production' | 'preview') => '[[%PREFIX%d1_databases]]\n'
@@ -253,7 +255,18 @@ exec python3 "$FIXTURE_WRANGLER" "$@"
   const repo = { owner: 'TJ-Frederick', repo: 'TheologAI' };
   const runId = Number(env.GITHUB_RUN_ID);
   const data = (value: unknown) => ({ data: value });
+  const archivePath = join(work, 'production-evidence.zip');
+  execFileSync('zip', ['-q', archivePath, 'release-evidence/accepted-production.json', 'release-evidence/production-final-routing.json'], { cwd: work });
+  const archive = readFileSync(archivePath);
+  const artifact = {
+    id: 930, name: `production-release-evidence-${runId}`, expired: false, size_in_bytes: archive.length,
+    expires_at: new Date(now + 30 * 86400_000).toISOString(),
+    digest: 'sha256:' + createHash('sha256').update(archive).digest('hex'),
+    workflow_run: { id: runId, head_sha: source },
+  };
   const selected = await resolveProductionBaseline({
+    now,
+    reviewed: read(join(root, 'release/serving.json')),
     context: { repo, runId: runId + 1 },
     github: { rest: { actions: {
       listWorkflowRuns: () => data({ total_count: 1, workflow_runs: [{
@@ -263,11 +276,27 @@ exec python3 "$FIXTURE_WRANGLER" "$@"
       }] }),
       listJobsForWorkflowRun: () => data({ total_count: 1, jobs: [{
         name: 'Test, Build & Deploy', conclusion: 'success', head_sha: source,
-        steps: [{ name: 'Record accepted production source and assignment', conclusion: 'success' }],
+        steps: [
+          { name: 'Record accepted production source and assignment', conclusion: 'success' },
+          { name: 'Retain sanitized release evidence', conclusion: 'success' },
+        ],
       }] }),
       getReviewsForRun: () => data([{ state: 'approved', user: { id: 40179660 }, environments: [{ name: 'production' }] }]),
+      listWorkflowRunArtifacts: (input: { run_id: number }) => {
+        assert.equal(input.run_id, runId);
+        return data({ total_count: 1, artifacts: [artifact] });
+      },
+      downloadArtifact: (input: { artifact_id: number; archive_format: string }) => {
+        assert.deepEqual(input, { ...repo, artifact_id: artifact.id, archive_format: 'zip' });
+        return data(archive);
+      },
     } } },
     readSource: (sha: string) => JSON.parse(execFileSync('git', ['show', sha + ':release/serving.json'], { cwd: root, encoding: 'utf8' })),
+    readTree: (sha: string) => execFileSync('git', ['rev-parse', '--verify', sha + '^{tree}'], { cwd: root, encoding: 'utf8' }).trim(),
   });
-  assert.deepEqual(selected, { productionSource: source, targets: TARGETS, requireVersionTag: true });
+  assert.deepEqual(selected, {
+    productionSource: source, sourceTree: accepted.sourceTree, targets: TARGETS, requireVersionTag: true,
+    productionAssignment: { ...TARGETS.production, deploymentId: cutoverDeployment, versionId: cutoverVersion },
+    artifactProvenance: { runId, artifactId: artifact.id, digest: artifact.digest },
+  });
 }
