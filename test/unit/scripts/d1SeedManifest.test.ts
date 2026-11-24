@@ -273,6 +273,50 @@ describe('staged D1 seed publication', () => {
     });
   });
 
+  it.skipIf(process.platform === 'win32' || process.geteuid?.() === 0)
+    .each([0o555, 0o666])('requires write and search access before staging into an empty destination with mode %i', mode => {
+      withSeedFixture(({ root, output }) => {
+        rmSync(output, { recursive: true });
+        mkdirSync(output);
+        chmodSync(output, mode);
+        const before = lstatSync(output);
+        let writerCalled = false;
+        try {
+          expect(() => stageAndPublishD1Seed(root, output, false, () => {
+            writerCalled = true;
+            throw new Error('unexpected seed generation');
+          })).toThrow('EACCES');
+          expect(writerCalled).toBe(false);
+          expect(lstatSync(output)).toMatchObject({ ino: before.ino, mode: before.mode });
+          expect(readdirSync(output)).toEqual([]);
+          expect(readdirSync(join(root, 'scripts'))).toEqual(['d1-seed']);
+        } finally {
+          chmodSync(output, 0o700);
+        }
+      });
+    });
+
+  it.skipIf(process.platform === 'win32' || process.geteuid?.() === 0)
+    ('rechecks access after validation and preserves the empty destination on denial', () => {
+      withSeedFixture(({ root, output, writeSeed }) => {
+        rmSync(output, { recursive: true });
+        mkdirSync(output);
+        const before = lstatSync(output);
+        try {
+          expect(() => stageAndPublishD1Seed(root, output, false, stage => {
+            writeSeed(stage, 'SELECT 2;\n');
+            chmodSync(output, 0o555);
+          })).toThrow('EACCES');
+          expect(lstatSync(output).ino).toBe(before.ino);
+          expect(lstatSync(output).mode & 0o777).toBe(0o555);
+          expect(readdirSync(output)).toEqual([]);
+          expect(readdirSync(join(root, 'scripts'))).toEqual(['d1-seed']);
+        } finally {
+          chmodSync(output, 0o700);
+        }
+      });
+    });
+
   it.each(['live', 'dangling'])('refuses a %s symlink as the output directory', kind => {
     withSeedFixture(({ root, output }) => {
       const link = join(root, 'scripts', 'output-link');
