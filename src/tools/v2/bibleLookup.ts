@@ -37,29 +37,31 @@ export function createBibleLookupHandler(bibleService: BibleService): ToolHandle
     handler: async (params) => {
       try {
         const translations = resolveTranslations(params.translation);
+        const reference = params.reference as string;
+        const includeFootnotes = params.includeFootnotes as boolean | undefined;
 
         if (translations.length === 1) {
           const result = await bibleService.lookup({
-            reference: params.reference as string,
+            reference,
             translation: translations[0],
-            includeFootnotes: params.includeFootnotes as boolean,
+            includeFootnotes,
           });
           return {
             content: [{ type: 'text', text: formatBibleResponse(result) }],
             structuredContent: presentBibleLookupStructured(
               result,
-              params.reference as string,
+              reference,
               translations,
             ),
           };
         }
 
-        const results = await bibleService.lookupMultiple(params.reference as string, translations);
+        const results = await bibleService.lookupMultiple(reference, translations, includeFootnotes);
         return {
           content: [{ type: 'text', text: formatMultiBibleResponse(results) }],
           structuredContent: presentBibleLookupStructured(
             results,
-            params.reference as string,
+            reference,
             translations,
           ),
         };
