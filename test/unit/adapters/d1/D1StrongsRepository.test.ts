@@ -113,6 +113,43 @@ describe('D1StrongsRepository', () => {
       const bindArgs = db.prepare.mock.results[0].value.bind.mock.calls[0];
       expect(bindArgs[1]).toBe(10);
     });
+
+    it.each([undefined, 3])('skips fallback for a full distinct page with limit %s', async limit => {
+      const entries = Array.from({ length: limit ?? 10 }, (_, index) => ({ ...sampleEntry, strongs_number: `G${25 + index}` }));
+      const db = createMockD1([{ sql: 'strongs_fts MATCH', all: { results: entries } }]);
+
+      await expect(new D1StrongsRepository(db as any).search('love', limit)).resolves.toEqual(entries);
+      expect(db.prepare).toHaveBeenCalledOnce();
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledExactlyOnceWith('"love"*', limit ?? 10);
+    });
+
+    it('uses fallback for a duplicate-heavy page and keeps the first occurrence of each identity', async () => {
+      const second = { ...sampleEntry, strongs_number: 'G25', definition: 'a distinct stored identity' };
+      const third = { ...sampleEntry, strongs_number: 'G26' };
+      const db = createMockD1([
+        { sql: 'strongs_fts MATCH', all: { results: [sampleEntry, { ...sampleEntry, definition: 'duplicate' }, second] } },
+        { sql: "LIKE ? || '%'", all: { results: [{ ...second, definition: 'fallback duplicate' }, third] } },
+      ]);
+
+      await expect(new D1StrongsRepository(db as any).search('love', 3)).resolves.toEqual([sampleEntry, second, third]);
+      expect(db.prepare).toHaveBeenCalledTimes(2);
+      expect(db.prepare.mock.calls[1][0]).toContain("LIKE ? || '%'");
+      expect(db.prepare.mock.results[1].value.bind).toHaveBeenCalledExactlyOnceWith('love', 3);
+      expect(db.prepare.mock.results[1].value.all).toHaveBeenCalledOnce();
+    });
+
+    it.each([
+      ['elohim', [{ ...sampleEntry, strongs_number: 'H430', transliteration: 'ʼĕlôhîym' }], true],
+      ['unmatched', [], true],
+      ['ἀγάπη', [], false],
+      ['x', [], false],
+    ] as const)('preserves fallback eligibility and empty results for %s', async (query, entries, eligible) => {
+      const db = createMockD1([{ sql: "LIKE ? || '%'", all: { results: [...entries] } }]);
+
+      await expect(new D1StrongsRepository(db as any).search(query)).resolves.toEqual(entries);
+      expect(db.prepare).toHaveBeenCalledTimes(eligible ? 2 : 1);
+      if (eligible) expect(db.prepare.mock.results[1].value.bind).toHaveBeenCalledExactlyOnceWith(query, 10);
+    });
   });
 
   describe('getLexiconEntry', () => {
