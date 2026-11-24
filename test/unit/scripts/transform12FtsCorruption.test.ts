@@ -138,14 +138,22 @@ describe('standalone D1 seed source identity', () => {
       db.close();
     }
 
-    function assertRejected(message: string) {
-      const result = spawnSync(process.execPath, ['--import', 'tsx', realpathSync(exporter), '--database', source, '--clean'], {
+    const contained = join(output, 'contained.db');
+    writeFileSync(contained, 'existing data bytes\n');
+    const alias = join(scripts, 'alias-to-seed');
+    symlinkSync(output, alias);
+    const includingSource = snapshot();
+    assertRejected('Source database cannot be inside the generated seed directory', contained, includingSource);
+    assertRejected('Source database cannot be inside the generated seed directory', join(alias, 'contained.db'), includingSource);
+
+    function assertRejected(message: string, database = source, expected = before) {
+      const result = spawnSync(process.execPath, ['--import', 'tsx', realpathSync(exporter), '--database', database, '--clean'], {
         cwd: ROOT, encoding: 'utf8', timeout: 30_000,
       });
       expect(result.error).toBeUndefined();
       expect(result.status).not.toBe(0);
       expect(result.stderr).toContain(message);
-      expect(snapshot()).toEqual(before);
+      expect(snapshot()).toEqual(expected);
     }
   }, 120_000);
 });
