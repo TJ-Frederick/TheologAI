@@ -61,6 +61,42 @@ describe('StrongsRepository', () => {
     ]);
   });
 
+  it.each([undefined, 3])('skips fallback for a full distinct page with limit %s', limit => {
+    const entries = Array.from({ length: limit ?? 10 }, (_, index) => ({ ...entry, strongs_number: `G${25 + index}` }));
+    const db = new FakeSqliteDatabase([{ match: 'strongs_fts MATCH', all: entries }]);
+    const repo = new StrongsRepository(db.asDatabase());
+
+    expect(repo.search('love', limit)).toEqual(entries);
+    expect(db.statement('strongs_fts MATCH').all).toHaveBeenCalledExactlyOnceWith('"love"*', limit ?? 10);
+    expect(db.prepare).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses fallback for a duplicate-heavy page and keeps the first occurrence of each identity', () => {
+    const second = { ...entry, strongs_number: 'G25', definition: 'a distinct stored identity' };
+    const third = { ...entry, strongs_number: 'G26' };
+    const db = new FakeSqliteDatabase([
+      { match: 'strongs_fts MATCH', all: [entry, { ...entry, definition: 'duplicate' }, second] },
+      { match: "LIKE ? || '%'", all: [{ ...second, definition: 'fallback duplicate' }, third] },
+    ]);
+
+    expect(new StrongsRepository(db.asDatabase()).search('love', 3)).toEqual([entry, second, third]);
+    expect(db.statement("LIKE ? || '%'").all).toHaveBeenCalledExactlyOnceWith('love', 3);
+  });
+
+  it.each([
+    ['elohim', [{ ...entry, strongs_number: 'H430', transliteration: 'ʼĕlôhîym' }], true],
+    ['unmatched', [], true],
+    ['ἀγάπη', [], false],
+    ['x', [], false],
+  ] as const)('preserves fallback eligibility and empty results for %s', (query, entries, eligible) => {
+    const db = new FakeSqliteDatabase([{ match: "LIKE ? || '%'", all: entries }]);
+    const repo = new StrongsRepository(db.asDatabase());
+
+    expect(repo.search(query)).toEqual(entries);
+    expect(db.prepare).toHaveBeenCalledTimes(eligible ? 4 : 3);
+    if (eligible) expect(db.statement("LIKE ? || '%'").all).toHaveBeenCalledExactlyOnceWith(query, 10);
+  });
+
   it('pads lexicon keys and parses extended JSON', () => {
     const db = new FakeSqliteDatabase([{
       match: 'stepbible_lexicons',
