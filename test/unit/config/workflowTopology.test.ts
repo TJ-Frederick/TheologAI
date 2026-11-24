@@ -63,6 +63,8 @@ interface Job {
   environment?: { name: string };
   concurrency?: Record<string, unknown>;
   permissions?: Record<string, string>;
+  env?: Record<string, string>;
+  outputs?: Record<string, string>;
   steps?: Step[];
   uses?: string;
 }
@@ -229,6 +231,65 @@ describe('workflow topology', () => {
     }
     expect(spawnSync('bash', ['-e', '-c', script], { env: { ...process.env, RESULTS: 'success,success,success,success,success' } }).status).toBe(0);
   });
+
+  it('uses one read-only cumulative PR decision for eligibility, the build and the two preview paths', async () => {
+    const workflow = parse(await readWorkflow('pr.yml')) as Workflow;
+    const classifier = workflow.jobs['classify-release']!;
+    const build = workflow.jobs['build-worker']!;
+    const eligibility = workflow.jobs['release-eligibility']!;
+    const mode = '${{ needs.classify-release.outputs.mode }}';
+    const baseline = '${{ needs.classify-release.outputs.baseline }}';
+    expect(classifier.permissions).toEqual({actions: 'read', contents: 'read'});
+    expect(classifier.environment).toBeUndefined();
+    expect(classifier.steps?.[0]?.with).toMatchObject({ref: '${{ github.sha }}', 'fetch-depth': 0, 'persist-credentials': false});
+    expect(JSON.stringify(classifier)).not.toMatch(/secrets\.|CLOUDFLARE/);
+    const canClassify = new Function('github', `return ${expressionBody(classifier.if!)}`);
+    const sameRepo = {event_name: 'pull_request', repository: 'owner/repo', event: {pull_request: {
+      base: {ref: 'main'}, head: {repo: {full_name: 'owner/repo'}}, labels: [],
+    }}};
+    expect(canClassify(sameRepo)).toBe(true);
+    expect(canClassify({...sameRepo, event: {pull_request: {...sameRepo.event.pull_request,
+      head: {repo: {full_name: 'fork/repo'}},
+    }}})).toBe(false);
+    expect(canClassify({...sameRepo, event_name: 'workflow_dispatch'})).toBe(false);
+    expect(classifier.steps?.filter(step => step.run?.includes('release-promotion.mjs classify-pr'))).toHaveLength(1);
+    expect(workflow.jobs.classify?.outputs).not.toHaveProperty('release');
+    expect(needs(eligibility)).toContain('classify-release');
+    expect(eligibility.steps?.at(-1)?.env).toMatchObject({
+      CI_RELEASE_CLASSIFICATION_RESULT: '${{ needs.classify-release.result }}', CI_RELEASE_MODE: mode,
+      CI_RELEASE_SAME_TREE: '${{ needs.classify-release.outputs.same_tree }}',
+    });
+    expect(needs(build)).toEqual(['classify', 'classify-release', 'validation-complete']);
+    expect(build.if).toContain("needs.validation-complete.result == 'success'");
+    expect(build.if).toContain("needs.classify-release.result == 'success'");
+    expect(build.if).toContain("needs.classify-release.outputs.mode == 'application' || needs.classify-release.outputs.mode == 'corpus'");
+    expect(build.if).toContain("contains(github.event.pull_request.labels.*.name, 'deploy-preview')");
+    expect(build.if).toContain('github.run_attempt == 1');
+    const verifyTree = build.steps!.find(step => step.name === 'Require the exact CI-tested tree')!;
+    expect(verifyTree.env).toMatchObject({
+      TESTED_TREE: '${{ needs.classify.outputs.tested_tree }}', CLASSIFIED_TREE: '${{ needs.classify-release.outputs.tested_tree }}',
+      EXPECTED_HEAD: '${{ github.event.pull_request.head.sha }}',
+    });
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).stdout.trim();
+    const tree = spawnSync('git', ['rev-parse', 'HEAD^{tree}'], {encoding: 'utf8'}).stdout.trim();
+    const env = {...process.env, EXPECTED_HEAD: head, TESTED_TREE: tree, CLASSIFIED_TREE: tree,
+      PRODUCTION_BASELINE: JSON.stringify({productionSource: head})};
+    for (const [key, value] of Object.entries({EXPECTED_HEAD: head, TESTED_TREE: tree, CLASSIFIED_TREE: tree})) {
+      expect(value).toMatch(/^[0-9a-f]{40}$/);
+      expect(spawnSync('bash', ['-e', '-c', verifyTree.run!], {env: {...env, [key]: '0'.repeat(40)}}).status).not.toBe(0);
+    }
+    expect(spawnSync('bash', ['-e', '-c', verifyTree.run!], {env}).status).toBe(0);
+    for (const job of [build, workflow.jobs['operator-proof-source']!, workflow.jobs['preview-deploy']!]) {
+      expect(job.env).toMatchObject({RELEASE_MODE: mode, PRODUCTION_BASELINE: baseline});
+      expect(needs(job)).toContain('classify-release');
+    }
+    expect(workflow.jobs['preview-deploy']!.steps?.find(step => step.name === 'Verify immutable Worker and candidate configuration')?.run)
+      .toContain('release-promotion.mjs classify');
+    const deploy = parse(await readWorkflow('deploy.yml')) as Workflow;
+    expect(deploy.jobs['classify-deployment']?.steps?.some(step => step.run?.includes('release-promotion.mjs classify'))).toBe(true);
+    expect(deploy.jobs['verify-preview']?.steps?.some(step => step.run?.includes('release-promotion.mjs verify'))).toBe(true);
+  });
+
   it('shares named validation suites without dropping data or transport proof', async () => {
     const action = parse(await readFile(new URL('../../../.github/actions/validate/action.yml', import.meta.url), 'utf8')) as { runs: { steps: Step[] } };
     const steps = action.runs.steps;

@@ -69,10 +69,16 @@ require_production_baseline() {
   local observed="$anchor"
   if [[ "$role" == preview ]]; then observed="$evidence/production-control-predecessor.json"; fi
   jq -e --slurpfile record "$baseline" --slurpfile inventory "$work/inventory.json" '
-    $record[0].targets.production as $expected |
+    $record[0].productionAssignment as $expected |
+    $record[0].targets.production == {databaseId: $expected.databaseId, databaseName: $expected.databaseName} and
     (.predecessorD1.databaseId // .d1.databaseId) == $expected.databaseId and
     any($inventory[0][]; .uuid == $expected.databaseId and .name == $expected.databaseName)
   ' "$observed" >/dev/null || refuse 'active production D1 differs from the accepted baseline'
+  jq -e --slurpfile record "$baseline" '
+    $record[0].productionAssignment as $expected |
+    (.predecessorVersionId // .workerVersionId) == $expected.versionId and
+    (.predecessorDeploymentId // .deploymentId) == $expected.deploymentId
+  ' "$observed" >/dev/null || refuse 'active production Worker version or deployment differs from the accepted baseline'
   if jq -e '.requireVersionTag == true' "$baseline" >/dev/null; then
     jq -e --slurpfile record "$baseline" '
       .annotations["workers/tag"] == $record[0].productionSource
@@ -82,8 +88,10 @@ require_production_baseline() {
     jq -e --slurpfile release release/serving.json --slurpfile record "$baseline" '
       $release[0].predecessors.production as $expected |
       $record[0].requireVersionTag == false and $record[0].productionSource == $release[0].productionSource and
-      (.predecessorVersionId // .workerVersionId) == $expected.versionId and
-      (.predecessorDeploymentId // .deploymentId) == $expected.deploymentId
+      $record[0].productionAssignment == {
+        versionId: $expected.versionId, deploymentId: $expected.deploymentId,
+        databaseId: $expected.databaseId, databaseName: $expected.databaseName
+      }
     ' "$observed" >/dev/null || refuse 'active production differs from the reviewed initial baseline'
   fi
 }
