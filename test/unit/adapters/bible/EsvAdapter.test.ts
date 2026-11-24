@@ -120,4 +120,20 @@ describe('EsvAdapter', () => {
     await expect(new EsvAdapter('key').getPassage(parseReference('John 3:16'), 'ESV'))
       .rejects.toBeInstanceOf(SyntaxError);
   });
+
+  it.each([
+    [{ canonical: 'John 1:1', passages: ['Different verse'] }, 'a passage for a different reference.'],
+    [{ passages: ['   '] }, 'an empty passage.'],
+    [{ passages: 'not an array' }, 'an invalid passage result.'],
+  ])('refetches a rejected ESV passage before caching a valid one', async (invalid, message) => {
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(jsonResponse(invalid))
+      .mockResolvedValueOnce(jsonResponse({ passages: [' Corrected passage. '] }));
+    const adapter = new EsvAdapter('key');
+    const read = () => adapter.getPassage(parseReference('John 3:16'), 'ESV');
+    await expect(read()).rejects.toEqual(new APIError(502, `Bible provider returned ${message}`));
+    await expect(read()).resolves.toMatchObject({ reference: 'John 3:16', text: 'Corrected passage.' });
+    await expect(read()).resolves.toMatchObject({ reference: 'John 3:16', text: 'Corrected passage.' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
 });

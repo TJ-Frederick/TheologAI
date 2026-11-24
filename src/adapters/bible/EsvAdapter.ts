@@ -41,9 +41,12 @@ export class EsvAdapter implements BibleProviderPort {
       'include-short-copyright': 'false',
     });
 
-    const data = await this.client.getJSON<any>(`/text/?${params}`);
+    return this.client.getJSON(`/text/?${params}`, undefined, value => this.decodePassage(value, ref, refStr));
+  }
 
-    if (!data.passages || data.passages.length === 0) {
+  private decodePassage(value: unknown, ref: BibleReference, refStr: string): BibleResult {
+    const data = value as { passages?: unknown; canonical?: unknown } | null;
+    if (!data?.passages || (Array.isArray(data.passages) && data.passages.length === 0)) {
       throw new APIError(404, `No passages found for: ${refStr}`);
     }
 
@@ -57,12 +60,20 @@ export class EsvAdapter implements BibleProviderPort {
       if (!referencesEqual(ref, canonicalRef)) {
         throw new APIError(502, 'Bible provider returned a passage for a different reference.');
       }
+    } else if (data.canonical != null) {
+      throw new APIError(502, 'Bible provider returned an invalid canonical reference.');
     }
+
+    if (!Array.isArray(data.passages) || typeof data.passages[0] !== 'string') {
+      throw new APIError(502, 'Bible provider returned an invalid passage result.');
+    }
+    const text = data.passages[0].trim();
+    if (!text) throw new APIError(502, 'Bible provider returned an empty passage.');
 
     return {
       reference: data.canonical || refStr,
       translation: 'ESV',
-      text: data.passages[0].trim(),
+      text,
       citation: {
         source: 'English Standard Version',
         copyright: COPYRIGHT,

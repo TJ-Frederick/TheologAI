@@ -33,8 +33,10 @@ export class NetBibleAdapter implements BibleProviderPort {
       type: 'json',
     });
 
-    const data = await this.client.getJSON<any[]>(`?${params}`);
+    return this.client.getJSON(`?${params}`, undefined, data => this.decodePassage(data, ref, refStr));
+  }
 
+  private decodePassage(data: unknown, ref: BibleReference, refStr: string): BibleResult {
     if (!Array.isArray(data) || data.length === 0) {
       throw new APIError(404, `No passage found for: ${refStr}`);
     }
@@ -42,8 +44,12 @@ export class NetBibleAdapter implements BibleProviderPort {
     this.assertResponseMatchesReference(ref, data);
 
     // Combine verses
-    const html = data.map((v: any) => v.text || '').join(' ');
+    const html = data.map(verse => {
+      if (typeof verse.text !== 'string') throw new APIError(502, 'Bible provider returned an invalid passage result.');
+      return verse.text;
+    }).join(' ');
     const text = stripHtml(html);
+    if (!text.trim()) throw new APIError(502, 'Bible provider returned an empty passage.');
 
     return {
       reference: refStr,
@@ -65,13 +71,21 @@ export class NetBibleAdapter implements BibleProviderPort {
     return COPYRIGHT;
   }
 
-  private assertResponseMatchesReference(ref: BibleReference, data: any[]): void {
+  private assertResponseMatchesReference(ref: BibleReference, data: unknown[]): asserts data is Record<string, unknown>[] {
     const returnedVerses = new Set<number>();
-    for (const verse of data) {
+    for (const value of data) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new APIError(502, 'Bible provider returned incomplete passage metadata.');
+      }
+      const verse = value as Record<string, unknown>;
       const bookName = typeof verse.bookname === 'string' ? verse.bookname : verse.book;
+      if ((typeof verse.chapter !== 'number' && typeof verse.chapter !== 'string')
+        || (typeof verse.verse !== 'number' && typeof verse.verse !== 'string')) {
+        throw new APIError(502, 'Bible provider returned incomplete passage metadata.');
+      }
       const chapter = Number(verse.chapter);
       const verseNumber = Number(verse.verse);
-      if (!bookName || !Number.isSafeInteger(chapter) || !Number.isSafeInteger(verseNumber)) {
+      if (typeof bookName !== 'string' || !bookName || !Number.isSafeInteger(chapter) || !Number.isSafeInteger(verseNumber)) {
         throw new APIError(502, 'Bible provider returned incomplete passage metadata.');
       }
 

@@ -122,24 +122,34 @@ describe('HelloAoAdapter', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('rejects a response without the requested verse', async () => {
+  it('reuses a valid chapter when the requested verse is missing', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue(response({
-      chapter: { content: [{ type: 'verse', number: 1, content: ['Different verse'] }] },
+      chapter: { content: [{ type: 'verse', number: 17, content: ['Neighbor'] }] },
     }));
+    const adapter = new HelloAoAdapter();
 
-    await expect(new HelloAoAdapter().getPassage(parseReference('John 3:16'), 'DBY'))
+    await expect(adapter.getPassage(parseReference('John 3:16'), 'DBY'))
       .rejects.toEqual(new AdapterError('HelloAO', 'No verses found for John 3:16'));
+    await expect(adapter.getPassage(parseReference('John 3:17'), 'DBY')).resolves.toMatchObject({ text: 'Neighbor' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects response metadata for a different book', async () => {
-    vi.mocked(globalThis.fetch).mockResolvedValue(response({
+  it('refetches a chapter whose identity failed validation and caches the corrected chapter', async () => {
+    const valid = {
       translation: { id: 'eng_dby' },
-      book: { id: 'MRK', number: 41 },
-      chapter: { number: 3, content: [{ type: 'verse', number: 16, content: ['Different passage'] }] },
-    }));
+      book: { id: 'JHN', number: 43 },
+      chapter: { number: 3, content: [{ type: 'verse', number: 16, content: ['Expected passage'] }] },
+    };
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(response({ ...valid, book: { id: 'MRK', number: 41 } }))
+      .mockResolvedValueOnce(response(valid));
+    const adapter = new HelloAoAdapter();
+    const read = () => adapter.getPassage(parseReference('John 3:16'), 'DBY');
 
-    await expect(new HelloAoAdapter().getPassage(parseReference('John 3:16'), 'DBY'))
-      .rejects.toEqual(new AdapterError('HelloAO', 'Provider returned a different book.'));
+    await expect(read()).rejects.toEqual(new AdapterError('HelloAO', 'Provider returned a different book.'));
+    await expect(read()).resolves.toMatchObject({ text: 'Expected passage' });
+    await expect(read()).resolves.toMatchObject({ text: 'Expected passage' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 
   it('rejects a partial provider response for a requested range', async () => {

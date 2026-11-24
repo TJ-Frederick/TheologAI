@@ -66,4 +66,20 @@ describe('NetBibleAdapter', () => {
     await expect(new NetBibleAdapter().getPassage(parseReference('John 1:1'), 'NET'))
       .rejects.toBeInstanceOf(SyntaxError);
   });
+
+  it.each(['wrong reference', 'incomplete range', 'empty text'])('refetches NET after %s', async failure => {
+    const verse = { bookname: 'John', chapter: 1, verse: 1, text: 'First.' };
+    const good = [verse, { ...verse, verse: 2, text: 'Second.' }];
+    const invalid = failure === 'wrong reference' ? [{ ...verse, chapter: 2 }]
+      : failure === 'incomplete range' ? [verse] : good.map(item => ({ ...item, text: '<b></b>' }));
+    const reason = failure === 'wrong reference' ? 'a passage for a different reference'
+      : failure === 'incomplete range' ? 'an incomplete passage' : 'an empty passage';
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(response(invalid)).mockResolvedValueOnce(response(good));
+    const adapter = new NetBibleAdapter();
+    const read = () => adapter.getPassage(parseReference('John 1:1-2'), 'NET');
+    await expect(read()).rejects.toEqual(new APIError(502, `Bible provider returned ${reason}.`));
+    await expect(read()).resolves.toMatchObject({ text: 'First. Second.' });
+    await expect(read()).resolves.toMatchObject({ text: 'First. Second.' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
 });
