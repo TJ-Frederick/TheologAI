@@ -3,7 +3,9 @@
 
 import { execFileSync } from 'child_process';
 import {
+  accessSync,
   chmodSync,
+  constants,
   existsSync,
   lstatSync,
   mkdtempSync,
@@ -93,8 +95,11 @@ function assertDestinationAvailable(root: string, output: string, clean: boolean
   if (!status) return undefined;
   if (status.isSymbolicLink()) throw new Error(`Refusing symlinked output directory: ${output}`);
   if (!status.isDirectory()) throw new Error(`Seed output is not a directory: ${output}`);
-  if (!clean && readdirSync(output).length > 0) {
-    throw new Error(`${relative(root, output)} is not empty; inspect it, then rerun with --clean`);
+  if (!clean) {
+    if (readdirSync(output).length > 0) {
+      throw new Error(`${relative(root, output)} is not empty; inspect it, then rerun with --clean`);
+    }
+    accessSync(output, constants.W_OK | constants.X_OK);
   }
   return status;
 }
@@ -119,6 +124,7 @@ export function stageAndPublishD1Seed(
   } catch (error) {
     // The publisher owns its separate recovery directory. Only clean our stage.
     try {
+      if (lstatSync(stage, { throwIfNoEntry: false })) chmodSync(stage, 0o700);
       rmSync(stage, { recursive: true, force: true });
     } catch (cleanupError) {
       throw new AggregateError(

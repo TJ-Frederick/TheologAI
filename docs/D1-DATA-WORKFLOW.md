@@ -42,6 +42,13 @@ seed directory. After inspecting an old artifact, replace it explicitly:
 npm run d1:seed:export -- --clean
 ```
 
+The exporter verifies a complete staged seed before installing it. Without
+`--clean`, an existing empty destination must grant the exporter write and
+search access, and the replacement retains its ordinary permission bits.
+A successful `--clean` replacement uses directory permissions derived from the
+process umask. In either case, ownership and ACL inheritance follow the
+filesystem rules for a new directory under `scripts/`.
+
 For a separately built database, pass exactly one explicit `.db` path:
 
 ```bash
