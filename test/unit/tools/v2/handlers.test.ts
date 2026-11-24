@@ -18,7 +18,8 @@ import {
   DonationService as DonationServiceClass,
   type DonationService,
 } from '../../../../src/services/donation/DonationService.js';
-import type { BibleService } from '../../../../src/services/bible/BibleService.js';
+import { BibleService } from '../../../../src/services/bible/BibleService.js';
+import type { BibleProviderPort } from '../../../../src/services/bible/BibleProviderPort.js';
 import type { CrossReferenceService } from '../../../../src/services/bible/CrossReferenceService.js';
 import type { ParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
 import type { CommentaryService } from '../../../../src/services/commentary/CommentaryService.js';
@@ -171,10 +172,57 @@ describe('bible_lookup handler', () => {
       translation: ['ESV', 'KJV'],
     });
 
-    expect(lookupMultiple).toHaveBeenCalledWith('John 3:16', ['ESV', 'KJV']);
+    expect(lookupMultiple).toHaveBeenCalledWith('John 3:16', ['ESV', 'KJV'], undefined);
     expect(lookup).not.toHaveBeenCalled();
     expect(textOf(result)).toContain('(2 translations)');
     expect(textOf(result)).toContain('**KJV:**');
+  });
+
+  it.each([true, false, undefined])('preserves footnote option %s across scalar and comparison modes', async includeFootnotes => {
+    const makeProvider = (translation: string) => ({
+      supportedTranslations: [translation],
+      isConfigured: () => true,
+      getPassage: vi.fn<BibleProviderPort['getPassage']>().mockImplementation(async (_ref, _translation, options) => ({
+        reference: 'John 3:16',
+        translation,
+        text: `${translation} text`,
+        citation,
+        ...(options?.includeFootnotes ? {
+          footnotes: [{ id: 1, caller: 'a', text: `${translation} note`, reference: { chapter: 3, verse: 16 } }],
+        } : {}),
+      })),
+    });
+    const esv = makeProvider('ESV');
+    const kjv = makeProvider('KJV');
+    const handler = createBibleLookupHandler(new BibleService([esv, kjv]));
+    const params = { reference: 'John 3:16', ...(includeFootnotes !== undefined && { includeFootnotes }) };
+
+    const single = await handler.handler({ ...params, translation: 'ESV' });
+    const singleArray = await handler.handler({ ...params, translation: ['ESV'] });
+    const comparison = await handler.handler({ ...params, translation: ['ESV', 'KJV'] });
+
+    expect(esv.getPassage.mock.calls).toEqual(Array.from({ length: 3 }, () => [
+      expect.objectContaining({ chapter: 3, startVerse: 16 }), 'ESV', { includeFootnotes },
+    ]));
+    expect(kjv.getPassage).toHaveBeenCalledExactlyOnceWith(expect.anything(), 'KJV', { includeFootnotes });
+    expect(singleArray).toEqual(single);
+    const singlePassages = single.structuredContent?.passages as unknown[];
+    const comparisonPassages = comparison.structuredContent?.passages as unknown[];
+    expect(comparisonPassages[0]).toEqual(singlePassages[0]);
+    if (includeFootnotes) {
+      expect(comparisonPassages[1]).toMatchObject({
+        translation: 'KJV',
+        footnotes: [{ caller: 'a', text: 'KJV note', chapter: 3, verse: 16 }],
+      });
+      expect(textOf(comparison)).toContain('a (v16): ESV note');
+      expect(textOf(comparison)).toContain('a (v16): KJV note');
+    } else {
+      expect(comparisonPassages[0]).not.toHaveProperty('footnotes');
+      expect(comparisonPassages[1]).not.toHaveProperty('footnotes');
+      expect(textOf(comparison)).toBe(
+        '**John 3:16** (2 translations)\n\n**ESV:**\nESV text\n\n**KJV:**\nKJV text\n\n*Sources: Test source*',
+      );
+    }
   });
 
   it('accepts legacy JSON-encoded translation arrays and preserves partial results', async () => {
@@ -193,7 +241,7 @@ describe('bible_lookup handler', () => {
       translation: '["WEB","DBY"]',
     });
 
-    expect(lookupMultiple).toHaveBeenCalledWith('Psalm 23:1', ['WEB', 'DBY']);
+    expect(lookupMultiple).toHaveBeenCalledWith('Psalm 23:1', ['WEB', 'DBY'], undefined);
     expect(textOf(result)).toContain('(2 translations requested; 1 available)');
     expect(textOf(result)).toContain('**WEB:**');
     expect(textOf(result)).toContain('**DBY:** unavailable');
