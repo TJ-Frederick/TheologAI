@@ -28,7 +28,6 @@ import {
 } from './d1-seed-utils.js';
 import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } from './data-integrity.js';
 import {
-  computeD1CorpusIdentity,
   computeSourceInventoryIdentity,
   parseDataManifest,
   verifyD1Migrations,
@@ -36,6 +35,7 @@ import {
 } from './d1-corpus-identity.js';
 import { D1_SEED_BASE_TABLES, D1_SEED_EXPORT_ORDER } from './d1-seed-order.js';
 import { assertCanonicalTransform12FtsMatchSentinels } from './transform12-candidate-c-storage.js';
+import { assertSqliteCorpusMarkers } from './sqlite-corpus-markers.js';
 
 export interface SeedStatement {
   sql: string;
@@ -312,12 +312,13 @@ function main(): void {
 const { database, clean } = parseArguments(process.argv.slice(2));
 const sourceManifestBytes = readFileSync(SOURCE_MANIFEST_PATH);
 const sourceManifest = parseDataManifest(sourceManifestBytes);
-const d1CorpusIdentity = computeD1CorpusIdentity(sourceManifest);
 verifyD1Migrations(ROOT, sourceManifest);
 validateCanonicalSources(sourceManifest);
-assertSemanticSource(database);
 const sentinelDatabase = new Database(database, { readonly: true, fileMustExist: true });
+let d1CorpusIdentity: string;
 try {
+  d1CorpusIdentity = assertSqliteCorpusMarkers(sentinelDatabase, sourceManifest);
+  assertSemanticSource(database);
   assertCanonicalTransform12FtsMatchSentinels(sentinelDatabase);
 } finally {
   sentinelDatabase.close();
