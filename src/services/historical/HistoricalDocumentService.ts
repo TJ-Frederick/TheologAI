@@ -9,12 +9,41 @@ import type {
 } from '../../kernel/repositories.js';
 import { NotFoundError } from '../../kernel/errors.js';
 
+interface HistoricalCatalogEntry {
+  document: DocumentInfo;
+  profile: HistoricalDocumentDeliveryProfile;
+}
+
+interface StoredHistoricalCatalogEntry {
+  document: DocumentInfo;
+  profile: HistoricalDocumentDeliveryProfile | undefined;
+}
+
+type HistoricalCatalogRepository = IHistoricalDocumentRepository & {
+  listDocumentsWithProfiles?(): StoredHistoricalCatalogEntry[] | Promise<StoredHistoricalCatalogEntry[]>;
+};
+
 export class HistoricalDocumentService {
-  constructor(private repo: IHistoricalDocumentRepository) {}
+  constructor(private repo: HistoricalCatalogRepository) {}
 
   /** List all available documents */
   async listDocuments(): Promise<DocumentInfo[]> {
     return await this.repo.listDocuments();
+  }
+
+  async listDocumentsWithProfiles(): Promise<HistoricalCatalogEntry[]> {
+    if (!this.repo.listDocumentsWithProfiles) {
+      const documents = await this.listDocuments();
+      return Promise.all(documents.map(async document => ({
+        document,
+        profile: await this.getDeliveryProfile(document.id),
+      })));
+    }
+
+    return (await this.repo.listDocumentsWithProfiles()).map(({ document, profile }) => ({
+      document,
+      profile: this.requireDeliveryProfile(document.id, profile),
+    }));
   }
 
   /** Get a document by ID or name */
@@ -41,7 +70,13 @@ export class HistoricalDocumentService {
   }
 
   async getDeliveryProfile(documentId: string): Promise<HistoricalDocumentDeliveryProfile> {
-    const profile = await this.repo.getDeliveryProfile(documentId);
+    return this.requireDeliveryProfile(documentId, await this.repo.getDeliveryProfile(documentId));
+  }
+
+  private requireDeliveryProfile(
+    documentId: string,
+    profile: HistoricalDocumentDeliveryProfile | undefined,
+  ): HistoricalDocumentDeliveryProfile {
     if (!profile) throw new NotFoundError('document', `Historical delivery profile not found for "${documentId}"`);
     return profile;
   }
