@@ -128,6 +128,29 @@ it('executes a fresh plan in order and refuses definitive or corrupt nonempty jo
     });
 });
 
+it('keeps the verified operation sequence when an operation is appended during dispatch', async () => {
+    await withPreparationPlan(async (plan, source) => {
+        const originalSql = plan.operations.map(({ sql }) => [sql]);
+        const originalDigest = plan.sha256;
+        const execute = vi.fn(async (sql: string) => {
+            if (sql === originalSql[0][0]) {
+                await Promise.resolve();
+                plan.operations.push({ ...plan.operations[0], sql: 'INSERT INTO fixture VALUES (3)' });
+            }
+            return { rows: [], rowsRead: 1, rowsWritten: 1 };
+        });
+        const fixture = session({ execute });
+
+        await expect(applyPreparation(plan, fixture.s, source)).resolves.toMatchObject({
+            planSha256: originalDigest,
+            rowsRead: 2,
+            rowsWritten: 2,
+        });
+        expect(plan.operations).toHaveLength(3);
+        expect(execute.mock.calls).toEqual(originalSql);
+    });
+});
+
 it('stops after a lost acknowledgement and refuses to replay the unmatched intent', async () => {
     await withPreparationPlan(async (plan, source) => {
         const execute = vi.fn(async (_sql: string) => { throw Error('lost acknowledgement'); });

@@ -154,7 +154,7 @@ async function applyPreparationPlan(plan: PreparationPlan, session: PreparationS
     const { sha256, ...body } = plan;
     same(hash(body), sha256, 'preparation plan changed');
     same(plan.target, TARGETS.production, 'preparation target differs');
-    for (const op of plan.operations)
+    for (const op of plan.operations.slice())
         await session.query(op.sql, op.readCeiling, op.writeCeiling);
     const readbacks = [];
     for (const proof of plan.readbacks)
