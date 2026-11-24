@@ -1,6 +1,6 @@
 // Local promotion checks. Cloud credentials and remote queries belong to the protected jobs.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { classifyCiChanges } from './classify-ci-changes.mjs';
@@ -21,6 +21,8 @@ const releaseOperations = new Set([
   'scripts/hosted-corpus-profile.mjs',
   'scripts/hosted-corpus-profile.d.mts',
   'scripts/norton-aquinas-live.ts',
+  'scripts/pr-release-eligibility.d.mts',
+  'scripts/pr-release-eligibility.mjs',
   'scripts/release-acceptance.ts',
   'scripts/release-promotion.mjs',
   'test/fixtures/release-workers/replay.py',
@@ -30,6 +32,7 @@ const releaseOperations = new Set([
   'test/unit/config/workflowTopology.test.ts',
   'test/unit/scripts/nortonAquinasLiveWorkflow.test.ts',
   'test/unit/scripts/nortonOperatorSuccessorFlow.test.ts',
+  'test/unit/scripts/prReleaseEligibility.test.ts',
   'test/unit/scripts/releasePromotion.test.ts',
 ]);
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
@@ -87,6 +90,18 @@ export function classifyRelease(root = process.cwd(), baselineFile) {
   const application = substantive.every(change => change.paths.every(path =>
     runtimeOnly(path) || ['docs','serving'].includes(classifyCiChanges('M\0' + path + '\0').mode)));
   return application ? 'application' : 'corpus';
+}
+
+function classifyPrRelease(root, baselineFile, env) {
+  const { CI_EXPECTED_HEAD: merge, CI_PR_BASE: base, CI_PR_HEAD: head } = env;
+  requireValue([merge, base, head].every(commit => SHA.test(commit ?? ''))
+    && git(root, ['rev-parse', 'HEAD']).trim() === merge, 'unexpected PR release checkout');
+  requireValue(git(root, ['rev-parse', '--is-shallow-repository']).trim() === 'false', 'PR release history is shallow');
+  requireValue(git(root, ['rev-list', '--parents', '-n', '1', merge]).trim() === `${merge} ${base} ${head}`,
+    'expected exact PR merge parents');
+  const tree = git(root, ['rev-parse', `${merge}^{tree}`]).trim();
+  const sameTree = tree === git(root, ['rev-parse', `${head}^{tree}`]).trim();
+  return {mode: classifyRelease(root, baselineFile), tree, sameTree};
 }
 
 export function createPreviewReceipt({root, mode, manifest, audit, identity, cutover}) {
@@ -157,10 +172,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const root = process.cwd();
   if (command === 'rollback-pair' && file && !target) console.log(JSON.stringify(rollbackPair(mode, json(manifest), json(file))));
   else if (command === 'classify' && manifest === undefined) console.log(classifyRelease(root, mode));
+  else if (command === 'classify-pr' && mode && manifest === undefined) {
+    const result = classifyPrRelease(root, mode, process.env);
+    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT,
+      `mode=${result.mode}\ntested_tree=${result.tree}\nsame_tree=${result.sameTree}\n`);
+    console.log(JSON.stringify(result));
+  }
   else if (command === 'record' && cutover && !extra.length) {
     const receipt = createPreviewReceipt({root, mode, manifest, audit: json(file), identity: json(identity), cutover: json(cutover)});
     writeFileSync(target, JSON.stringify(receipt) + '\n', {flag: 'wx'});
   } else if (command === 'verify' && target && !identity) {
     console.log(JSON.stringify(verifyPreviewReceipt(root, json(file), mode, manifest, target)));
-  } else throw Error('Expected classify, record MODE SHA AUDIT OUT IDENTITY CUTOVER, or verify MODE SHA RECEIPT TREE');
+  } else throw Error('Expected classify, classify-pr BASELINE, record MODE SHA AUDIT OUT IDENTITY CUTOVER, or verify MODE SHA RECEIPT TREE');
 }

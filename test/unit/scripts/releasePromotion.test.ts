@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,12 +28,33 @@ function repo() {
     return git('rev-parse','HEAD');
   };
   git('init','--quiet');
+  git('config', 'user.name', 'Fixture');
+  git('config', 'user.email', 'fixture@localhost');
   const productionSource = commit('data/manifest.json', '{}');
   const record = structuredClone(config);
   record.productionSource = productionSource;
   record.predecessors.production = {...record.predecessors.production, ...record.targets.production};
   commit('release/serving.json',JSON.stringify(record));
-  return {root, write, git, run, commit, record};
+  const mergeCandidate = (base: string, path: string, contents: string, branchPoint = base) => {
+    git('checkout', '--quiet', '--detach', branchPoint);
+    const head = commit(path, contents);
+    git('checkout', '--quiet', '--detach', base);
+    git('merge', '--quiet', '--no-ff', '-m', 'Synthetic PR merge', head);
+    return {base, head, merge: git('rev-parse', 'HEAD')};
+  };
+  const classifyCandidate = (
+    {base, head, merge}: {base: string; head: string; merge: string},
+    baseline: {productionSource: string; targets: unknown},
+  ) => {
+    write('baseline.json', JSON.stringify(baseline));
+    write('pr-output', '');
+    const result = spawnSync(process.execPath, [cli, 'classify-pr', 'baseline.json'], {
+      cwd: root, encoding: 'utf8', env: {...process.env,
+        CI_EXPECTED_HEAD: merge, CI_PR_BASE: base, CI_PR_HEAD: head, GITHUB_OUTPUT: join(root, 'pr-output')},
+    });
+    return {...result, outputs: readFileSync(join(root, 'pr-output'), 'utf8')};
+  };
+  return {root, write, git, run, commit, record, mergeCandidate, classifyCandidate};
 }
 
 it('classifies the cumulative delta to the serving release through the actual CLI', () => {
@@ -69,6 +90,51 @@ it('uses the last accepted release for a historical-search code fix and detects 
   expect(f.run('classify','previous.json')).toBe('corpus');
 });
 
+it.each([
+  ['README.md', '.github/workflows/pr.yml', 'docs'],
+  ['data/manifest.json', 'README.md', 'corpus'],
+  ['src/formatters/bible.ts', 'README.md', 'application'],
+])('classifies pending %s plus a PR changing %s as %s', (pendingPath, prPath, expected) => {
+  const f = repo();
+  const pending = f.commit(pendingPath, 'pending');
+  const pr = f.mergeCandidate(pending, prPath, 'PR change');
+  const result = f.classifyCandidate(pr, {productionSource: f.record.productionSource, targets: f.record.predecessors});
+  const tree = f.git('rev-parse', `${pr.merge}^{tree}`);
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({mode: expected, tree, sameTree: true});
+  expect(result.outputs).toBe(`mode=${expected}\ntested_tree=${tree}\nsame_tree=true\n`);
+});
+
+it('reclassifies after production advances and emits no decision for an unavailable baseline or wrong merge parents', () => {
+  const f = repo();
+  const pendingCorpus = f.commit('data/manifest.json', '{"corpus":"pending"}');
+  const pr = f.mergeCandidate(pendingCorpus, 'README.md', 'PR docs');
+  const reviewed = {productionSource: f.record.productionSource, targets: f.record.predecessors};
+  const advanced = {productionSource: pendingCorpus, targets: f.record.targets};
+  expect(f.classifyCandidate(pr, reviewed).outputs).toContain('mode=corpus\n');
+  expect(f.classifyCandidate(pr, advanced).outputs).toContain('mode=docs\n');
+  for (const result of [
+    f.classifyCandidate(pr, {...advanced, productionSource: '0'.repeat(40)}),
+    f.classifyCandidate({...pr, base: f.record.productionSource}, reviewed),
+    f.classifyCandidate({...pr, head: pr.base}, reviewed),
+    f.classifyCandidate({...pr, merge: pr.head}, reviewed),
+  ]) {
+    expect(result.status).not.toBe(0);
+    expect(result.outputs).toBe('');
+  }
+});
+
+it('reports separate PR-head and tested trees when the pinned base adds a change absent from the head', () => {
+  const f = repo();
+  const branchPoint = f.git('rev-parse', 'HEAD');
+  const base = f.commit('README.md', 'base change');
+  const pr = f.mergeCandidate(base, 'src/formatters/bible.ts', 'application change', branchPoint);
+  const result = f.classifyCandidate(pr, {productionSource: f.record.productionSource, targets: f.record.predecessors});
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.outputs).toContain('mode=application\n');
+  expect(result.outputs).toContain('same_tree=false\n');
+});
+
 it('records and consumes a passing protected receipt, refusing a different tree, artifact, D1 or a failed probe', () => {
   const f = repo();
   const db = {binding:'THEOLOGAI_DB', ...config.targets.preview};
@@ -86,6 +152,7 @@ it('records and consumes a passing protected receipt, refusing a different tree,
   record('receipt.json');
   const tree = f.git('rev-parse','HEAD^{tree}');
   expect(JSON.parse(f.run('verify','corpus',sha,'receipt.json',tree)).databaseId).toBe(db.databaseId);
+  expect(() => f.run('verify','application',sha,'receipt.json',tree)).toThrow();
   expect(() => f.run('verify','corpus','b'.repeat(64),'receipt.json',tree)).toThrow();
   expect(() => f.run('verify','corpus',sha,'receipt.json','0'.repeat(40))).toThrow();
   f.write('cutover.json',JSON.stringify({...cutover,observedActiveD1:{...db,databaseId:config.targets.production.databaseId}}));

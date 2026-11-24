@@ -195,6 +195,7 @@
       "test/unit/scripts/primarySourceEdgeStabilization.test.ts",
       "test/unit/scripts/productionReleaseGuards.test.ts",
       "test/unit/scripts/productionRollbackRehearsal.test.ts",
+      "test/unit/scripts/prReleaseEligibility.test.ts",
       "test/unit/scripts/publicDomainHistoricalSources.test.ts",
       "test/unit/scripts/releaseAcceptance.test.ts",
       "test/unit/scripts/releaseCorpusCapacity.test.ts",
