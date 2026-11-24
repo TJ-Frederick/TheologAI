@@ -51,6 +51,10 @@ export class D1StrongsRepository implements IStrongsRepository {
     const normalizedQuery = normalizeTransliteration(query);
     if (normalizedQuery.length < 2) return results;
 
+    if (limit > 0 && results.length === limit && new Set(results.map(entry => entry.strongs_number)).size === limit) {
+      return results;
+    }
+
     const normalized = await this.db.prepare(
       `SELECT strongs_number, testament, lemma, transliteration,
               pronunciation, definition, derivation
