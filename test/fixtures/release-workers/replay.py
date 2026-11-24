@@ -22,11 +22,19 @@ read_ceiling = int(subprocess.check_output(
 def j(path, value):
     path.write_text(json.dumps(value, separators=(",", ":")) + "\n")
 
-def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=False, expired=False, wrong_route=False, tagged=False, wrong_tag=False):
+def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=False, expired=False, wrong_route=False, tagged=False, wrong_tag=False, stale_deployment=False, stale_database=False):
     other = "production" if role == "preview" else "preview"
     with tempfile.TemporaryDirectory(prefix="theologai-release-replay-") as run:
         root = pathlib.Path(run).resolve()
         config = json.loads(json.dumps(reviewed))
+        previous_production = {
+            "databaseName": "theologai-production-20260811-schema0009-a",
+            "databaseId": "9bc79346-338b-439e-a2a5-424f4418eb21",
+            "deploymentId": "f6c9a995-0940-4758-a9a9-14f1389a9ab3",
+            "versionId": "d2e2bd87-1213-4ba5-891d-e0f9b3293cb9",
+        }
+        if role == "production" and mode == "corpus":
+            config["predecessors"]["production"] = previous_production
         if mode == "application":
             for r in ("preview", "production"):
                 config["targets"][r] = {k: config["predecessors"][r][k] for k in ("databaseName", "databaseId")}
@@ -51,7 +59,12 @@ def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=F
         if role == "production":
             assignments["preview"]["databaseId"] = bindings["preview"]["databaseId"]
         if stale or tagged:
-            assignments["production"]["versionId"] = "70cc3000-0000-4000-a000-000000000000"
+            assignments["production"]["versionId"] = previous_production["versionId"]
+        if stale_deployment:
+            assignments["production"]["deploymentId"] = previous_production["deploymentId"]
+        if stale_database:
+            bindings["production"] = previous_production
+            assignments["production"]["databaseId"] = previous_production["databaseId"]
         baseline_source = "1" * 40 if tagged else config["productionSource"]
         j(root / "production-baseline.json", {
             "productionSource": baseline_source,
@@ -86,7 +99,7 @@ def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=F
             "d1_databases":[{"binding":"THEOLOGAI_DB","database_name":bindings[role]["databaseName"],"database_id":selected}]})
         j(root / "verified-preview.json", assignments["preview"])
         databases = {entry["databaseId"]:entry["databaseName"] for entry in (
-            *config["targets"].values(), *config["predecessors"].values())}
+            *config["targets"].values(), *config["predecessors"].values(), previous_production)}
         j(root / "provider.json",dict(role=role,assignments=assignments,bindings=bindings,ambiguous=ambiguous,
             production_tag=("2" * 40 if wrong_tag else baseline_source) if tagged else None,
             inventory=[{"uuid":key,"name":name} for key,name in databases.items()]))
@@ -118,7 +131,7 @@ def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=F
             result = subprocess.run(["bash", str(repo/".github/scripts/release-workers.sh"), phase,role,mode],
                 cwd=root, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
             assert (result.returncode == 0) == expect_ok, f"{case} {phase}: {result.returncode} {result.stdout}"
-        bad_preflight = wrong or stale or wrong_route or wrong_tag
+        bad_preflight = wrong or stale or wrong_route or wrong_tag or stale_deployment or stale_database
         bad_mutation = tamper or expired or ambiguous
         execute("preflight", not bad_preflight)
         if bad_preflight:
@@ -174,3 +187,5 @@ replay("expired approval refused at mutation boundary", "production", "corpus", 
 
 replay("routine release after a tagged production release", "production", "application", tagged=True)
 replay("wrong accepted production tag refused", "preview", "application", tagged=True, wrong_tag=True)
+replay("stale production deployment refused during preview", "preview", "application", stale_deployment=True)
+replay("stale production D1 refused during preview", "preview", "application", stale_database=True)

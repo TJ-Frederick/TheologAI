@@ -38,6 +38,14 @@ function repo() {
 it('classifies the cumulative delta to the serving release through the actual CLI', () => {
   const f = repo();
   expect(f.run('classify')).toBe('docs');
+  for (const path of [
+    '.github/scripts/production-baseline.cjs',
+    'scripts/release-promotion.mjs',
+    'test/fixtures/release-workers/replay.py',
+    'test/unit/scripts/releasePromotion.test.ts',
+    'docs/CURRENT-RELEASE.md',
+  ]) f.commit(path, 'reviewed production bookkeeping');
+  expect(f.run('classify')).toBe('docs');
   f.commit('src/formatters/bible.ts','export const value = 1;');
   expect(f.run('classify')).toBe('application');
   f.commit('data/manifest.json','{"source":2}');
@@ -148,7 +156,7 @@ it('replays the protected Worker shell and blocks unsafe provider operations', (
     encoding: 'utf8',
     timeout: 120_000,
   });
-  expect(output.match(/: PASS /g)).toHaveLength(13);
+  expect(output.match(/: PASS /g)).toHaveLength(15);
 }, 125_000);
 
 it('uses the newest approved production deployment and ignores validation-only runs', async () => {
@@ -157,20 +165,30 @@ it('uses the newest approved production deployment and ignores validation-only r
   const run = {
     id:21, repository:{full_name:'owner/repo'}, path:'.github/workflows/deploy.yml', head_branch:'main',
     head_sha:deployed, status:'completed', conclusion:'success', event:'workflow_dispatch', run_attempt:1,
+    run_number:config.productionRunNumber + 1,
   };
+  const older = {...run, id:41645812927, run_number:141, run_attempt:2,
+    head_sha:'701ab6295f033105ec306f7878a85e294cba0f6d'};
+  const reviewedCutover = {...run, id:45324148171, run_number:config.productionRunNumber, head_sha:config.productionSource};
+  const validation = {...run, id:22, run_number:run.run_number + 1};
+  const docs = {...run, id:23, run_number:run.run_number + 2};
   const protectedJob = {name:'Test, Build & Deploy', conclusion:'success', head_sha:deployed,
     steps:[{name:'Record accepted production source and assignment',conclusion:'success'}]};
   const approved = [{state:'approved',user:{id:40179660},environments:[{name:'production'}]}];
   let jobs = [protectedJob];
-  let history = [{...run,id:22},run];
+  let history = [docs, validation, reviewedCutover, older];
   let reviews = approved;
   const github = {rest:{actions:{
     listWorkflowRuns: ({status}: {status:string}) => {
       expect(status).toBe('success');
       return {data:{total_count:history.length,workflow_runs:history}};
     },
-    listJobsForWorkflowRun: ({run_id}: {run_id:number}) =>
-      ({data:run_id === 22 ? {total_count:1,jobs:[{...protectedJob,conclusion:'skipped'}]} : {total_count:jobs.length,jobs}}),
+    listJobsForWorkflowRun: ({run_id}: {run_id:number}) => {
+      const roster = run_id === docs.id ? [] : run_id === validation.id
+        ? [{...protectedJob,conclusion:'skipped'}] : jobs;
+      expect([docs.id, validation.id, run.id]).toContain(run_id);
+      return {data:{total_count:roster.length,jobs:roster}};
+    },
     getReviewsForRun: () => ({data:reviews}),
   }}};
   const args = {github,context:{repo:{owner:'owner',repo:'repo'},runId:50},reviewed:config,
@@ -178,6 +196,15 @@ it('uses the newest approved production deployment and ignores validation-only r
       expect(source).toBe(deployed);
       return config;
     }};
+  const reviewedBaseline = {
+    productionSource:config.productionSource,targets:config.targets,requireVersionTag:false,
+  };
+  expect(await resolveProductionBaseline(args)).toEqual(reviewedBaseline);
+  // The failed cutover is normally absent from the success-filtered response.
+  history = [docs, validation, older];
+  expect(await resolveProductionBaseline(args)).toEqual(reviewedBaseline);
+
+  history = [older, validation, run, docs];
   expect(await resolveProductionBaseline(args)).toEqual({
     productionSource:deployed,targets:config.targets,requireVersionTag:true,
   });
@@ -188,8 +215,6 @@ it('uses the newest approved production deployment and ignores validation-only r
   jobs = [{...protectedJob,steps:[]}];
   await expect(resolveProductionBaseline(args)).rejects.toThrow('exact reviewed rebaseline');
 
-  history = [{...run,id:22}];
-  expect(await resolveProductionBaseline(args)).toMatchObject({
-    productionSource:config.productionSource,requireVersionTag:false,
-  });
+  history = [docs, validation];
+  expect(await resolveProductionBaseline(args)).toEqual(reviewedBaseline);
 });

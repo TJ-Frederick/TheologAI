@@ -1,5 +1,6 @@
 {
-  "productionSource": "701ab6295f033105ec306f7878a85e294cba0f6d",
+  "productionSource": "9e479e723d96a12c61063e28781f084f0b574fb6",
+  "productionRunNumber": 150,
   "targets": {
     "preview": {
       "databaseName": "theologai-preview-20260728-transform11-a",
@@ -14,14 +15,14 @@
     "preview": {
       "databaseName": "theologai-preview-20260728-transform11-a",
       "databaseId": "62b871a6-5b4d-4d9b-8f52-301f6c878f48",
-      "deploymentId": "62da1803-b313-4dc7-94bf-80d3394957b1",
-      "versionId": "8fb1be2c-72f7-4a4e-bbd6-117adfc30410"
+      "deploymentId": "2b6c65ba-15c8-471b-8b79-9205398fef07",
+      "versionId": "10ef3591-bf3f-430e-9b0c-bb3b59a3bf53"
     },
     "production": {
-      "databaseName": "theologai-production-20260811-schema0009-a",
-      "databaseId": "9bc79346-338b-439e-a2a5-424f4418eb21",
-      "deploymentId": "f6c9a995-0940-4758-a9a9-14f1389a9ab3",
-      "versionId": "d2e2bd87-1213-4ba5-891d-e0f9b3293cb9"
+      "databaseName": "theologai-preview-20260811-schema0009-a",
+      "databaseId": "74f456e2-6951-4003-bb6f-91951342bf8f",
+      "deploymentId": "41d8904d-5b4a-473e-a1e1-31a493bf0d33",
+      "versionId": "e1942c16-9938-433e-8a17-f51fca541043"
     }
   }
 }

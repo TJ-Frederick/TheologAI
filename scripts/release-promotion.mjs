@@ -10,6 +10,14 @@ const SHA = /^[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const roles = ['preview', 'production'];
+const releaseBookkeeping = new Set([
+  'release/serving.json',
+  '.github/scripts/production-baseline.cjs',
+  'scripts/release-promotion.mjs',
+  'test/fixtures/release-workers/replay.py',
+  'test/helpers/corpusTransportFixture.ts',
+  'test/unit/scripts/releasePromotion.test.ts',
+]);
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
 const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
 function requireValue(value, message) {
@@ -32,8 +40,8 @@ export function readReleaseConfiguration(root = process.cwd()) {
 
 export function classifyRelease(root = process.cwd(), baselineFile) {
   const config = readReleaseConfiguration(root);
-  // Before the first release on this workflow, use the reviewed bootstrap assignment.
-  // Thereafter the workflow supplies the source of the last successful production deploy.
+  // Local classification starts from the reviewed assignment. The workflow
+  // can supply an accepted deployment that supersedes that assignment.
   const baseline = baselineFile ? json(baselineFile) : {productionSource:config.productionSource, targets:config.predecessors};
   requireValue(SHA.test(baseline.productionSource), 'invalid accepted production source');
   git(root, ['merge-base', '--is-ancestor', config.productionSource, baseline.productionSource]);
@@ -51,7 +59,8 @@ export function classifyRelease(root = process.cwd(), baselineFile) {
   if (!paths.length) return 'docs';
   // The CI classifier already has an explicit list of runtime-only and documentation changes.
   // Anything outside it, including builders and their dependencies, needs data validation.
-  const substantive = paths.filter(change => !change.paths.every(path => path === 'release/serving.json'));
+  // Baseline bookkeeping can change independently of the Worker and corpus.
+  const substantive = paths.filter(change => !change.paths.every(path => releaseBookkeeping.has(path)));
   if (!substantive.length) return 'docs';
   const diff = substantive.map(change => [change.status, ...change.paths].join('\0') + '\0').join('');
   const {mode} = classifyCiChanges(diff);

@@ -17,7 +17,7 @@ function targets(record) {
   }));
 }
 
-/** Select the newest successful deployment, skipping successful validation-only runs. */
+/** Select the newest accepted deployment after the reviewed assignment. */
 async function resolveProductionBaseline({
   github, context,
   reviewed = JSON.parse(readFileSync('release/serving.json', 'utf8')),
@@ -27,6 +27,10 @@ async function resolveProductionBaseline({
   const actions = github.rest.actions;
   const query = {...repo, workflow_id:'deploy.yml', branch:'main', event:'workflow_dispatch', status:'success', per_page:100};
   if (!shaPattern.test(reviewed.productionSource)) throw Error('Invalid reviewed production source');
+  const reviewedRunNumber = reviewed.productionRunNumber;
+  if (!Number.isSafeInteger(reviewedRunNumber) || reviewedRunNumber < 1) {
+    throw Error('Invalid reviewed production run number');
+  }
   const initial = {
     productionSource: reviewed.productionSource,
     targets: targets(reviewed.predecessors),
@@ -34,14 +38,19 @@ async function resolveProductionBaseline({
   };
   const {data} = await actions.listWorkflowRuns(query);
   if (!Array.isArray(data.workflow_runs)) throw Error('Missing production workflow history');
-  for (const run of data.workflow_runs) {
+  const runs = [...data.workflow_runs].sort((a, b) => b.run_number - a.run_number);
+  for (const run of runs) {
     if (run.id === context.runId) continue;
     if (run.repository?.full_name !== repo.owner + '/' + repo.repo ||
         run.path !== '.github/workflows/deploy.yml' || run.head_branch !== 'main' ||
         run.status !== 'completed' || run.conclusion !== 'success' ||
-        run.event !== 'workflow_dispatch' || !shaPattern.test(run.head_sha)) {
+        run.event !== 'workflow_dispatch' || !shaPattern.test(run.head_sha) ||
+        !Number.isSafeInteger(run.run_number) || run.run_number < 1) {
       throw Error('Unexpected production workflow history');
     }
+    // A rerun keeps its original workflow number. Reviewed serving evidence
+    // takes precedence over every run at or before that cutover.
+    if (run.run_number <= reviewedRunNumber) continue;
     const {data: roster} = await actions.listJobsForWorkflowRun({...repo, run_id:run.id, per_page:100});
     if (roster.jobs?.length !== roster.total_count) throw Error('Incomplete production job roster');
     const jobs = roster.jobs.filter(job => job.name === 'Test, Build & Deploy');
@@ -50,7 +59,6 @@ async function resolveProductionBaseline({
     if (jobs[0].conclusion !== 'success' || jobs[0].head_sha !== run.head_sha) {
       throw Error('Unexpected protected production job result');
     }
-    if (run.head_sha === reviewed.productionSource) return initial;
     if (run.run_attempt !== 1 || !jobs[0].steps?.some(step =>
       step.name === cutoverStep && step.conclusion === 'success')) {
       throw Error('Latest successful production deployment needs an exact reviewed rebaseline');
