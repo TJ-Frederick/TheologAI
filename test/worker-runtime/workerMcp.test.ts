@@ -704,6 +704,17 @@ describe('Worker MCP endpoint in workerd', () => {
       }),
     ]));
 
+    const flatWorks = await rpc('tools/call', { name: 'classic_text_lookup', arguments: { listWorks: true } }, 39);
+    expect(flatWorks.message.error).toBeUndefined();
+    expect(flatWorks.message.result?.isError).not.toBe(true);
+    expect(flatWorks.message.result?.structuredContent).toMatchObject({
+      mode: 'list_works',
+      catalog: {
+        resultWindow: { returnedCount: 1 },
+        works: [{ id: 'apostles-creed', resource: { uri: 'theologai://documents/apostles-creed' } }],
+      },
+    });
+
     const catalog = await rpc('resources/read', { uri: 'theologai://primary-sources/catalog' }, 40);
     expect(catalog.response.status).toBe(200);
     expect(JSON.parse(String((catalog.message.result?.contents as Array<{ text: string }>)[0].text))).toEqual({
@@ -769,6 +780,26 @@ describe('Worker MCP endpoint in workerd', () => {
         'theologai/sectionResolution': 'canonical',
       }) }),
     ]);
+  });
+
+  it('fails closed in both catalogs when a stored flat work has no delivery profile', async () => {
+    await env.THEOLOGAI_DB.prepare('INSERT INTO documents (id, title, type, date, metadata) VALUES (?, ?, ?, ?, ?)')
+      .bind('missing-profile-fixture', 'Missing Profile', 'Creed', null, '{}').run();
+    try {
+      const listed = await rpc('resources/list');
+      expect(listed.message.error).toMatchObject({
+        code: -32603, message: expect.stringContaining('Unable to list resources'),
+      });
+      expect(listed.message.result).toBeUndefined();
+
+      const tools = await rpc('tools/call', { name: 'classic_text_lookup', arguments: { listWorks: true } });
+      expect(tools.message.error).toBeUndefined();
+      expect(tools.message.result?.isError).toBe(true);
+      expect(tools.message.result?.structuredContent).toBeUndefined();
+      expect(textContent(tools.message)).toContain('Historical delivery profile not found for "missing-profile-fixture"');
+    } finally {
+      await env.THEOLOGAI_DB.prepare('DELETE FROM documents WHERE id = ?').bind('missing-profile-fixture').run();
+    }
   });
 
   it('executes cross-reference and expanded morphology tools against D1', async () => {

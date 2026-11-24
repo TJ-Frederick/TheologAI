@@ -61,13 +61,10 @@ export function createClassicTextsHandler(historicalService: HistoricalDocumentS
         validateMode(params);
         // List works
         if (params.listWorks) {
-          const docs = await historicalService.listDocuments();
-          const profiles = await Promise.all(docs.map(async document => ({
-            document, profile: await historicalService.getDeliveryProfile(document.id),
-          })));
+          const profiles = await historicalService.listDocumentsWithProfiles();
           const presented = presentClassicTextCatalog(profiles);
           return {
-            content: [{ type: 'text', text: formatDocumentList(docs) }],
+            content: [{ type: 'text', text: formatDocumentList(profiles.map(({ document }) => document)) }],
             structuredContent: presented,
           };
         }

@@ -69,6 +69,10 @@ export class StrongsRepository implements IStrongsRepository {
     const normalizedQuery = normalizeTransliteration(query);
     if (normalizedQuery.length < 2) return results;
 
+    if (limit > 0 && results.length === limit && new Set(results.map(entry => entry.strongs_number)).size === limit) {
+      return results;
+    }
+
     // The canonical FTS index stores diacritics and transliteration markers.
     // Match a normalized SQL expression as a fallback so ASCII `elohim` can
     // find STEPBible's `ʼĕlôhîym` without changing the source or FTS schema.
