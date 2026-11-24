@@ -164,12 +164,13 @@ it('accepts real post-merge metadata shape with an empty inline PR association a
   await expect(resolver({github,context,runId:'13',now})).rejects.toThrow('protected preview');
 });
 
-it('replays the protected Worker shell and blocks unsafe provider operations', () => {
-  const output = execFileSync('python3', ['test/fixtures/release-workers/replay.py'], {
+// Each matrix retains the same per-phase checks and has its own bounded CI runner window.
+it.each([['cutover', 11], ['baseline', 10]] as const)('replays protected Worker %s decisions', (group, cases) => {
+  const output = execFileSync('python3', ['test/fixtures/release-workers/replay.py', '--group', group], {
     encoding: 'utf8',
     timeout: 120_000,
   });
-  expect(output.match(/: PASS /g)).toHaveLength(21);
+  expect(output.match(/: PASS /g)).toHaveLength(cases);
 }, 125_000);
 
 it('uses the newest approved production deployment and ignores validation-only runs', async () => {
