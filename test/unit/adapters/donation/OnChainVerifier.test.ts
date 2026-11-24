@@ -142,7 +142,10 @@ describe('OnChainVerifier evidence', () => {
     mockByChain((url, method) => {
       if (url !== 'base') return response(null);
       return response(method === 'eth_getTransactionReceipt'
-        ? receipt({ logs: [transfer(RECIPIENT_ADDRESS)] })
+        ? receipt({ logs: [
+          { ...transfer(RECIPIENT_ADDRESS), topics: [], removed: true },
+          { ...transfer(RECIPIENT_ADDRESS), transactionHash: TX_HASH, blockHash: BLOCK_HASH, blockNumber: '0x100', removed: false },
+        ] })
         : transaction({ blockHash: `0x${BLOCK_HASH.slice(2).toUpperCase()}` }));
     });
     const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
@@ -152,6 +155,27 @@ describe('OnChainVerifier evidence', () => {
     expect(result.status).toBe('verified');
     expect(result.transfers).toHaveLength(1);
     expect(result.chainStatuses?.map(chain => chain.state)).toEqual(['absent', 'mined', 'absent']);
+  });
+
+  it.each([
+    ['transaction hash', { transactionHash: OTHER_HASH }],
+    ['block hash', { blockHash: OTHER_HASH }],
+    ['block number', { blockNumber: '0x101' }],
+    ['removed flag', { removed: true }],
+  ])('rejects a qualifying transfer log with inconsistent %s', async (_label, metadata) => {
+    mockByChain((url, method) => {
+      if (url !== 'base') return response(null);
+      return response(method === 'eth_getTransactionReceipt'
+        ? receipt({ logs: [{ ...transfer(RECIPIENT_ADDRESS), ...metadata }] })
+        : transaction());
+    });
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const result = await new DonationService(provider).verifyDonation(TX_HASH);
+
+    expect(result.status).toBe('unavailable');
+    expect(result.transfers).toEqual([]);
+    expect(result.chainStatuses?.map(chain => chain.state)).toEqual(['absent', 'unavailable', 'absent']);
   });
 
   it.each([

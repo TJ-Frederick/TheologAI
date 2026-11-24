@@ -36,13 +36,12 @@ const RPC_KEY_BY_NETWORK = {
   'eip155:8453': 'base',
   'eip155:723': 'radius',
 } as const satisfies Record<SupportedDonationNetwork, RpcOverrideKey & DonationRpcKey>;
-interface RpcReceiptLog { address: string; topics: string[]; data: string }
 interface RpcReceipt {
   transactionHash: string;
   status: string;
   blockHash: string;
   blockNumber: string;
-  logs: RpcReceiptLog[];
+  logs: unknown[];
 }
 interface RpcTransaction {
   hash: string;
@@ -116,10 +115,16 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
       return { ...base, state: 'unavailable' };
     }
 
-    const transfers = receipt.logs.flatMap(log => {
+    const transfers: ChainTransferEvidence[] = [];
+    for (const log of receipt.logs) {
+      if (!isRecord(log)) continue;
       const decoded = this.decodeTransfer(log);
-      return decoded ? [decoded] : [];
-    });
+      if (!decoded) continue;
+      if (!this.logMatchesMinedIdentity(log, receipt, blockNumber)) {
+        return { ...base, state: 'unavailable' };
+      }
+      transfers.push(decoded);
+    }
     const native = this.decodeNativeTransfer(transaction);
     if (native) transfers.push(native);
 
@@ -148,9 +153,17 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
       && typeof candidate.value === 'string';
   }
 
-  private decodeTransfer(value: unknown): ChainTransferEvidence | undefined {
-    if (!value || typeof value !== 'object') return undefined;
-    const log = value as Partial<RpcReceiptLog>;
+  private logMatchesMinedIdentity(log: Record<string, unknown>, receipt: RpcReceipt, blockNumber: number): boolean {
+    return (log.transactionHash === undefined
+      || (isHash(log.transactionHash) && log.transactionHash.toLowerCase() === receipt.transactionHash.toLowerCase()))
+      && (log.blockHash === undefined
+        || (isHash(log.blockHash) && log.blockHash.toLowerCase() === receipt.blockHash.toLowerCase()))
+      && (log.blockNumber === undefined
+        || (typeof log.blockNumber === 'string' && this.parseQuantity(log.blockNumber) === blockNumber))
+      && (log.removed === undefined || log.removed === false);
+  }
+
+  private decodeTransfer(log: Record<string, unknown>): ChainTransferEvidence | undefined {
     if (typeof log.address !== 'string' || !ADDRESS_PATTERN.test(log.address)) return undefined;
     if (!Array.isArray(log.topics) || log.topics.length < 3 || typeof log.data !== 'string') return undefined;
     if (typeof log.topics[0] !== 'string' || log.topics[0].toLowerCase() !== TRANSFER_TOPIC) return undefined;
