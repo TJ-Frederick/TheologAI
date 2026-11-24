@@ -177,6 +177,42 @@ describe('HelloAoCommentaryAdapter', () => {
       .rejects.toEqual(new CommentaryScalarNotFoundError('HelloAO', 'John 3', 'No exact commentary match for John 3:16 in Adam Clarke'));
   });
 
+  it('refetches a rejected chapter identity and caches the corrected chapter', async () => {
+    const identity = identityFor('adam-clarke', 'John 3:16');
+    const payload = { chapter: { content: [{ type: 'verse', number: 17, content: ['Neighbor'] }] } };
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(response(payload, { ...identity, chapterNumber: 4 }))
+      .mockResolvedValueOnce(response(payload, identity));
+    const adapter = new HelloAoCommentaryAdapter();
+    const read = (verse: number) => adapter.getCommentary(parseReference(`John 3:${verse}`), 'Clarke');
+
+    await expect(read(16)).rejects.toEqual(new AdapterIntegrityError('HelloAO', 'Commentary payload chapter identity mismatch'));
+    await expect(read(16)).rejects.toBeInstanceOf(CommentaryScalarNotFoundError);
+    await expect(read(17)).resolves.toMatchObject({ text: 'Neighbor' });
+    await expect(read(17)).resolves.toMatchObject({ text: 'Neighbor' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('evicts an aggregate chapter when a scalar lookup detects duplicate exact entries', async () => {
+    const identity = identityFor('adam-clarke', 'John 3');
+    const first = { type: 'verse', number: 16, content: ['First'] };
+    const second = { type: 'verse', number: 16, content: ['Second'] };
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(response({ chapter: { content: [first, second] } }, identity))
+      .mockResolvedValueOnce(response({ chapter: { content: [first] } }, identity));
+    const adapter = new HelloAoCommentaryAdapter();
+    const read = () => adapter.getCommentary(parseReference('John 3:16'), 'Clarke');
+
+    await expect(adapter.getCommentary(parseReference('John 3'), 'Clarke')).resolves.toMatchObject({
+      text: 'First\n\nSecond',
+    });
+    await expect(read()).rejects.toEqual(new AdapterIntegrityError('HelloAO', 'Duplicate exact commentary identity'));
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    await expect(read()).resolves.toMatchObject({ text: 'First' });
+    await expect(read()).resolves.toMatchObject({ text: 'First' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects verse ranges before making a provider request', async () => {
     await expect(new HelloAoCommentaryAdapter().getCommentary(parseReference('John 3:16-17'), 'John Gill'))
       .rejects.toEqual(new ValidationError(
