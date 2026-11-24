@@ -45,8 +45,9 @@ export class EsvAdapter implements BibleProviderPort {
   }
 
   private decodePassage(value: unknown, ref: BibleReference, refStr: string): BibleResult {
-    const data = value as { passages?: unknown; canonical?: unknown } | null;
-    if (!data?.passages || (Array.isArray(data.passages) && data.passages.length === 0)) {
+    if (value === null) throw new TypeError('Malformed ESV passage payload.');
+    const data = value as { passages?: unknown; canonical?: unknown };
+    if (!data.passages || (Array.isArray(data.passages) && data.passages.length === 0)) {
       throw new APIError(404, `No passages found for: ${refStr}`);
     }
 

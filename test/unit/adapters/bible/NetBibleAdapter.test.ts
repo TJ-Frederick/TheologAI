@@ -82,4 +82,20 @@ describe('NetBibleAdapter', () => {
     await expect(read()).resolves.toMatchObject({ text: 'First. Second.' });
     expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
+
+  it('rejects a separately textless row in a range and refetches on the next lookup', async () => {
+    const first = { bookname: 'John', chapter: 1, verse: 1, text: 'First.<br>' };
+    const invalid = { ...first, verse: 2, text: '<b>&nbsp;</b>' };
+    const corrected = { ...invalid, text: '<span>Second.</span>' };
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(response([first, invalid]))
+      .mockResolvedValueOnce(response([first, corrected]));
+    const adapter = new NetBibleAdapter();
+    const read = () => adapter.getPassage(parseReference('John 1:1-2'), 'NET');
+
+    await expect(read()).rejects.toEqual(new APIError(502, 'Bible provider returned an empty passage.'));
+    await expect(read()).resolves.toMatchObject({ text: 'First.\nSecond.' });
+    await expect(read()).resolves.toMatchObject({ text: 'First.\nSecond.' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HelloAoAdapter } from '../../../../src/adapters/bible/HelloAoAdapter.js';
-import { AdapterError } from '../../../../src/kernel/errors.js';
+import { AdapterError, APIError } from '../../../../src/kernel/errors.js';
 import { parseReference } from '../../../../src/kernel/reference.js';
 
 const response = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), {
@@ -161,6 +161,28 @@ describe('HelloAoAdapter', () => {
 
     await expect(new HelloAoAdapter().getPassage(parseReference('John 3:16-17'), 'DBY'))
       .rejects.toEqual(new AdapterError('HelloAO', 'No verses found for John 3:16-17'));
+  });
+
+  it.each([
+    ['a malformed inline note', [{ noteId: '7' }], new AdapterError('HelloAO', 'Malformed Bible verse entry.')],
+    ['a malformed line break', ['Text', { lineBreak: false }], new AdapterError('HelloAO', 'Malformed Bible verse entry.')],
+    ['conflicting inline discriminants', [{ text: 'Text', noteId: 7 }], new AdapterError('HelloAO', 'Malformed Bible verse entry.')],
+    ['a verse containing only a valid note', [{ noteId: 7 }], new APIError(502, 'Bible provider returned an empty passage.')],
+  ])('refetches the chapter when a selected verse contains %s', async (_label, invalid, error) => {
+    const chapter = (secondVerse: unknown[]) => ({ chapter: { content: [
+      { type: 'verse', number: 16, content: ['First.'] },
+      { type: 'verse', number: 17, content: secondVerse },
+    ] } });
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(response(chapter(invalid)))
+      .mockResolvedValueOnce(response(chapter(['Second.', { noteId: 7 }])));
+    const adapter = new HelloAoAdapter();
+    const read = () => adapter.getPassage(parseReference('John 3:16-17'), 'DBY');
+
+    await expect(read()).rejects.toEqual(error);
+    await expect(read()).resolves.toMatchObject({ text: 'First. Second.' });
+    await expect(read()).resolves.toMatchObject({ text: 'First. Second.' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 
   it('normalizes an upstream HTTP error as an adapter error', async () => {

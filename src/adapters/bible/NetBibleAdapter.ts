@@ -43,13 +43,15 @@ export class NetBibleAdapter implements BibleProviderPort {
 
     this.assertResponseMatchesReference(ref, data);
 
-    // Combine verses
-    const html = data.map(verse => {
+    const verses = data.map(verse => {
       if (typeof verse.text !== 'string') throw new APIError(502, 'Bible provider returned an invalid passage result.');
       return verse.text;
-    }).join(' ');
-    const text = stripHtml(html);
-    if (!text.trim()) throw new APIError(502, 'Bible provider returned an empty passage.');
+    });
+    // Render the combined HTML so line breaks between verses are preserved.
+    const text = stripHtml(verses.join(' '));
+    if (!text || (verses.length > 1 && verses.some(verse => !stripHtml(verse)))) {
+      throw new APIError(502, 'Bible provider returned an empty passage.');
+    }
 
     return {
       reference: refStr,

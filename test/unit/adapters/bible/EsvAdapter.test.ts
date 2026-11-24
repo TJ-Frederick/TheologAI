@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EsvAdapter } from '../../../../src/adapters/bible/EsvAdapter.js';
-import { APIError } from '../../../../src/kernel/errors.js';
+import { APIError, getUserMessage } from '../../../../src/kernel/errors.js';
 import { parseReference } from '../../../../src/kernel/reference.js';
 
 const jsonResponse = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), {
@@ -112,6 +112,22 @@ describe('EsvAdapter', () => {
 
     await expect(new EsvAdapter('key').getPassage(parseReference('John 3:16'), 'ESV'))
       .rejects.toEqual(new APIError(404, 'No passages found for: John 3:16'));
+  });
+
+  it.each([
+    ['a malformed root', null, 'I encountered an error retrieving that information. Please try again.'],
+    ['an empty passage list', { passages: [] }, 'Not found: No matching content was found.'],
+  ])('preserves the public error for %s and refetches immediately', async (_label, payload, message) => {
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(jsonResponse(payload))
+      .mockResolvedValueOnce(jsonResponse({ passages: ['Corrected passage'] }));
+    const adapter = new EsvAdapter('key');
+    const read = () => adapter.getPassage(parseReference('John 3:16'), 'ESV');
+
+    await expect(read()).rejects.toSatisfy((error: Error) => getUserMessage(error) === message);
+    await expect(read()).resolves.toMatchObject({ text: 'Corrected passage' });
+    await expect(read()).resolves.toMatchObject({ text: 'Corrected passage' });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 
   it('surfaces malformed JSON from the upstream response', async () => {

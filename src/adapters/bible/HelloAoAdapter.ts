@@ -39,6 +39,16 @@ function providerNumber(value: unknown): number {
   return typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
 }
 
+function isVerseContent(value: unknown): value is VerseContent {
+  if (typeof value === 'string') return true;
+  if (!isRecord(value)) return false;
+  if ('text' in value) {
+    return typeof value.text === 'string' && !('lineBreak' in value) && !('noteId' in value);
+  }
+  if ('lineBreak' in value) return value.lineBreak === true && !('noteId' in value);
+  return typeof value.noteId === 'number' && Number.isSafeInteger(value.noteId) && value.noteId >= 0;
+}
+
 export class HelloAoAdapter implements BibleProviderPort {
   readonly supportedTranslations = Object.keys(TRANSLATIONS);
   private client: HttpClient;
@@ -112,7 +122,7 @@ export class HelloAoAdapter implements BibleProviderPort {
       throw new AdapterError('HelloAO', 'Provider returned a different chapter.');
     }
 
-    const verses: Array<{ number: number; content: VerseContent[] }> = [];
+    const verses: Array<{ number: number; text: string }> = [];
     for (const item of data.chapter.content as unknown[]) {
       if (!isRecord(item) || typeof item.type !== 'string') {
         throw new AdapterError('HelloAO', 'Malformed Bible chapter entry.');
@@ -122,12 +132,13 @@ export class HelloAoAdapter implements BibleProviderPort {
       const { number, content } = item;
       const verseNumber = providerNumber(number);
       if (!Number.isSafeInteger(verseNumber) || verseNumber < 1 || !Array.isArray(content)
-        || !content.every(fragment => typeof fragment === 'string'
-          || (isRecord(fragment) && (!('text' in fragment) || typeof fragment.text === 'string')))) {
+        || !content.every(isVerseContent)) {
         throw new AdapterError('HelloAO', 'Malformed Bible verse entry.');
       }
       if (hao.verse == null || (verseNumber >= hao.verse && verseNumber <= (hao.endVerse ?? hao.verse))) {
-        verses.push({ number: verseNumber, content });
+        const text = this.extractVerseText(content);
+        if (!text) throw new APIError(502, 'Bible provider returned an empty passage.');
+        verses.push({ number: verseNumber, text });
       }
     }
 
@@ -141,8 +152,7 @@ export class HelloAoAdapter implements BibleProviderPort {
         if (!returned.has(verse)) return undefined;
       }
     }
-    const text = verses.map(verse => this.extractVerseText(verse.content)).join(' ');
-    if (!text.trim()) throw new APIError(502, 'Bible provider returned an empty passage.');
+    const text = verses.map(verse => verse.text).join(' ');
     const footnotes = includeFootnotes && Array.isArray(chapter.footnotes)
       ? this.extractFootnotes(chapter.footnotes, hao.verse, hao.endVerse)
       : undefined;
