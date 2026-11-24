@@ -10,9 +10,9 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 303,
+    "totalTestTypeScript": 304,
     "activeVitest": 224,
-    "support": 24,
+    "support": 25,
     "manual": 4,
     "legacyOrphan": 50,
     "conformance": 1
@@ -261,6 +261,7 @@
       "test/helpers/corpusNative.ts",
       "test/helpers/corpusTransportFixture.ts",
       "test/helpers/corpusWorkerBindings.d.ts",
+      "test/helpers/hostedCorpusRecoveryFixture.ts",
       "test/helpers/mcpTransportContract.ts",
       "test/helpers/mockD1.ts",
       "test/helpers/originalLanguageStudyV2ProductionFixtures.ts",

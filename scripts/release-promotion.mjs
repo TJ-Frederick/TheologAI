@@ -26,6 +26,9 @@ const releaseOperations = new Set([
   'test/fixtures/release-workers/replay.py',
   'test/helpers/corpusTransportFixture.ts',
   'test/helpers/hostedCorpusRecoveryFixture.ts',
+  'test/test-topology.json',
+  'test/unit/config/workflowTopology.test.ts',
+  'test/unit/scripts/nortonAquinasLiveWorkflow.test.ts',
   'test/unit/scripts/nortonOperatorSuccessorFlow.test.ts',
   'test/unit/scripts/releasePromotion.test.ts',
 ]);

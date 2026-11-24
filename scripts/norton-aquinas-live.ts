@@ -115,6 +115,8 @@ export async function runCorpusLive(input: CorpusLiveInput) {
     check(before.accountReads <= accountFloor + charged, 'prior live/control allowance exceeded');
     check(accountFloor + challenge.liveControlReserve + POLICY.uncertaintyMargin <= challenge.accountReadCeiling,
       'original live/control reservation and uncertainty margin');
+    event({ kind: 'live-admitted', attempt, accountReadFloor: accountFloor, priorReservedReads: charged,
+      reservedReads: reservation, liveControlReserve: challenge.liveControlReserve, accountReadCeiling: challenge.accountReadCeiling });
     charged += reservation;
     event({ kind: 'live-intent', attempt, reservedReads: reservation, cumulativeReservedReads: charged,
       liveControlReserve: challenge.liveControlReserve, accountReadFloor: accountFloor, evidenceSha256: original.evidenceSha256 });
@@ -145,7 +147,12 @@ export async function runCorpusLive(input: CorpusLiveInput) {
     }
     const after = await observe();
     check(JSON.stringify(after.controls) === originalControls, 'serving controls changed during hosted verification');
-    check(after.accountReads <= accountFloor + charged, 'observed live/control allowance exceeded');
+    if (after.accountReads > accountFloor + charged) {
+      const reason = 'observed live/control allowance exceeded';
+      event({ kind: 'live-budget-stop', attempt, reason, accountReadFloor: accountFloor,
+        observedAccountReads: after.accountReads, cumulativeReservedReads: charged, reservationRetained: true });
+      check(false, reason);
+    }
     requireLiveOperatorGate(challenge);
     if (live.failure) {
       event({ kind: 'verification-only-recovery', fromAttempt: attempt, retainedReservedReads: charged,

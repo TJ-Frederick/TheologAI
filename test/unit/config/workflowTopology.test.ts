@@ -386,7 +386,7 @@ describe('ordinary release paths', () => {
       'Verify immutable Worker and candidate configuration', 'Retain matched predecessor before mutation',
       'Complete source-bound corpus verification', 'Retain verified corpus before cutover',
       'Deploy the verified Worker once', 'Confirm active Worker and D1 binding', 'Run two-protocol release smoke',
-      'Run full corpus acceptance in both protocol versions', 'Confirm final routing and environment isolation',
+      'Verify serving corpus in both protocol versions with bounded recovery', 'Confirm final routing and environment isolation',
     ];
     let previous = -1;
     for (const name of required) {
@@ -396,7 +396,9 @@ describe('ordinary release paths', () => {
     }
     expect(steps.find(step => step.name === required[2])?.if).toContain('corpus');
     expect(steps.find(step => step.name === required[6])?.if).toContain("== 'application'");
-    expect(steps.find(step => step.name === required[7])?.if).toContain("== 'corpus'");
+    const hosted = steps.find(step => step.name === required[7]);
+    expect(hosted?.if).toContain("== 'corpus'");
+    expect(hosted?.run).toBe(`bash .github/scripts/release-workers.sh audit-corpus ${role} "$RELEASE_MODE"`);
     expect(steps.filter(step => step.run?.includes('release-workers.sh deploy '))).toHaveLength(1);
     expect(steps.find(step => step.run?.includes('release-workers.sh reconcile '))?.if).toMatch(/failure\(\).*cancelled\(\)/);
     expect(steps.find(step => step.name === 'Retain sanitized release evidence')?.if).toBe('always()');
@@ -411,7 +413,9 @@ describe('ordinary release paths', () => {
       expect(job.concurrency).toEqual({group:'theologai-shared-preview-mutation','cancel-in-progress':false});
       const build = workflow.jobs['build-worker']!;
       expect(build.environment).toBeUndefined();
-      expect(JSON.stringify(build)).toContain('release-acceptance.ts');
+      const local = build.steps?.find(step => step.name === 'Exercise the exact Worker on local Workerd');
+      expect(local?.run).toContain('scripts/release-acceptance.ts --mode "$RELEASE_MODE" --role preview');
+      expect(local?.run).not.toContain('--focused');
       expect(JSON.stringify(build)).not.toContain('secrets.');
     }
   });

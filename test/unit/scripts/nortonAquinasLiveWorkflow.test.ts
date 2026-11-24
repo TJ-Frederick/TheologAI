@@ -6,7 +6,7 @@ import{tmpdir}from'node:os';
 import{createHash}from'node:crypto';
 const classify = vi.hoisted(() => vi.fn());
 vi.mock('../../../scripts/application-release-policy.mjs',async importOriginal=>({...(await importOriginal<object>()),classifyApplicationRelease:classify}));
-import{createOperatorChallenge}from'../../../scripts/operator-corpus-proof.js';
+import{createOperatorChallenge,operatorApproval}from'../../../scripts/operator-corpus-proof.js';
 import{POLICY,TARGETS}from'../../../scripts/application-release-policy.mjs';
 import{corpusGrant,corpusTransportFixture}from'../../helpers/corpusTransportFixture.js';
 const audit=vi.hoisted(()=>vi.fn());
@@ -31,10 +31,33 @@ function fixture(role:'preview'|'production'='preview'){
  const grant=authorization.authorization;
  for(const [key,value] of Object.entries({GITHUB_RUN_ID:'12345',GITHUB_RUN_ATTEMPT:'1',GITHUB_EVENT_NAME:production?'workflow_dispatch':'pull_request',GITHUB_REF:production?'refs/heads/main':'refs/pull/172/merge'}))vi.stubEnv(key,value);
  const c=createOperatorChallenge(role,classification,digest,{GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:grant.repository,GITHUB_RUN_ATTEMPT:'1',GITHUB_RUN_ID:'12345',GITHUB_EVENT_NAME:production?'workflow_dispatch':'pull_request',GITHUB_REF:production?'refs/heads/main':'refs/pull/172/merge',OPERATOR_BASE_COMMIT:grant.baseCommit},now,{accountId:POLICY.account,role,...dated,day:new Date(now).toISOString().slice(0,10),observedAt:new Date(now).toISOString(),inventoryObservedAt:new Date(now).toISOString(),liveControlReserve,rowsRead:100,rowsWritten:0,sampleInterval:1,readBudget:3450000,controls:[]},authorization);
- const receipt={schemaVersion:'theologai-fresh-complete-corpus-proof.v1',releasePolicy:POLICY.policy,liveControlReserve,role,accountId:POLICY.account,...TARGETS[role],sourceCommit:classification.sourceCommit,sourceTree:classification.sourceTree,corpusIdentity:hash,schema:classification.schema,sourcePlanSha256:digest,approvalSha256:hash,startedAt:new Date(now-1000).toISOString(),completedAt:new Date(now).toISOString(),readBudget:3450000,metering:{rowsRead:3332195,rowsWritten:4,requests:3337,integrityCommands:4,retries:0,unknownAttempts:0},controlsUnchanged:true,operationalAssumption:'owner_reserves_target_data_writes_during_proof_not_an_enforced_provider_lease',proof:{method:'fresh_complete_cells_physical_and_rank1_fts.v1',quickCheck:'ok',ftsIntegrity:['strongs_fts','sections_fts','historical_edition_sections_fts','historical_edition_hierarchy_bodies_fts'],tables,sourceRows:39,catalogSha256:hash,ledgerSha256:hash,foreignKeys:{method:'local_clean_raw_schema_plus_all_child_parent_cells',witnessSha256:hash}}};
+ const receipt={schemaVersion:'theologai-fresh-complete-corpus-proof.v1',releasePolicy:POLICY.policy,liveControlReserve,role,accountId:POLICY.account,...TARGETS[role],sourceCommit:classification.sourceCommit,sourceTree:classification.sourceTree,corpusIdentity:hash,schema:classification.schema,sourcePlanSha256:digest,approvalSha256:sha(JSON.stringify(operatorApproval(c))),startedAt:new Date(now).toISOString(),completedAt:new Date(now).toISOString(),readBudget:3450000,metering:{rowsRead:3332195,rowsWritten:4,requests:3337,integrityCommands:4,retries:0,unknownAttempts:0},controls:c.admission.controls,controlsUnchanged:true,operationalAssumption:'owner_reserves_target_data_writes_during_proof_not_an_enforced_provider_lease',proof:{method:'fresh_complete_cells_physical_and_rank1_fts.v1',quickCheck:'ok',ftsIntegrity:['strongs_fts','sections_fts','historical_edition_sections_fts','historical_edition_hierarchy_bodies_fts'],tables,sourceRows:39,catalogSha256:hash,ledgerSha256:hash,foreignKeys:{method:'local_clean_raw_schema_plus_all_child_parent_cells',witnessSha256:hash}}};
  let calls=0;const provider=corpusTransportFixture({role,activated:true,advance:()=>vi.setSystemTime(Date.now()+1000),record:()=>{calls++;},query:()=>{throw Error('SQL forbidden');}});
- const files={challengeFile:join(directory,'challenge.json'),receiptFile:join(directory,'receipt.json'),cutoverFile:join(directory,'cutover.json')};writeFileSync(files.challengeFile,JSON.stringify(c));writeFileSync(files.receiptFile,JSON.stringify(receipt));writeFileSync(files.cutoverFile,JSON.stringify({candidateBindingMatches:true,candidateD1:TARGETS[role],observedActiveDeploymentId:provider.deployments[role],observedActiveVersionId:provider.versions[role]}));
- return {directory,calls:()=>calls,input:{role,sourceDirectory,planSha256:digest,...files,outputDirectory:directory,token:'synthetic-token',fetch:provider.fetch},hash};
+ const files={challengeFile:join(directory,'challenge.json'),receiptFile:join(directory,'receipt.json'),cutoverFile:join(directory,'cutover.json')};
+ writeFileSync(files.challengeFile,JSON.stringify(c));
+ writeFileSync(files.receiptFile,JSON.stringify(receipt));
+ writeFileSync(files.cutoverFile,JSON.stringify({worker:production?'theologai':'theologai-preview',candidateBindingMatches:true,
+  candidateD1:TARGETS[role],observedActiveD1:TARGETS[role],observedActiveDeploymentId:provider.deployments[role],
+  observedActiveVersionId:provider.versions[role]}));
+ const journal=JSON.stringify({kind:'complete-unbound-inventory',capture:{exclusiveUsage:{
+  databaseId:TARGETS[role].databaseId,completeDatabaseGroups:true,windowStart:dated.accountReadCeilingDay+'T00:00:00.000Z',
+  candidate:{rowsWritten:4},
+ }}})+'\n';
+ writeFileSync(files.receiptFile+'.events.jsonl',journal);
+ writeFileSync(join(directory,'operator-proof-envelope.json'),JSON.stringify({
+  schemaVersion:'theologai-operator-corpus-envelope.v1',challenge:c,receipt,journalSha256:sha(journal),
+  budget:{authorizationId:grant.authorizationId,previousReadsSpentOrReserved:0,previousWritesSpentOrReserved:0,
+   previousDiagnosticCommands:0,cumulativeReadsSpentOrReserved:receipt.metering.rowsRead,
+   cumulativeWritesSpentOrReserved:4,cumulativeDiagnosticCommands:4},
+ }));
+ const fetch:typeof globalThis.fetch=async(input,init)=>{
+  const response=await provider.fetch(input,init);
+  if(!String(input).endsWith('/graphql'))return response;
+  const body=await response.json() as {data:{viewer:{accounts:{databases:{sum:{rowsWritten:number}}[]}[]}}};
+  body.data.viewer.accounts[0]!.databases[0]!.sum.rowsWritten=4;
+  return Response.json(body);
+ };
+ return {directory,calls:()=>calls,input:{role,sourceDirectory,planSha256:digest,...files,outputDirectory:directory,token:'synthetic-token',fetch},hash};
 }
 it('runs the actual live orchestration through controls, audit and completion with single journal ownership',async()=>{
  const f=fixture();audit.mockImplementationOnce(async(options:any)=>{options.guard();return{endpoint:options.endpoint,productProfile:'7',serverVersion:'3.6.0-preview',protocols:['2025-11-25','2026-07-28'],fingerprints:[0,1].map(()=>Object.fromEntries(['capabilities','tools','prompts','resourceTemplates','staticResources'].map(key=>[key,f.hash]))),checks:[{id:'language:fixture',result:'passed'}]};});
@@ -53,7 +76,7 @@ it('refuses an observed production overage even when the account still has daily
   const response=await provider(input,init);
   if(audited&&String(input).endsWith('/graphql')){
    const body=await response.json() as {data:{viewer:{accounts:{databases:{sum:{rowsRead:number}}[]}[]}}};
-   body.data.viewer.accounts[0].databases[0].sum.rowsRead=3332195+100+300001;
+   body.data.viewer.accounts[0].databases[0].sum.rowsRead=3332195+100+150001;
    return Response.json(body);
   }
   return response;
@@ -62,7 +85,8 @@ it('refuses an observed production overage even when the account still has daily
   await expect(runCorpusLive(f.input)).rejects.toThrow('observed live/control allowance exceeded');
   expect(audited).toBe(true);
   const journal=readFileSync(join(f.directory,'corpus-live.json.events.jsonl'),'utf8').trim().split('\n');
-  expect(JSON.parse(journal.at(-1)!)).toMatchObject({kind:'live-budget-stop',reason:'observed live/control allowance exceeded',effectiveAccountReads:3332295,observedAccountReads:3632296,reservationRetained:true,retry:false});
+  expect(JSON.parse(journal.at(-1)!)).toMatchObject({kind:'live-budget-stop',attempt:1,reason:'observed live/control allowance exceeded',accountReadFloor:3332295,
+   observedAccountReads:3482296,cumulativeReservedReads:150000,reservationRetained:true});
   expect(existsSync(join(f.directory,'corpus-live.json'))).toBe(false);
  }finally{vi.unstubAllEnvs();audit.mockReset();rmSync(f.directory,{recursive:true,force:true});}
 },30000);
