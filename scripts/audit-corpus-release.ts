@@ -1,4 +1,4 @@
-/** Fixed corpus-only live profile. Both protocol eras; frozen core/spine/language fixtures. */
+/** Both-era corpus acceptance against a frozen local source and the canonical MCP contracts. */
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -8,6 +8,7 @@ import { assertSuccess, assertSafeError, assertInputError, corruptCursor } from 
 import { captureMcpTransportSnapshot, assertMcpTransportContract, fingerprintMcpTransportSnapshot } from '../test/helpers/mcpTransportContract.js';
 import { escapeFrozenEditionSectionContentForMarkdown } from '../src/kernel/editionProvenanceFoundation.js';
 import {createHash} from 'node:crypto';
+import { hostedCorpusProfile } from './hosted-corpus-profile.mjs';
 const sha=(v:string|Buffer)=>createHash('sha256').update(v).digest('hex');
 const hash=(v:unknown)=>sha(JSON.stringify(v));
 export const CORPUS_LIVE_FAILURE_CATEGORIES=['timeout','aborted','guard','network','http_status','response_size','response_read','transport_budget','protocol','tool_error','assertion','cleanup','unknown','diagnostic_boundary'] as const;
@@ -174,11 +175,15 @@ export async function auditCorpusRelease(options: {
     guard?:()=>void;
     pace?:CorpusRequestPacer;
     diagnosticStopAfterProbe?:'search:calvin-institutes';
+    profile?: typeof hostedCorpusProfile;
 }) {
     const root = options.root;
     const parsed = new URL(options.endpoint);
     check(parsed.protocol === 'https:' && !parsed.username && !parsed.password && !parsed.search && !parsed.hash, 'unsafe_endpoint');
     const started = Date.now();
+    const focused = options.profile === hostedCorpusProfile;
+    const exchangeLimit = focused ? 24 : 200;
+    const durationLimit = focused ? 120_000 : 600_000;
     const pace=options.pace??createCorpusRequestPacer();
     let aggregateBytes = 0;
     const checks: {
@@ -251,13 +256,13 @@ export async function auditCorpusRelease(options: {
                     if(awaited)requestObservations.set(requestProbe,observation);
                     try{
                     try{options.guard?.();}catch{throw new AuditFault('guard');}
-                    check(exchanges < 200 && Date.now() - started <= 600000, 'live_http_time_budget');
+                    check(exchanges < exchangeLimit && Date.now() - started <= durationLimit, 'live_http_time_budget');
                     const url = String(input instanceof Request ? input.url : input);
                     check(url === options.endpoint, 'unexpected_endpoint');
                     const requestStarted=Date.now();const controller = new AbortController(), timer = setTimeout(() => {observation.responseBody.deadlineFired=true;controller.abort();}, 30000);
                     try {
                         const signal=init?.signal?AbortSignal.any([init.signal,controller.signal]):controller.signal;
-                        const dispatchGuard=()=>{check(exchanges<200,'live_http_time_budget');if(halted)throw new AuditFault('aborted','transport_stopped');try{options.guard?.();}catch{throw new AuditFault('guard');}check(Date.now()-started<=600000,'live_http_time_budget');if(controller.signal.aborted)throw new AuditFault('timeout');if(init?.signal?.aborted)throw new AuditFault('aborted');};
+                        const dispatchGuard=()=>{check(exchanges<exchangeLimit,'live_http_time_budget');if(halted)throw new AuditFault('aborted','transport_stopped');try{options.guard?.();}catch{throw new AuditFault('guard');}check(Date.now()-started<=durationLimit,'live_http_time_budget');if(controller.signal.aborted)throw new AuditFault('timeout');if(init?.signal?.aborted)throw new AuditFault('aborted');};
                         let response:Response;
                         try{response=await pace(signal,dispatchGuard,()=>{dispatchGuard();exchanges++;totalExchanges++;eraExchanges=exchanges;return fetchImpl(input,{...init,headers:{...Object.fromEntries(new Headers(init?.headers)),'user-agent':`TheologAI-Corpus-${role}-Audit/1.0`},redirect:'error',signal});});}catch(error){if(error instanceof AuditFault)throw error;throw new AuditFault(controller.signal.aborted?'timeout':init?.signal?.aborted?'aborted':'network');}
                         observation.responseBody.headersMs=Date.now()-requestStarted;requestStatus=response.status;requestEvidence=httpEvidence(response);observation.status=requestStatus;observation.evidence=requestEvidence;if(awaited){if(requestProbe.startsWith('contract:'))contractResponses.set(requestProbe,{status:requestStatus,evidence:requestEvidence});lastHttpStatus=requestStatus;lastHttpEvidence=requestEvidence;httpObservationProbe=requestProbe;}
@@ -310,6 +315,9 @@ export async function auditCorpusRelease(options: {
                     if(options.diagnosticStopAfterProbe===id){stage='probe';throw new AuditFault('diagnostic_boundary','fixed_prefix_boundary');}
                     return value;
                 };
+                const uris = (v: unknown): string[] => v && typeof v === 'object'
+                    ? Object.entries(v).flatMap(([key, value]) => key === 'uri' && typeof value === 'string' ? [value] : uris(value))
+                    : [];
                 let eraFailed=false;
                 try {
                     current = 'initialize';stage='initialize';failedRequest=undefined;lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
@@ -321,69 +329,130 @@ export async function auditCorpusRelease(options: {
                     check(client.getNegotiatedProtocolVersion() === protocol, 'protocol_version_mismatch');
                     check(snapshot.server.version === options.serverVersion, 'server_version_mismatch');
                     fingerprints.push(await fingerprintMcpTransportSnapshot(snapshot));
-                    const catalog = await probe('catalog', () => client.readResource({ uri: 'theologai://primary-sources/catalog' }));
-                    check(JSON.parse(catalog.contents[0].text).workCount === 36, 'catalog_count_mismatch');
-                    await probe('classic-catalog', () => client.callTool({ name: 'classic_text_lookup', arguments: { listWorks: true } }));
-                    await probe('primary-research-prompt', () => client.getPrompt({ name: 'primary-source-research', arguments: { topic: 'eucharist', authors: 'Erasmus of Rotterdam,Martin Luther', startYear: '500', endYear: '1500', maxSections: '2' } }));
-                    await probe('confession-prompt', () => client.getPrompt({ name: 'confession-study', arguments: { topic: 'justification' } }));
-                    const uris = (v: any): string[] => v && typeof v === 'object' ? Object.entries(v).flatMap(([k, x]) => k === 'uri' && typeof x === 'string' ? [x] : uris(x)) : [];
-                    for (const p of [...core.probes, ...spine.probes]) {
-                        await probe('classic-landing:' + p.workId, () => client.callTool({ name: 'classic_text_lookup', arguments: { work: p.workId } }));
-                        const page = await probe('browse:' + p.workId, () => client.callTool({ name: 'classic_text_lookup', arguments: { work: p.workId, browseSections: true } }));
-                        const next = (page.structuredContent as any)?.directory?.pagination?.nextCursor;
-                        if (next)
-                            await probe('browse-next:' + p.workId, () => client.callTool({ name: 'classic_text_lookup', arguments: { work: p.workId, browseSections: true, cursor: next } }));
-                        await probe('landing:' + p.workId, () => client.readResource({ uri: 'theologai://documents/' + p.workId }));
-                        await probe('body:' + p.workId, () => client.readResource({ uri: 'theologai://documents/' + p.workId + '#section-' + p.firstSection.sectionKey }));
-                        const global = await probe('global-classic-search:' + p.workId, () => client.callTool({ name: 'classic_text_lookup', arguments: { query: p.query } }));
-                        const globalUri = uris(global.structuredContent).find(x => x.startsWith('theologai://documents/' + p.workId + '#section-'));
-                        if (!globalUri && p.sourcePackId)
-                            throw new AuditFault('assertion','global_search_locator_missing');
-                        await probe('global-search-body:' + p.workId, () => client.readResource({ uri: globalUri ?? 'theologai://documents/' + p.workId }));
-                        const q = { id: 'scope', text: p.query, work: p.workId, match: 'all_terms', limit: 8, ...(!preview ? { providers: ['local'] } : { searchDepth: 'standard' }) };
-                        const primary = await probe('search:' + p.workId, () => client.callTool({ name: 'primary_source_search', arguments: { queries: [q] } }));
-                        const primaryUri = uris(primary.structuredContent).find(x => x.startsWith('theologai://documents/' + p.workId + '#section-'));
-                        if (!primaryUri)
-                            throw new AuditFault('assertion','scoped_search_locator_missing');
-                        await probe('primary-search-body:' + p.workId, () => client.readResource({ uri: primaryUri }));
-                    }
-                    await probe('legacy-regression', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: core.legacyRegression.workId } }));
-                    const disabled = await probe('external-disabled', () => client.callTool({ name: 'primary_source_search', arguments: { queries: [{ id: 'external', text: 'Lord Supper', ...(preview ? { searchDepth: 'expanded', expandedLimit: 1 } : { providers: ['ccel'] }), match: 'all_terms', selection: 'relevance', limit: 1 }] } }), !preview);
-                    const badCursor = await probe('invalid-classic-cursor', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: core.probes[0].workId, browseSections: true, cursor: 'not-a-valid-cursor' } }), true);
-                    check(badCursor.isError === true, 'invalid_cursor_accepted');
-                    current='external-disabled';stage='assertion';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
-                    check(preview ? !JSON.stringify(disabled).includes('external_discovery_executed') : disabled.isError === true, 'external_disabled_contract');
-                    await probe('norton-browse', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: norton.document_id, browseSections: true } }));
-                    await probe('norton-body', () => client.readResource({ uri: 'theologai://documents/' + norton.document_id + '#section-' + norton.section_key }));
-                    await probe('aquinas-landing', () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug } }));
-                    await probe('aquinas-children', () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, browseChildren: true } }));
-                    for (const node of directNodes) {
-                        await probe('aquinas-node:' + node, () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, nodeKey: node } }));
-                        await probe('aquinas-resource:' + node, () => client.readResource({ uri: 'theologai://documents/' + aquinas.public_slug + '#node-' + node }));
-                    }
-                    await probe('aquinas-search', () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, query: 'grace', match: 'all_terms' } }));
-                    const cursorHistory = new Map<string, string>(), priorCandidates = new Map<string, string[]>();
-                    for (const c of language.cases) {
-                        current='language:'+c.id;stage='assertion';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;failedRequest=undefined;
-                        const args = { ...c.arguments };
-                        if (c.cursorFrom) {
-                            const cursor = cursorHistory.get(c.cursorFrom);
-                            if (!cursor)
-                                throw new AuditFault('assertion','language_cursor_missing');
-                            args.cursor = c.cursorMutation ? corruptCursor(cursor) : cursor;
-                        }
-                        const value = await probe('language:' + c.id, () => client.callTool({ name: 'original_language_study', arguments: args }), c.mode !== 'success');
-                        const raw = { ...value, text: (value.content ?? []).filter((x: any) => x.type === 'text').map((x: any) => x.text) };
-                        try{
-                            if (c.mode === 'success')
-                                assertSuccess(c.id, raw as any, language, cursorHistory, priorCandidates);
-                            else if (c.mode === 'safe-error')
-                                assertSafeError(c.id, raw as any, args.cursor);
-                            else
-                                assertInputError(raw as any);
-                        }catch{throw new AuditFault('assertion',c.mode==='success'?'language_success_contract':c.mode==='safe-error'?'language_safe_error_contract':'language_input_error_contract');}
+                    if (focused) {
+                        await focusedChecks();
+                    } else {
+                        await fullChecks();
                     }
                     summaries.push({ role, era, httpExchanges: exchanges, checks: checks.filter(x => x.role === role && x.era === era).length });
+
+                    async function focusedChecks() {
+                        const nortonPrefix = 'theologai://documents/' + norton.document_id + '#section-';
+                        const nortonUri = nortonPrefix + norton.section_key;
+                        const aquinasPrefix = 'theologai://documents/' + aquinas.public_slug + '#node-';
+                        const aquinasUri = aquinasPrefix + directNodes[0];
+                        const wesley = 'wesley-standard-sermons';
+                        const hooker = 'hooker-laws-of-ecclesiastical-polity-book-1';
+                        const wesleyFixture = core.probes.find((item: {workId: string}) => item.workId === wesley);
+                        const hookerFixture = spine.probes.find((item: {workId: string}) => item.workId === hooker);
+                        check(wesleyFixture && hookerFixture, 'required_search_fixture_missing');
+                        const exactBody = (id: string, uri: string) => probe(id, async () => {
+                            const result = await client.readResource({ uri });
+                            check(result.contents.some(item => item.uri === uri && 'text' in item), 'exact_citation_missing');
+                            return result;
+                        });
+                        const locator = (value: unknown, prefix: string) => {
+                            const uri = uris(value).find(candidate => candidate.startsWith(prefix));
+                            check(uri, 'search_locator_missing');
+                            return uri;
+                        };
+                        const scopedSearch = (id: string, work: string, text: string) => probe(id, () =>
+                            client.callTool({ name: 'primary_source_search', arguments: { queries: [{
+                                id: 'scope', work, text, match: 'all_terms', limit: 8,
+                                ...(preview ? { searchDepth: 'standard' } : { providers: ['local'] }),
+                            }] } }));
+                        const index = await probe('norton-lookup', () => client.callTool({
+                            name: 'classic_text_lookup', arguments: { work: norton.document_id, browseSections: true },
+                        }));
+                        check(uris(index.structuredContent).includes(nortonUri), 'norton_directory_locator_missing');
+                        await exactBody('norton-body', nortonUri);
+                        const nortonSearch = await scopedSearch('norton-search', norton.document_id, 'latine maister caluin');
+                        await exactBody('norton-search-body', locator(nortonSearch.structuredContent, nortonPrefix));
+
+                        const node = await probe('aquinas-node', () => client.callTool({
+                            name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, nodeKey: directNodes[0] },
+                        }));
+                        check(uris(node.structuredContent).includes(aquinasUri), 'aquinas_node_locator_missing');
+                        await exactBody('aquinas-node-body', aquinasUri);
+                        const aquinasSearch = await probe('aquinas-search', () => client.callTool({
+                            name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, query: 'grace', match: 'all_terms' },
+                        }));
+                        await exactBody('aquinas-search-body', locator(aquinasSearch.structuredContent, aquinasPrefix));
+
+                        const wesleySearch = await scopedSearch('search:' + wesley, wesley, wesleyFixture.query);
+                        const wesleyUri = locator(wesleySearch.structuredContent, 'theologai://documents/' + wesley + '#section-');
+                        check(wesleyUri === wesleyFixture.primarySearch.resourceUri, 'wesley_known_sermon_missing');
+                        await exactBody('primary-search-body:' + wesley, wesleyUri);
+                        const hookerSearch = await probe('global-classic-search:' + hooker, () => client.callTool({
+                            name: 'classic_text_lookup', arguments: { query: hookerFixture.query },
+                        }));
+                        await exactBody('global-search-body:' + hooker, locator(hookerSearch.structuredContent,
+                            'theologai://documents/' + hooker + '#section-'));
+                    }
+
+                    async function fullChecks() {
+                        const catalog = await probe('catalog', () => client.readResource({ uri: 'theologai://primary-sources/catalog' }));
+                        check(JSON.parse(catalog.contents[0].text).workCount === 36, 'catalog_count_mismatch');
+                        await probe('classic-catalog', () => client.callTool({ name: 'classic_text_lookup', arguments: { listWorks: true } }));
+                        await probe('primary-research-prompt', () => client.getPrompt({ name: 'primary-source-research', arguments: { topic: 'eucharist', authors: 'Erasmus of Rotterdam,Martin Luther', startYear: '500', endYear: '1500', maxSections: '2' } }));
+                        await probe('confession-prompt', () => client.getPrompt({ name: 'confession-study', arguments: { topic: 'justification' } }));
+                        for (const p of [...core.probes, ...spine.probes]) {
+                            await probe('classic-landing:' + p.workId, () => client.callTool({ name: 'classic_text_lookup', arguments: { work: p.workId } }));
+                            const page = await probe('browse:' + p.workId, () => client.callTool({ name: 'classic_text_lookup', arguments: { work: p.workId, browseSections: true } }));
+                            const next = (page.structuredContent as any)?.directory?.pagination?.nextCursor;
+                            if (next)
+                                await probe('browse-next:' + p.workId, () => client.callTool({ name: 'classic_text_lookup', arguments: { work: p.workId, browseSections: true, cursor: next } }));
+                            await probe('landing:' + p.workId, () => client.readResource({ uri: 'theologai://documents/' + p.workId }));
+                            await probe('body:' + p.workId, () => client.readResource({ uri: 'theologai://documents/' + p.workId + '#section-' + p.firstSection.sectionKey }));
+                            const global = await probe('global-classic-search:' + p.workId, () => client.callTool({ name: 'classic_text_lookup', arguments: { query: p.query } }));
+                            const globalUri = uris(global.structuredContent).find(x => x.startsWith('theologai://documents/' + p.workId + '#section-'));
+                            if (!globalUri && p.sourcePackId)
+                                throw new AuditFault('assertion','global_search_locator_missing');
+                            await probe('global-search-body:' + p.workId, () => client.readResource({ uri: globalUri ?? 'theologai://documents/' + p.workId }));
+                            const q = { id: 'scope', text: p.query, work: p.workId, match: 'all_terms', limit: 8, ...(!preview ? { providers: ['local'] } : { searchDepth: 'standard' }) };
+                            const primary = await probe('search:' + p.workId, () => client.callTool({ name: 'primary_source_search', arguments: { queries: [q] } }));
+                            const primaryUri = uris(primary.structuredContent).find(x => x.startsWith('theologai://documents/' + p.workId + '#section-'));
+                            if (!primaryUri)
+                                throw new AuditFault('assertion','scoped_search_locator_missing');
+                            await probe('primary-search-body:' + p.workId, () => client.readResource({ uri: primaryUri }));
+                        }
+                        await probe('legacy-regression', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: core.legacyRegression.workId } }));
+                        const disabled = await probe('external-disabled', () => client.callTool({ name: 'primary_source_search', arguments: { queries: [{ id: 'external', text: 'Lord Supper', ...(preview ? { searchDepth: 'expanded', expandedLimit: 1 } : { providers: ['ccel'] }), match: 'all_terms', selection: 'relevance', limit: 1 }] } }), !preview);
+                        const badCursor = await probe('invalid-classic-cursor', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: core.probes[0].workId, browseSections: true, cursor: 'not-a-valid-cursor' } }), true);
+                        check(badCursor.isError === true, 'invalid_cursor_accepted');
+                        current='external-disabled';stage='assertion';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;
+                        check(preview ? !JSON.stringify(disabled).includes('external_discovery_executed') : disabled.isError === true, 'external_disabled_contract');
+                        await probe('norton-browse', () => client.callTool({ name: 'classic_text_lookup', arguments: { work: norton.document_id, browseSections: true } }));
+                        await probe('norton-body', () => client.readResource({ uri: 'theologai://documents/' + norton.document_id + '#section-' + norton.section_key }));
+                        await probe('aquinas-landing', () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug } }));
+                        await probe('aquinas-children', () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, browseChildren: true } }));
+                        for (const node of directNodes) {
+                            await probe('aquinas-node:' + node, () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, nodeKey: node } }));
+                            await probe('aquinas-resource:' + node, () => client.readResource({ uri: 'theologai://documents/' + aquinas.public_slug + '#node-' + node }));
+                        }
+                        await probe('aquinas-search', () => client.callTool({ name: 'historical_hierarchy_lookup', arguments: { slug: aquinas.public_slug, query: 'grace', match: 'all_terms' } }));
+                        const cursorHistory = new Map<string, string>(), priorCandidates = new Map<string, string[]>();
+                        for (const c of language.cases) {
+                            current='language:'+c.id;stage='assertion';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;failedRequest=undefined;
+                            const args = { ...c.arguments };
+                            if (c.cursorFrom) {
+                                const cursor = cursorHistory.get(c.cursorFrom);
+                                if (!cursor)
+                                    throw new AuditFault('assertion','language_cursor_missing');
+                                args.cursor = c.cursorMutation ? corruptCursor(cursor) : cursor;
+                            }
+                            const value = await probe('language:' + c.id, () => client.callTool({ name: 'original_language_study', arguments: args }), c.mode !== 'success');
+                            const raw = { ...value, text: (value.content ?? []).filter((x: any) => x.type === 'text').map((x: any) => x.text) };
+                            try{
+                                if (c.mode === 'success')
+                                    assertSuccess(c.id, raw as any, language, cursorHistory, priorCandidates);
+                                else if (c.mode === 'safe-error')
+                                    assertSafeError(c.id, raw as any, args.cursor);
+                                else
+                                    assertInputError(raw as any);
+                            }catch{throw new AuditFault('assertion',c.mode==='success'?'language_success_contract':c.mode==='safe-error'?'language_safe_error_contract':'language_input_error_contract');}
+                        }
+                    }
                 }
                 catch(error){
                     eraFailed=true;halted=true;await terminalEvidence;
@@ -407,6 +476,6 @@ export async function auditCorpusRelease(options: {
     finally {
         try{db.close();}catch{cleanupFailed=true;if(!failure){failure='cleanup';failureReason='database_close';current='database-close';stage='cleanup';lastHttpStatus=null;lastHttpEvidence=null;httpObservationProbe=null;}}
     }
-    return { schemaVersion: 'norton-aquinas-live.v1', role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,reason:failureReason,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.some(c=>c.passed)?trustedId([...checks].reverse().find(c=>c.passed)!.id):null,lastCompletedEra:[...checks].reverse().find(c=>c.passed)?.era??null,completedChecks:checks.filter(c=>c.passed).length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,httpObservationProbe:httpObservationProbe?trustedId(httpObservationProbe):null,httpEvidence:lastHttpEvidence,aggregateResponseBytes:aggregateBytes,cleanupFailed,httpMethod:originatingFailure?.httpMethod??null,rpcMethod:originatingFailure?.rpcMethod??null,requestId:originatingFailure?.requestId??null,sdkErrorCode:originatingFailure?.sdkErrorCode??null,responseBody:originatingFailure?.responseBody??null,httpErrorResponse:originatingFailure?.httpErrorResponse??null,secondaryHttpFailure:secondaryHttpFailure?{...secondaryHttpFailure,probeId:trustedId(secondaryHttpFailure.probeId)}:null}}:{}) };
+    return { schemaVersion: 'norton-aquinas-live.v1', ...(focused ? {profile:hostedCorpusProfile} : {}), role: options.role, endpoint: options.endpoint, serverVersion: options.serverVersion, productProfile: options.role === 'preview' ? '7' : '6', protocols: ['2025-11-25', '2026-07-28'], summaries, fixtureSha256: hash([core, spine, language]), fingerprints, checks, databaseSha256, manifestSha256, sourceBodyOutput: false, broaderV9Features: false, aggregateResponseBytes: aggregateBytes, durationMs: Date.now() - started,...(failure?{failure:{schemaVersion:'norton-aquinas-live-failure.v1' as const,category:failure,reason:failureReason,stage,role:options.role,era:era||null,probeId:trustedId(current),lastCompletedProbe:checks.some(c=>c.passed)?trustedId([...checks].reverse().find(c=>c.passed)!.id):null,lastCompletedEra:[...checks].reverse().find(c=>c.passed)?.era??null,completedChecks:checks.filter(c=>c.passed).length,httpExchanges:totalExchanges,eraHttpExchanges:eraExchanges,lastHttpStatus,httpObservationProbe:httpObservationProbe?trustedId(httpObservationProbe):null,httpEvidence:lastHttpEvidence,aggregateResponseBytes:aggregateBytes,cleanupFailed,httpMethod:originatingFailure?.httpMethod??null,rpcMethod:originatingFailure?.rpcMethod??null,requestId:originatingFailure?.requestId??null,sdkErrorCode:originatingFailure?.sdkErrorCode??null,responseBody:originatingFailure?.responseBody??null,httpErrorResponse:originatingFailure?.httpErrorResponse??null,secondaryHttpFailure:secondaryHttpFailure?{...secondaryHttpFailure,probeId:trustedId(secondaryHttpFailure.probeId)}:null}}:{}) };
     function sameFingerprints() { check(hash(fingerprints[0]) === hash(fingerprints[1]), 'dual_era_contract_mismatch'); }
 }

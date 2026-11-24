@@ -199,6 +199,14 @@ case "$phase" in
       --command-output "$work/deploy-output.txt" --output "$pre_audit" --github-output "$work/deploy.outputs"
     control cutover
     ;;
+  audit-corpus)
+    [[ "$mode" == corpus ]] || exit 2
+    test -f "$pre_audit" || refuse 'the verified cutover identity is required'
+    npx --no-install tsx scripts/norton-aquinas-live.ts "$role" \
+      "$RUNNER_TEMP/corpus-source" "$CORPUS_PLAN_SHA256" \
+      "$RUNNER_TEMP/operator-corpus-challenge.json" "$evidence/corpus-readiness.json" \
+      "$cutover" "$evidence"
+    ;;
   finish)
     observe final reconcile-post-mutation "$evidence/$role-final-routing.json"
     deployment_identity verify-audit-stability --pre-audit-identity "$pre_audit" \

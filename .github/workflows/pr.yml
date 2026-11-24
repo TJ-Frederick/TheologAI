@@ -592,18 +592,14 @@ jobs:
           npx --no-install tsx scripts/release-acceptance.ts --mode application --role preview \
             --endpoint https://preview-mcp.theologai.xyz/mcp --version "$version" --search \
             --output "$RUNNER_TEMP/release-evidence/application-smoke.json"
-      - name: Run full corpus acceptance in both protocol versions
+      - name: Verify serving corpus in both protocol versions with bounded recovery
         if: env.RELEASE_MODE == 'corpus'
         env:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_LOG_PATH: ${{ runner.temp }}/wrangler-logs
-        run: |
-          npx --no-install tsx scripts/norton-aquinas-live.ts preview \
-            "$RUNNER_TEMP/corpus-source" "$CORPUS_PLAN_SHA256" \
-            "$RUNNER_TEMP/operator-corpus-challenge.json" "$RUNNER_TEMP/release-evidence/corpus-readiness.json" \
-            "$RUNNER_TEMP/release-evidence/preview-worker-candidate-cutover.json" "$RUNNER_TEMP/release-evidence"
+        run: bash .github/scripts/release-workers.sh audit-corpus preview "$RELEASE_MODE"
       - name: Confirm final routing and environment isolation
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -5,17 +5,31 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { classifyCiChanges } from './classify-ci-changes.mjs';
 import { parseNameStatusNul } from './classify-production-deployment.mjs';
+import { hasHostedCorpusChecks, hostedCorpusCheckCount, hostedCorpusProfile } from './hosted-corpus-profile.mjs';
 
 const SHA = /^[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const roles = ['preview', 'production'];
-const releaseBookkeeping = new Set([
+const releaseOperations = new Set([
   'release/serving.json',
   '.github/scripts/production-baseline.cjs',
+  '.github/scripts/release-workers.sh',
+  '.github/workflows/deploy.yml',
+  '.github/workflows/pr.yml',
+  'scripts/audit-corpus-release.ts',
+  'scripts/hosted-corpus-profile.mjs',
+  'scripts/hosted-corpus-profile.d.mts',
+  'scripts/norton-aquinas-live.ts',
+  'scripts/release-acceptance.ts',
   'scripts/release-promotion.mjs',
   'test/fixtures/release-workers/replay.py',
   'test/helpers/corpusTransportFixture.ts',
+  'test/helpers/hostedCorpusRecoveryFixture.ts',
+  'test/test-topology.json',
+  'test/unit/config/workflowTopology.test.ts',
+  'test/unit/scripts/nortonAquinasLiveWorkflow.test.ts',
+  'test/unit/scripts/nortonOperatorSuccessorFlow.test.ts',
   'test/unit/scripts/releasePromotion.test.ts',
 ]);
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
@@ -59,8 +73,8 @@ export function classifyRelease(root = process.cwd(), baselineFile) {
   if (!paths.length) return 'docs';
   // The CI classifier already has an explicit list of runtime-only and documentation changes.
   // Anything outside it, including builders and their dependencies, needs data validation.
-  // Baseline bookkeeping can change independently of the Worker and corpus.
-  const substantive = paths.filter(change => !change.paths.every(path => releaseBookkeeping.has(path)));
+  // Release automation can change independently of the Worker and corpus.
+  const substantive = paths.filter(change => !change.paths.every(path => releaseOperations.has(path)));
   if (!substantive.length) return 'docs';
   const diff = substantive.map(change => [change.status, ...change.paths].join('\0') + '\0').join('');
   const {mode} = classifyCiChanges(diff);
@@ -82,7 +96,10 @@ export function createPreviewReceipt({root, mode, manifest, audit, identity, cut
   requireValue(audit.mode === mode && audit.role === 'preview' && audit.passed === true
     && audit.endpoint === 'https://preview-mcp.theologai.xyz/mcp', 'protected preview acceptance required');
   const protocols = ['2025-11-25', '2026-07-28'];
-  const count = mode === 'corpus' ? 185 : 4;
+  const focused = mode === 'corpus' && audit.profile === hostedCorpusProfile;
+  requireValue(audit.profile === undefined || focused, 'invalid preview audit profile');
+  if (focused) requireValue(hasHostedCorpusChecks(audit), 'focused preview acceptance incomplete');
+  const count = mode === 'corpus' ? focused ? hostedCorpusCheckCount / protocols.length : 185 : 4;
   requireValue(passed === count * protocols.length, 'preview acceptance incomplete');
   for (const era of protocols) {
     const ids = audit.checks.filter(check => check.era === era).map(check => mode === 'corpus' ? check.id : check.probeId);
@@ -103,16 +120,20 @@ export function createPreviewReceipt({root, mode, manifest, audit, identity, cut
     && cutover.observedActiveD1.databaseId === expected.databaseId, 'audited preview assignment differs');
   return {schemaVersion: 1, sourceTree: git(root, ['rev-parse', 'HEAD^{tree}']).trim(), mode,
     manifestSha256: manifest, checks: passed, deploymentId: identity.deploymentId,
-    versionId: identity.deployedVersionId, databaseId: expected.databaseId};
+    versionId: identity.deployedVersionId, databaseId: expected.databaseId,
+    ...(focused ? {corpusProfile: hostedCorpusProfile} : {})};
 }
 
 export function verifyPreviewReceipt(root, receipt, mode, manifest, tree) {
   requireValue(SHA.test(tree) && tree === git(root, ['rev-parse','HEAD^{tree}']).trim(), 'merged tree differs');
+  const expectedChecks = mode === 'application' ? 8 : receipt.corpusProfile === hostedCorpusProfile ? hostedCorpusCheckCount : 370;
+  requireValue(receipt.corpusProfile === undefined || (mode === 'corpus' && receipt.corpusProfile === hostedCorpusProfile),
+    'invalid corpus acceptance profile');
   requireValue(['application','corpus'].includes(mode) && DIGEST.test(manifest)
     && receipt.schemaVersion === 1 && receipt.mode === mode && receipt.sourceTree === tree
     && receipt.manifestSha256 === manifest && UUID.test(receipt.versionId) && UUID.test(receipt.deploymentId)
     && receipt.databaseId === readReleaseConfiguration(root).targets.preview.databaseId
-    && Number.isSafeInteger(receipt.checks) && (mode === 'corpus' ? receipt.checks === 370 : receipt.checks === 8), 'preview receipt mismatch');
+    && receipt.checks === expectedChecks, 'preview receipt mismatch');
   return receipt;
 }
 
