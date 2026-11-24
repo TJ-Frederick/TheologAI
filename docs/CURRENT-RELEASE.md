@@ -10,6 +10,34 @@ historical evidence.
 
 ## Latest verified production release — November 24, 2026
 
+[PR #190](https://github.com/TJ-Frederick/TheologAI/pull/190) restored
+footnotes in Bible translation comparisons, and
+[PR #191](https://github.com/TJ-Frederick/TheologAI/pull/191) batched
+historical catalog reads. The combined
+[PR #195](https://github.com/TJ-Frederick/TheologAI/pull/195) also added
+compact ranking for work-diverse search and tightened release baseline and
+preview eligibility checks.
+
+Production source `f79e1978872aac0bf163409846be13d33973cbd9` has the exact
+tree `c8ed236e0c6b88c1ed5d5f159e1c77732549126f` accepted by
+[protected preview run 45505223910](https://github.com/TJ-Frederick/TheologAI/actions/runs/45505223910).
+[Protected production run 45510247088](https://github.com/TJ-Frederick/TheologAI/actions/runs/45510247088),
+attempt 1, deployed that application bundle on the existing schema-0010
+production D1. Preview and production each passed **8/8** checks across
+both MCP protocol versions. The final routing check confirmed the production
+D1 binding and preview isolation before the workflow recorded acceptance.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — verified serving assignment | `485d1cc7-9244-4038-8887-ecca6387b073` | `e41a0440-8708-4aa3-a274-1fb39ec51c64` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control at production verification | `84fbbf0b-760a-4fde-9033-758124fb3716` | `337319a3-9ca0-41e1-8dea-f6579e981beb` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The protected run retained its matched predecessor and acceptance receipt.
+The receipt SHA-256 is
+`4f8f41397bb19cfa5ac9156052f5abf6e34dfcac7f379e1b1f08ac385c71dac8`.
+
+## Historical application release — November 24, 2026
+
 [PR #187](https://github.com/TJ-Frederick/TheologAI/pull/187) bound
 donation verification to the requested transaction evidence.
 [PR #188](https://github.com/TJ-Frederick/TheologAI/pull/188) removed the

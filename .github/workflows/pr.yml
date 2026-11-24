@@ -37,7 +37,6 @@ jobs:
       mode: ${{ steps.select.outputs.mode }}
       data: ${{ steps.select.outputs.data }}
       serving: ${{ steps.select.outputs.serving }}
-      release: ${{ steps.release.outputs.classification_succeeded == 'true' && steps.release.outputs.deploy_required }}
       tested_tree: ${{ steps.select.outputs.tested_tree }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -57,10 +56,6 @@ jobs:
         run: |
           node scripts/classify-ci-changes.mjs
           printf 'tested_tree=%s\n' "$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
-      - name: Identify documentation-only pull requests
-        if: github.event_name == 'pull_request'
-        id: release
-        run: node scripts/classify-production-deployment.mjs --before "$(git rev-parse HEAD^1)" --after "$(git rev-parse HEAD)" --head "$(git rev-parse HEAD)"
 
   test-and-build:
     name: ${{ github.event_name == 'workflow_dispatch' && (inputs.operator_proof_json != '' || inputs.operator_authorization_json != '') && 'Operator metadata / Test & Build' || 'Test & Build' }}
@@ -176,24 +171,70 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ',') }}
         run: test "$RESULTS" = 'success,success,success,success,success'
 
+  classify-release:
+    name: Classify PR Release
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      baseline: ${{ steps.production-baseline.outputs.baseline }}
+      mode: ${{ steps.release.outputs.mode }}
+      tested_tree: ${{ steps.release.outputs.tested_tree }}
+      same_tree: ${{ steps.release.outputs.same_tree }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
+          package-manager-cache: false
+      - name: Resolve accepted production baseline
+        id: production-baseline
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const {resolveProductionBaseline} = require('./.github/scripts/production-baseline.cjs');
+            const baseline = await resolveProductionBaseline({github, context});
+            core.setOutput('baseline', JSON.stringify(baseline));
+      - name: Classify the exact PR merge against accepted production
+        id: release
+        env:
+          CI_EXPECTED_HEAD: ${{ github.sha }}
+          CI_PR_BASE: ${{ github.event.pull_request.base.sha }}
+          CI_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PRODUCTION_BASELINE: ${{ steps.production-baseline.outputs.baseline }}
+        run: |
+          printf '%s\n' "$PRODUCTION_BASELINE" > "$RUNNER_TEMP/production-baseline.json"
+          node scripts/release-promotion.mjs classify-pr "$RUNNER_TEMP/production-baseline.json"
+
   release-eligibility:
     name: Release Eligibility
-    needs: [classify, validation-complete, preview-deploy]
-    if: ${{ always() && github.event_name == 'pull_request' && needs.classify.result != 'skipped' }}
+    needs: [classify-release, validation-complete, preview-deploy]
+    if: ${{ always() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
-          fetch-depth: 2
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version-file: '.nvmrc'
       - name: Explain exact candidate release eligibility
         env:
-          CI_EXPECTED_HEAD: ${{ github.sha }}
-          CI_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          CI_RELEASE_CLASSIFICATION_RESULT: ${{ needs.classify-release.result }}
+          CI_RELEASE_MODE: ${{ needs.classify-release.outputs.mode }}
+          CI_RELEASE_SAME_TREE: ${{ needs.classify-release.outputs.same_tree }}
           CI_VALIDATION_RESULT: ${{ needs.validation-complete.result }}
           CI_PREVIEW_RESULT: ${{ needs.preview-deploy.result }}
         run: node scripts/pr-release-eligibility.mjs
@@ -201,7 +242,7 @@ jobs:
 
   build-worker:
     name: Build preview Worker artifact (no cloud credentials)
-    needs: [classify, validation-complete]
+    needs: [classify, classify-release, validation-complete]
     if: >-
       github.event_name == 'pull_request' &&
       (github.event.action != 'labeled' || github.event.label.name == 'deploy-preview') &&
@@ -211,15 +252,17 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'deploy-preview') &&
       github.run_attempt == 1 &&
-      needs.classify.outputs.release == 'true'
+      needs.validation-complete.result == 'success' &&
+      needs.classify-release.result == 'success' &&
+      (needs.classify-release.outputs.mode == 'application' || needs.classify-release.outputs.mode == 'corpus')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
-      actions: read
+    env:
+      RELEASE_MODE: ${{ needs.classify-release.outputs.mode }}
+      PRODUCTION_BASELINE: ${{ needs.classify-release.outputs.baseline }}
     outputs:
-      baseline: ${{ steps.production-baseline.outputs.baseline }}
-      mode: ${{ steps.release.outputs.mode }}
       worker_sha256: ${{ steps.worker.outputs.sha256 }}
       worker_artifact_id: ${{ steps.worker-upload.outputs.artifact-id }}
       corpus_plan_sha256: ${{ steps.corpus.outputs.sha256 }}
@@ -229,33 +272,23 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: '.nvmrc'
       - name: Require the exact CI-tested tree
         env:
           TESTED_TREE: ${{ needs.classify.outputs.tested_tree }}
-        run: test "$(git rev-parse HEAD^{tree})" = "$TESTED_TREE"
-      - name: Resolve accepted production baseline
-        id: production-baseline
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const {resolveProductionBaseline} = require('./.github/scripts/production-baseline.cjs');
-            const baseline = await resolveProductionBaseline({github, context});
-            core.setOutput('baseline', JSON.stringify(baseline));
-      - name: Select release path before building
-        id: release
-        env:
-          PRODUCTION_BASELINE: ${{ steps.production-baseline.outputs.baseline }}
+          CLASSIFIED_TREE: ${{ needs.classify-release.outputs.tested_tree }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          printf '%s\n' "$PRODUCTION_BASELINE" > "$RUNNER_TEMP/production-baseline.json"
-          mode="$(node scripts/release-promotion.mjs classify "$RUNNER_TEMP/production-baseline.json")"
-          case "$mode" in application|corpus) ;; *) exit 1 ;; esac
-          printf 'mode=%s\n' "$mode" >> "$GITHUB_OUTPUT"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git rev-parse HEAD^{tree})" = "$TESTED_TREE"
+          test "$TESTED_TREE" = "$CLASSIFIED_TREE"
+          baseline="$(jq -er '.productionSource' <<< "$PRODUCTION_BASELINE")"
+          git merge-base --is-ancestor "$baseline" HEAD
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: '.nvmrc'
       - run: npm ci --ignore-scripts --no-audit
       - name: Prepare source for complete corpus verification
-        if: steps.release.outputs.mode == 'corpus'
+        if: env.RELEASE_MODE == 'corpus'
         id: corpus
         run: |
           npm rebuild better-sqlite3 --ignore-scripts=false
@@ -263,7 +296,7 @@ jobs:
           digest="$(npx --no-install tsx scripts/application-corpus-check.ts prepare --database data/theologai.db --directory "$RUNNER_TEMP/corpus-source")"
           printf 'sha256=%s\n' "$digest" >> "$GITHUB_OUTPUT"
       - name: Retain source for complete corpus verification
-        if: steps.release.outputs.mode == 'corpus'
+        if: env.RELEASE_MODE == 'corpus'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: corpus-source-${{ github.run_id }}-attempt-${{ github.run_attempt }}
@@ -290,8 +323,6 @@ jobs:
             --endpoint https://worker.test/mcp --version "$version-preview" --search \
             --database data/theologai.db --bundle "$RUNNER_TEMP/worker-bundle/worker.js" \
             --output "$RUNNER_TEMP/local-release-acceptance.json"
-        env:
-          RELEASE_MODE: ${{ steps.release.outputs.mode }}
       - name: Retain exact local Worker acceptance
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -310,14 +341,17 @@ jobs:
           retention-days: 7
   operator-proof-source:
     name: Verify operator proof source (no cloud credentials)
-    needs: [build-worker, validation-complete]
-    if: needs.build-worker.outputs.mode == 'corpus'
+    needs: [classify-release, build-worker, validation-complete]
+    if: needs.classify-release.outputs.mode == 'corpus'
     runs-on: ubuntu-latest
     timeout-minutes: 65
     permissions:
       contents: read
       actions: read
       pull-requests: read
+    env:
+      RELEASE_MODE: ${{ needs.classify-release.outputs.mode }}
+      PRODUCTION_BASELINE: ${{ needs.classify-release.outputs.baseline }}
     outputs:
       source: ${{ steps.source.outputs.source }}
       tree: ${{ steps.source.outputs.tree }}
@@ -328,6 +362,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+      - name: Record the classification used for this corpus source
+        run: |
+          baseline="$(jq -er '.productionSource' <<< "$PRODUCTION_BASELINE")"
+          printf 'Source proof for **%s** release against `%s`.\n' "$RELEASE_MODE" "$baseline" >> "$GITHUB_STEP_SUMMARY"
       - uses: ./.github/actions/release-toolchain
       - name: Verify normal CI and live operator-proof authorization
         id: source
@@ -401,12 +439,13 @@ jobs:
 
   preview-deploy:
     name: Deploy Preview
-    needs: [validation-complete, build-worker, operator-proof-source]
+    needs: [classify-release, validation-complete, build-worker, operator-proof-source]
     if: >-
       !cancelled() && needs.validation-complete.result == 'success' &&
+      needs.classify-release.result == 'success' &&
       needs.build-worker.result == 'success' &&
-      (needs.build-worker.outputs.mode == 'application' ||
-       (needs.build-worker.outputs.mode == 'corpus' && needs.operator-proof-source.result == 'success'))
+      (needs.classify-release.outputs.mode == 'application' ||
+       (needs.classify-release.outputs.mode == 'corpus' && needs.operator-proof-source.result == 'success'))
     concurrency:
       group: theologai-shared-preview-mutation
       cancel-in-progress: false
@@ -420,9 +459,9 @@ jobs:
       contents: read
       pull-requests: read
     env:
-      RELEASE_MODE: ${{ needs.build-worker.outputs.mode }}
+      RELEASE_MODE: ${{ needs.classify-release.outputs.mode }}
       WORKER_SHA256: ${{ needs.build-worker.outputs.worker_sha256 }}
-      PRODUCTION_BASELINE: ${{ needs.build-worker.outputs.baseline }}
+      PRODUCTION_BASELINE: ${{ needs.classify-release.outputs.baseline }}
       CORPUS_PLAN_SHA256: ${{ needs.build-worker.outputs.corpus_plan_sha256 }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
