@@ -36,13 +36,25 @@ const RPC_KEY_BY_NETWORK = {
   'eip155:8453': 'base',
   'eip155:723': 'radius',
 } as const satisfies Record<SupportedDonationNetwork, RpcOverrideKey & DonationRpcKey>;
-interface RpcReceiptLog { address: string; topics: string[]; data: string }
-interface RpcReceipt { status: string; blockNumber: string; logs: RpcReceiptLog[] }
-interface RpcTransaction { from: string; to: string | null; value: string }
-type RpcResult<T> = { available: true; result: T | null } | { available: false };
+interface RpcReceipt {
+  transactionHash: string;
+  status: string;
+  blockHash: string;
+  blockNumber: string;
+  logs: unknown[];
+}
+interface RpcTransaction {
+  hash: string;
+  blockHash: string | null;
+  blockNumber: string | null;
+  from: string;
+  to: string | null;
+  value: string;
+}
+type RpcResult = { available: true; result: unknown } | { available: false };
 
 export class OnChainVerifier implements ITransactionEvidenceProvider {
-  private readonly cache = new Cache<ChainTransactionEvidence[]>(50, 5 * 60 * 1000);
+  private readonly cache = new Cache<ChainTransactionEvidence>(50 * SUPPORTED_DONATION_CHAINS.length, 5 * 60 * 1000);
   private readonly rpcs: RpcConfig[];
   private readonly rpcTimeoutMs: number;
 
@@ -58,12 +70,15 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
   }
 
   async getEvidence(txHash: string): Promise<ChainTransactionEvidence[]> {
-    const cached = this.cache.get(txHash);
-    if (cached) return cached;
+    return Promise.all(this.rpcs.map(async rpc => {
+      const key = `${rpc.network}:${txHash.toLowerCase()}`;
+      const cached = this.cache.get(key);
+      if (cached) return { ...cached, txHash };
 
-    const evidence = await Promise.all(this.rpcs.map(rpc => this.getChainEvidence(rpc, txHash)));
-    if (evidence.some(item => item.state === 'mined')) this.cache.set(txHash, evidence);
-    return evidence;
+      const evidence = await this.getChainEvidence(rpc, txHash);
+      if (evidence.state === 'mined') this.cache.set(key, evidence);
+      return evidence;
+    }));
   }
 
   private async getChainEvidence(rpc: RpcConfig, txHash: string): Promise<ChainTransactionEvidence> {
@@ -74,27 +89,42 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
       transfers: [] as ChainTransferEvidence[],
     };
     const [receiptResult, transactionResult] = await Promise.all([
-      this.rpcCall<RpcReceipt>(rpc.url, 'eth_getTransactionReceipt', [txHash]),
-      this.rpcCall<RpcTransaction>(rpc.url, 'eth_getTransactionByHash', [txHash]),
+      this.rpcCall(rpc.url, 'eth_getTransactionReceipt', [txHash]),
+      this.rpcCall(rpc.url, 'eth_getTransactionByHash', [txHash]),
     ]);
 
     if (!receiptResult.available || !transactionResult.available) return { ...base, state: 'unavailable' };
     const receipt = receiptResult.result;
     const transaction = transactionResult.result;
-    if (!receipt && !transaction) return { ...base, state: 'absent' };
-    if (!receipt && transaction) return { ...base, state: 'pending' };
-    if (!receipt || !transaction || !this.validReceipt(receipt) || !this.validTransaction(transaction)) {
+    if (receipt === null && transaction === null) return { ...base, state: 'absent' };
+    if (!this.validTransaction(transaction) || transaction.hash.toLowerCase() !== txHash.toLowerCase()) {
+      return { ...base, state: 'unavailable' };
+    }
+    if (receipt === null && transaction.blockHash === null && transaction.blockNumber === null) {
+      return { ...base, state: 'pending' };
+    }
+    if (!this.validReceipt(receipt) || receipt.transactionHash.toLowerCase() !== txHash.toLowerCase()
+      || transaction.blockHash?.toLowerCase() !== receipt.blockHash.toLowerCase()
+      || transaction.blockNumber === null) {
       return { ...base, state: 'unavailable' };
     }
 
     const minedSuccessfully = receipt.status.toLowerCase() === '0x1';
     const blockNumber = this.parseQuantity(receipt.blockNumber);
-    if (blockNumber === undefined) return { ...base, state: 'unavailable' };
+    if (blockNumber === undefined || this.parseQuantity(transaction.blockNumber) !== blockNumber) {
+      return { ...base, state: 'unavailable' };
+    }
 
-    const transfers = receipt.logs.flatMap(log => {
+    const transfers: ChainTransferEvidence[] = [];
+    for (const log of receipt.logs) {
+      if (!isRecord(log)) continue;
       const decoded = this.decodeTransfer(log);
-      return decoded ? [decoded] : [];
-    });
+      if (!decoded) continue;
+      if (!this.logMatchesMinedIdentity(log, receipt, blockNumber)) {
+        return { ...base, state: 'unavailable' };
+      }
+      transfers.push(decoded);
+    }
     const native = this.decodeNativeTransfer(transaction);
     if (native) transfers.push(native);
 
@@ -104,8 +134,10 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
   private validReceipt(receipt: unknown): receipt is RpcReceipt {
     if (!receipt || typeof receipt !== 'object') return false;
     const candidate = receipt as Partial<RpcReceipt>;
-    return typeof candidate.status === 'string'
+    return isHash(candidate.transactionHash)
+      && typeof candidate.status === 'string'
       && /^0x[01]$/.test(candidate.status.toLowerCase())
+      && isHash(candidate.blockHash)
       && typeof candidate.blockNumber === 'string'
       && Array.isArray(candidate.logs);
   }
@@ -113,14 +145,25 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
   private validTransaction(transaction: unknown): transaction is RpcTransaction {
     if (!transaction || typeof transaction !== 'object') return false;
     const candidate = transaction as Partial<RpcTransaction>;
-    return typeof candidate.from === 'string'
+    return isHash(candidate.hash)
+      && (candidate.blockHash === null || isHash(candidate.blockHash))
+      && (candidate.blockNumber === null || typeof candidate.blockNumber === 'string')
+      && typeof candidate.from === 'string'
       && (candidate.to === null || typeof candidate.to === 'string')
       && typeof candidate.value === 'string';
   }
 
-  private decodeTransfer(value: unknown): ChainTransferEvidence | undefined {
-    if (!value || typeof value !== 'object') return undefined;
-    const log = value as Partial<RpcReceiptLog>;
+  private logMatchesMinedIdentity(log: Record<string, unknown>, receipt: RpcReceipt, blockNumber: number): boolean {
+    return (log.transactionHash === undefined
+      || (isHash(log.transactionHash) && log.transactionHash.toLowerCase() === receipt.transactionHash.toLowerCase()))
+      && (log.blockHash === undefined
+        || (isHash(log.blockHash) && log.blockHash.toLowerCase() === receipt.blockHash.toLowerCase()))
+      && (log.blockNumber === undefined
+        || (typeof log.blockNumber === 'string' && this.parseQuantity(log.blockNumber) === blockNumber))
+      && (log.removed === undefined || log.removed === false);
+  }
+
+  private decodeTransfer(log: Record<string, unknown>): ChainTransferEvidence | undefined {
     if (typeof log.address !== 'string' || !ADDRESS_PATTERN.test(log.address)) return undefined;
     if (!Array.isArray(log.topics) || log.topics.length < 3 || typeof log.data !== 'string') return undefined;
     if (typeof log.topics[0] !== 'string' || log.topics[0].toLowerCase() !== TRANSFER_TOPIC) return undefined;
@@ -162,32 +205,36 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
     return Number.isSafeInteger(parsed) ? parsed : undefined;
   }
 
-  private async rpcCall<T>(url: string, method: string, params: unknown[]): Promise<RpcResult<T>> {
+  private async rpcCall(url: string, method: string, params: unknown[]): Promise<RpcResult> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.rpcTimeoutMs);
+    const id = 1;
     try {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
         signal: controller.signal,
       });
       if (!response.ok) return { available: false };
       const json = JSON.parse(
         await readBoundedResponseText(response, MAX_RPC_RESPONSE_BYTES, 'Donation RPC'),
-      ) as { result?: T | null; error?: unknown };
+      ) as unknown;
+      if (!isRecord(json) || json.jsonrpc !== '2.0' || json.id !== id) return { available: false };
+      const hasResult = Object.hasOwn(json, 'result');
+      const hasError = Object.hasOwn(json, 'error');
+      if (hasResult === hasError) return { available: false };
       // Nodes are allowed to return null for an unknown hash, but some public
       // endpoints use a JSON-RPC "not found" error instead. That is conclusive
       // absence, not an outage. Keep all other RPC errors unavailable so a
       // rate limit, malformed response, or provider failure cannot become a
       // false negative.
-      if (json.error) {
+      if (hasError) {
         return isTransactionNotFoundError(json.error)
           ? { available: true, result: null }
           : { available: false };
       }
-      if (!Object.hasOwn(json, 'result')) return { available: false };
-      return { available: true, result: json.result ?? null };
+      return { available: true, result: json.result };
     } catch {
       return { available: false };
     } finally {
@@ -198,7 +245,16 @@ export class OnChainVerifier implements ITransactionEvidenceProvider {
   dispose(): void { this.cache.dispose(); }
 }
 
+function isHash(value: unknown): value is string {
+  return typeof value === 'string' && WORD_PATTERN.test(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function isTransactionNotFoundError(error: unknown): boolean {
+  if (!isRecord(error) || !Number.isInteger(error.code)) return false;
   const text = rpcErrorText(error).toLowerCase().replace(/[_-]+/g, ' ').trim();
   return [
     'transaction not found',

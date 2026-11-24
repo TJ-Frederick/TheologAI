@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OnChainVerifier } from '../../../../src/adapters/donation/OnChainVerifier.js';
-import { SUPPORTED_DONATION_CHAINS } from '../../../../src/kernel/donation-types.js';
+import { RECIPIENT_ADDRESS, SUPPORTED_DONATION_CHAINS } from '../../../../src/kernel/donation-types.js';
+import { DonationService } from '../../../../src/services/donation/DonationService.js';
 
 const TX_HASH = `0x${'ab'.repeat(32)}`;
+const OTHER_HASH = `0x${'cd'.repeat(32)}`;
+const BLOCK_HASH = `0x${'ef'.repeat(32)}`;
 const TOKEN = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
 const FROM = `0x${'11'.repeat(20)}`;
 const TO = `0x${'22'.repeat(20)}`;
@@ -13,22 +16,25 @@ function transfer(to = TO, address = TOKEN, amount = 1_500_000n) {
   return { address, topics: [TRANSFER_TOPIC, word(FROM), word(to)], data: `0x${amount.toString(16).padStart(64, '0')}` };
 }
 function receipt(overrides: Record<string, unknown> = {}) {
-  return { status: '0x1', blockNumber: '0x100', logs: [], ...overrides };
+  return { transactionHash: TX_HASH, status: '0x1', blockHash: BLOCK_HASH, blockNumber: '0x100', logs: [], ...overrides };
 }
 function transaction(overrides: Record<string, unknown> = {}) {
-  return { from: FROM, to: TOKEN, value: '0x0', ...overrides };
+  return { hash: TX_HASH, blockHash: BLOCK_HASH, blockNumber: '0x100', from: FROM, to: TOKEN, value: '0x0', ...overrides };
+}
+function pendingTransaction(overrides: Record<string, unknown> = {}) {
+  return transaction({ blockHash: null, blockNumber: null, ...overrides });
+}
+function rpcResponse(fields: Record<string, unknown>) {
+  return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, ...fields }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 function response(result: unknown) {
-  return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return rpcResponse({ result });
 }
 function errorResponse(error: unknown) {
-  return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, error }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return rpcResponse({ error });
 }
 
 function mockByChain(handler: (url: string, method: string) => Response | Promise<Response>) {
@@ -91,7 +97,7 @@ describe('OnChainVerifier evidence', () => {
 
   it.each([
     [null, null, 'absent'],
-    [null, transaction(), 'pending'],
+    [null, pendingTransaction(), 'pending'],
     [receipt({ status: '0x0' }), transaction(), 'mined'],
   ])('distinguishes receipt/transaction state %#', async (receiptValue, txValue, state) => {
     mockChains(receiptValue, txValue);
@@ -106,6 +112,136 @@ describe('OnChainVerifier evidence', () => {
     const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
     const evidence = await provider.getEvidence(TX_HASH);
     expect(evidence.every(item => item.state === 'unavailable')).toBe(true);
+  });
+
+  it.each([
+    ['receipt hash', { transactionHash: OTHER_HASH }, {}],
+    ['transaction hash', {}, { hash: OTHER_HASH }],
+    ['both hashes', { transactionHash: OTHER_HASH }, { hash: OTHER_HASH }],
+    ['block hash', {}, { blockHash: OTHER_HASH }],
+    ['block number', {}, { blockNumber: '0x101' }],
+    ['invalid block hash on both records', { blockHash: '0x0' }, { blockHash: '0x0' }],
+    ['invalid block number on both records', { blockNumber: '0x' }, { blockNumber: '0x' }],
+  ])('fails closed through the donation service on mismatched or malformed %s', async (_label, receiptFields, txFields) => {
+    mockByChain((url, method) => {
+      if (url !== 'base') return response(null);
+      return response(method === 'eth_getTransactionReceipt'
+        ? receipt({ logs: [transfer(RECIPIENT_ADDRESS)], ...receiptFields })
+        : transaction(txFields));
+    });
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const result = await new DonationService(provider).verifyDonation(TX_HASH);
+
+    expect(result.status).toBe('unavailable');
+    expect(result.transfers).toEqual([]);
+    expect(result.chainStatuses?.map(chain => chain.state)).toEqual(['absent', 'unavailable', 'absent']);
+  });
+
+  it('verifies the same Base transfer when transaction and block identities agree', async () => {
+    mockByChain((url, method) => {
+      if (url !== 'base') return response(null);
+      return response(method === 'eth_getTransactionReceipt'
+        ? receipt({ logs: [
+          { ...transfer(RECIPIENT_ADDRESS), topics: [], removed: true },
+          { ...transfer(RECIPIENT_ADDRESS), transactionHash: TX_HASH, blockHash: BLOCK_HASH, blockNumber: '0x100', removed: false },
+        ] })
+        : transaction({ blockHash: `0x${BLOCK_HASH.slice(2).toUpperCase()}` }));
+    });
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const result = await new DonationService(provider).verifyDonation(TX_HASH);
+
+    expect(result.status).toBe('verified');
+    expect(result.transfers).toHaveLength(1);
+    expect(result.chainStatuses?.map(chain => chain.state)).toEqual(['absent', 'mined', 'absent']);
+  });
+
+  it.each([
+    ['transaction hash', { transactionHash: OTHER_HASH }],
+    ['block hash', { blockHash: OTHER_HASH }],
+    ['block number', { blockNumber: '0x101' }],
+    ['removed flag', { removed: true }],
+  ])('rejects a qualifying transfer log with inconsistent %s', async (_label, metadata) => {
+    mockByChain((url, method) => {
+      if (url !== 'base') return response(null);
+      return response(method === 'eth_getTransactionReceipt'
+        ? receipt({ logs: [{ ...transfer(RECIPIENT_ADDRESS), ...metadata }] })
+        : transaction());
+    });
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+
+    const result = await new DonationService(provider).verifyDonation(TX_HASH);
+
+    expect(result.status).toBe('unavailable');
+    expect(result.transfers).toEqual([]);
+    expect(result.chainStatuses?.map(chain => chain.state)).toEqual(['absent', 'unavailable', 'absent']);
+  });
+
+  it.each([
+    [{ id: '1', result: null }],
+    [{ jsonrpc: '1.0', result: null }],
+    [{ id: 2, error: { code: -32000, message: 'transaction not found' } }],
+    [{ result: null, error: { code: -32000, message: 'transaction not found' } }],
+    [{ result: null, error: null }],
+    [{ error: 'transaction not found' }],
+    [{ error: { message: 'transaction not found' } }],
+    [{}],
+  ])('rejects malformed RPC envelopes %#', async fields => {
+    mockByChain(() => rpcResponse(fields));
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+    expect((await provider.getEvidence(TX_HASH)).map(item => item.state)).toEqual(
+      ['unavailable', 'unavailable', 'unavailable'],
+    );
+  });
+
+  it.each([
+    [false, null],
+    [null, false],
+    [null, pendingTransaction({ hash: OTHER_HASH })],
+    [null, pendingTransaction({ blockNumber: '0x100' })],
+    [null, transaction()],
+    [receipt(), null],
+    [receipt(), pendingTransaction()],
+  ])('rejects invalid or contradictory result pairs %#', async (receiptValue, txValue) => {
+    mockChains(receiptValue, txValue);
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+    expect((await provider.getEvidence(TX_HASH))[0].state).toBe('unavailable');
+  });
+
+  it('rechecks unresolved chains and caches mined results by chain and normalized hash until expiry', async () => {
+    vi.useFakeTimers();
+    let recovered = false;
+    mockByChain((url, method) => {
+      const isReceipt = method === 'eth_getTransactionReceipt';
+      if (!recovered && url === 'base') return new Response(null, { status: 503 });
+      if (!recovered && url === 'radius') return response(isReceipt ? null : pendingTransaction());
+      return response(isReceipt ? receipt({ status: url === 'eth' ? '0x0' : '0x1' }) : transaction());
+    });
+    const provider = new OnChainVerifier({ ethereum: 'eth', base: 'base', radius: 'radius' });
+    expect((await provider.getEvidence(TX_HASH)).map(item => item.state)).toEqual(['mined', 'unavailable', 'pending']);
+    expect(fetch).toHaveBeenCalledTimes(6);
+
+    vi.mocked(fetch).mockClear();
+    recovered = true;
+    const uppercaseHash = `0x${TX_HASH.slice(2).toUpperCase()}`;
+    const recoveredEvidence = await provider.getEvidence(uppercaseHash);
+    expect(recoveredEvidence.map(item => item.state)).toEqual(['mined', 'mined', 'mined']);
+    expect(recoveredEvidence.map(item => item.txHash)).toEqual(Array(3).fill(uppercaseHash));
+    expect(recoveredEvidence[0].minedSuccessfully).toBe(false);
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual(['base', 'base', 'radius', 'radius']);
+
+    vi.mocked(fetch).mockClear();
+    expect((await provider.getEvidence(OTHER_HASH)).map(item => item.state)).toEqual(
+      ['unavailable', 'unavailable', 'unavailable'],
+    );
+    expect(fetch).toHaveBeenCalledTimes(6);
+
+    vi.mocked(fetch).mockClear();
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1);
+    expect((await provider.getEvidence(TX_HASH)).map(item => item.state)).toEqual(['mined', 'mined', 'mined']);
+    expect(fetch).toHaveBeenCalledTimes(6);
+    provider.dispose();
   });
 
   it('normalizes explicit transaction-not-found RPC errors to absent', async () => {
