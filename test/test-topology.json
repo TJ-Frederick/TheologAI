@@ -10,9 +10,9 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 304,
-    "activeVitest": 224,
-    "support": 25,
+    "totalTestTypeScript": 308,
+    "activeVitest": 227,
+    "support": 26,
     "manual": 4,
     "legacyOrphan": 50,
     "conformance": 1
@@ -49,6 +49,7 @@
       "test/unit/adapters/shared/hebrewMorphExpander.test.ts",
       "test/unit/adapters/shared/morphologyUsage.test.ts",
       "test/unit/adapters/shared/primarySourceSearchSql.test.ts",
+      "test/unit/adapters/workDiverseSql.test.ts",
       "test/unit/config/applicationBoundaries.test.ts",
       "test/unit/config/ccelCoordinatorConfig.test.ts",
       "test/unit/config/ccelOperatorSecretProvisioning.test.ts",
@@ -189,6 +190,7 @@
       "test/unit/scripts/originalLanguageV2PreviewAudit.test.ts",
       "test/unit/scripts/parallelPassagePaginationGuards.test.ts",
       "test/unit/scripts/parallelPassagesPreviewAudit.test.ts",
+      "test/unit/scripts/prReleaseEligibility.test.ts",
       "test/unit/scripts/preparePreviewD1Candidate.test.ts",
       "test/unit/scripts/prepareProductionD1Candidate.test.ts",
       "test/unit/scripts/previewReleaseReconciliation.test.ts",
@@ -242,6 +244,7 @@
       "test/unit/tools/v2/primarySourceSearch.test.ts",
       "test/unit/tools/worker/compositionRoot.test.ts",
       "test/unit/worker/workerEntryPoint.test.ts",
+      "test/worker-runtime/workDiverseMcp.test.ts",
       "test/worker-runtime/workerMcp.test.ts"
     ],
     "support": [
@@ -269,7 +272,8 @@
       "test/setup.ts",
       "test/unit/adapters/data/fakeSqlite.ts",
       "test/unit/scripts/originalLanguageContextCapacityRuntime.d.mts",
-      "test/worker-runtime/setup.ts"
+      "test/worker-runtime/setup.ts",
+      "test/worker-runtime/workDiverseFixture.ts"
     ],
     "manual": [
       "test/scripts/bible-lookup-17-tests-detailed.ts",

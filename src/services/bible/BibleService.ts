@@ -24,46 +24,44 @@ export class BibleService {
     const translation = this.resolveTranslation(params.translation);
     const ref = parseReference(params.reference);
 
-    const provider = this.providersByTranslation.get(translation);
-    if (!provider) {
+    const provider = this.selectConfiguredProvider(translation);
+    if (provider === 'unsupported') {
       throw new ValidationError(
         'translation',
         `Unsupported translation: "${translation}". Available: ${this.getSupportedTranslations().join(', ')}`
       );
     }
 
-    if (!provider.isConfigured()) {
+    if (provider === 'unconfigured') {
       throw new NotFoundError('adapter', `${translation} adapter is not configured`);
     }
 
-    const result = await provider.getPassage(ref, translation, {
-      includeFootnotes: params.includeFootnotes,
-    });
-    this.assertResultConsistency(ref, translation, result);
-    return result;
+    return this.fetchPassage(provider, ref, translation, params.includeFootnotes);
   }
 
   /** Look up the same reference in multiple translations */
-  async lookupMultiple(reference: string, translations: string[]): Promise<BibleLookupMultipleResult> {
+  async lookupMultiple(
+    reference: string,
+    translations: string[],
+    includeFootnotes?: boolean,
+  ): Promise<BibleLookupMultipleResult> {
     const ref = parseReference(reference);
     const results: BibleResult[] = [];
     const failures: BibleLookupMultipleResult['failures'] = [];
 
     for (const t of translations) {
       const upper = t.toUpperCase();
-      const provider = this.providersByTranslation.get(upper);
-      if (!provider) {
+      const provider = this.selectConfiguredProvider(upper);
+      if (provider === 'unsupported') {
         failures.push({ translation: upper, reason: 'Translation is not supported by this server.' });
         continue;
       }
-      if (!provider.isConfigured()) {
+      if (provider === 'unconfigured') {
         failures.push({ translation: upper, reason: 'Translation provider is not configured.' });
         continue;
       }
       try {
-        const result = await provider.getPassage(ref, upper);
-        this.assertResultConsistency(ref, upper, result);
-        results.push(result);
+        results.push(await this.fetchPassage(provider, ref, upper, includeFootnotes));
       } catch {
         failures.push({ translation: upper, reason: 'Translation could not be retrieved.' });
       }
@@ -74,6 +72,23 @@ export class BibleService {
 
   getSupportedTranslations(): string[] {
     return [...this.providersByTranslation.keys()];
+  }
+
+  private selectConfiguredProvider(translation: string): BibleProviderPort | 'unsupported' | 'unconfigured' {
+    const provider = this.providersByTranslation.get(translation);
+    if (!provider) return 'unsupported';
+    return provider.isConfigured() ? provider : 'unconfigured';
+  }
+
+  private async fetchPassage(
+    provider: BibleProviderPort,
+    ref: ReturnType<typeof parseReference>,
+    translation: string,
+    includeFootnotes?: boolean,
+  ): Promise<BibleResult> {
+    const result = await provider.getPassage(ref, translation, { includeFootnotes });
+    this.assertResultConsistency(ref, translation, result);
+    return result;
   }
 
   private resolveTranslation(input?: string | string[]): string {

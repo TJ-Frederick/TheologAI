@@ -486,7 +486,8 @@ describe('shared MCP registration', () => {
 
   it('fails stateless resource listing safely instead of hiding a corpus outage', async () => {
     const root = makeMockRoot();
-    root.services.historicalService.listDocuments = vi.fn().mockRejectedValue(new Error('private database detail'));
+    root.services.historicalService.listDocumentsWithProfiles = vi.fn().mockRejectedValue(new Error('private database detail'));
+    const listDocuments = vi.spyOn(root.services.historicalService, 'listDocuments');
     const client = await connect(
       createTheologAiMcpServer(root, '1.0.0-test', STATELESS_HTTP_CAPABILITIES).server,
     );
@@ -494,6 +495,64 @@ describe('shared MCP registration', () => {
     await expect(client.listResources()).rejects.toMatchObject({
       code: -32603,
       message: expect.stringContaining('Unable to list resources'),
+    });
+    expect(listDocuments).not.toHaveBeenCalled();
+  });
+
+  it.each(['legacy', 'modern'] as const)('uses one batch to list fail-closed %s resources in point-read order', async era => {
+    const root = makeMockRoot();
+    const historical = root.services.historicalService;
+    const [first] = await historical.listDocuments();
+    const second = { ...first, id: 'second-work', date: null };
+    const profile = await historical.getDeliveryProfile(first.id);
+    const pointList = vi.spyOn(historical, 'listDocuments').mockResolvedValue([first, second]);
+    const pointProfile = vi.spyOn(historical, 'getDeliveryProfile').mockImplementation(async id => id === first.id
+      ? profile
+      : { ...profile, documentId: second.id, deliveryMode: 'sectioned_only' });
+    const previous = await connect(createTheologAiMcpServer(root, '1.0.0-test', STATELESS_HTTP_CAPABILITIES, era).server);
+    const expected = await previous.listResources();
+    const pairs = await Promise.all([first, second].map(async document => ({
+      document, profile: await pointProfile(document.id),
+    })));
+    historical.listDocumentsWithProfiles = vi.fn().mockResolvedValue(pairs);
+    pointList.mockClear();
+    pointProfile.mockClear();
+    const profileForEra = { logging: era === 'modern' };
+    const current = await connect(createTheologAiMcpServer(root, '1.0.0-test', profileForEra, era).server);
+
+    await expect(current.listResources()).resolves.toEqual(expected);
+    expect(historical.listDocumentsWithProfiles).toHaveBeenCalledOnce();
+    expect(pointList).not.toHaveBeenCalled();
+    expect(pointProfile).not.toHaveBeenCalled();
+  });
+
+  it.each(['profile', 'hierarchy'] as const)('keeps the legacy stdio prefix and warning on %s failure', async failure => {
+    const root = makeMockRoot();
+    const historical = root.services.historicalService;
+    const [first] = await historical.listDocuments();
+    const subsequent = { ...first, id: 'second-work' };
+    const profile = await historical.getDeliveryProfile(first.id);
+    historical.listDocuments = vi.fn().mockResolvedValue([first, subsequent]);
+    historical.listDocumentsWithProfiles = vi.fn().mockRejectedValue(new Error('unexpected bulk call'));
+    historical.getDeliveryProfile = vi.fn(async id => {
+      if (id === subsequent.id && failure === 'profile') throw new NotFoundError('document', 'missing profile');
+      return { ...profile, documentId: id };
+    });
+    root.services.historicalHierarchyService.listPublications = vi.fn().mockRejectedValue(new Error('invalid authority'));
+    const client = await connect(createTheologAiMcpServer(root, '1.0.0-test').server);
+    const messages: unknown[] = [];
+    client.setNotificationHandler('notifications/message', notification => { messages.push(notification.params); });
+    await client.setLoggingLevel('warning');
+
+    const { resources } = await client.listResources();
+
+    expect(resources.map(({ uri }) => uri)).toEqual([
+      'theologai://translations', 'theologai://commentaries', 'theologai://primary-sources/catalog',
+      'theologai://documents/nicene-creed', ...(failure === 'hierarchy' ? ['theologai://documents/second-work'] : []),
+    ]);
+    expect(historical.listDocumentsWithProfiles).not.toHaveBeenCalled();
+    expect(messages).toContainEqual({
+      level: 'warning', logger: 'theologai.resources', data: { event: 'historical_resources_unavailable' },
     });
   });
 

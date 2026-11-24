@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { HistoricalDocumentService } from '../../../../src/services/historical/HistoricalDocumentService.js';
 import type { DocumentInfo, DocumentSection } from '../../../../src/adapters/data/HistoricalDocumentRepository.js';
 import { NotFoundError } from '../../../../src/kernel/errors.js';
+import type { HistoricalDocumentDeliveryProfile } from '../../../../src/kernel/repositories.js';
 
 // ── Mock repository ──
 
@@ -22,9 +23,18 @@ const mockSection: DocumentSection = {
   topics: ['god'],
 };
 
+const mockProfile: HistoricalDocumentDeliveryProfile = {
+  documentId: mockDoc.id, workId: null, editionId: null,
+  immutableCorpusIdentity: 'a'.repeat(64), sectionPackageIdentity: null,
+  deliveryMode: 'complete_document', sectionCount: 1,
+  landingMaxBytes: 0, browsePageSize: 0, cursorVersion: 0,
+  provenance: {}, rights: {},
+};
+
 function makeMockRepo() {
   return {
     listDocuments: vi.fn().mockReturnValue([mockDoc]),
+    getDeliveryProfile: vi.fn().mockReturnValue(mockProfile),
     getDocument: vi.fn().mockReturnValue(mockDoc),
     findDocumentByName: vi.fn().mockReturnValue(undefined),
     getSections: vi.fn().mockReturnValue([mockSection]),
@@ -44,6 +54,42 @@ describe('HistoricalDocumentService', () => {
     const docs = await service.listDocuments();
     expect(repo.listDocuments).toHaveBeenCalled();
     expect(docs).toHaveLength(1);
+  });
+
+  it('uses the bulk catalog read without point reads when supported', async () => {
+    const entries = [{ document: mockDoc, profile: mockProfile }];
+    const repo = { ...makeMockRepo(), listDocumentsWithProfiles: vi.fn().mockResolvedValue(entries) };
+    const service = new HistoricalDocumentService(repo as any);
+
+    await expect(service.listDocumentsWithProfiles()).resolves.toEqual(entries);
+    expect(repo.listDocumentsWithProfiles).toHaveBeenCalledOnce();
+    expect(repo.listDocuments).not.toHaveBeenCalled();
+    expect(repo.getDeliveryProfile).not.toHaveBeenCalled();
+  });
+
+  it('reports the exact missing joined profile without reading individual works', async () => {
+    const repo = { ...makeMockRepo(), listDocumentsWithProfiles: vi.fn().mockReturnValue([
+      { document: mockDoc, profile: mockProfile },
+      { document: { ...mockDoc, id: 'missing-middle' }, profile: undefined },
+      { document: { ...mockDoc, id: 'last' }, profile: { ...mockProfile, documentId: 'last' } },
+    ]) };
+    const service = new HistoricalDocumentService(repo as any);
+
+    await expect(service.listDocumentsWithProfiles()).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.listDocumentsWithProfiles()).rejects.toThrow('Historical delivery profile not found for "missing-middle"');
+    expect(repo.getDeliveryProfile).not.toHaveBeenCalled();
+  });
+
+  it('supports point-read repositories and preserves an empty catalog', async () => {
+    const repo = makeMockRepo();
+    const service = new HistoricalDocumentService(repo as any);
+
+    await expect(service.listDocumentsWithProfiles()).resolves.toEqual([{ document: mockDoc, profile: mockProfile }]);
+    expect(repo.getDeliveryProfile).toHaveBeenCalledExactlyOnceWith(mockDoc.id);
+    repo.getDeliveryProfile.mockClear();
+    repo.listDocuments.mockReturnValue([]);
+    await expect(service.listDocumentsWithProfiles()).resolves.toEqual([]);
+    expect(repo.getDeliveryProfile).not.toHaveBeenCalled();
   });
 
   describe('getDocument', () => {
