@@ -3,21 +3,49 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. Production was released on November 3. The November 20 preview observation below supersedes the preview control captured during that release. The August 31 release provenance and custody record is retained afterward as dated historical evidence. These are point-in-time observations, not a guarantee against later authorized activity.
+identity authority. The November 24 verification established the current
+Norton and Thomas Aquinas production release and preview control. The November 3
+release and earlier custody records below preserve dated historical evidence.
 
-## Latest completed production release — November 3, 2026 UTC
+## Latest verified production release — November 24, 2026
+
+PR #184 merged as `9e479e723d96a12c61063e28781f084f0b574fb6` with tree
+`75ebacf612cdc743c202ddaff7376d56794c32b3`. Protected production run
+[45324148171](https://github.com/TJ-Frederick/TheologAI/actions/runs/45324148171)
+switched traffic to the Worker below, then stopped on an HTTP 503 during the
+Richard Hooker search. GitHub retains the original failure conclusion.
+
+At 11:10 a.m. Eastern, the verification-only pass completed **370/370**
+production checks, 185 in each MCP protocol version. It passed the Hooker
+search, Norton lookup and Aquinas search. Routing observations before and
+after the pass matched both assignments below and confirmed 100% production
+traffic on the same Worker. The pass stayed within the approved cumulative
+29,570,000-read cap. The sanitized per-check report has SHA-256
+`85691ed16189b5ff343996e9bb9cc55567e37a4b089b0f613ace63e30aba0679`.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — sole 100% assignment | `41d8904d-5b4a-473e-a1e1-31a493bf0d33` | `e1942c16-9938-433e-8a17-f51fca541043` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control observed before and after verification | `2b6c65ba-15c8-471b-8b79-9205398fef07` | `10ef3591-bf3f-430e-9b0c-bb3b59a3bf53` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The production D1 retains its historical name and serves the schema-0010 corpus.
+[The reviewed serving record](../release/serving.json) pins the November 24
+assignment at Deploy Production run number 150. A later successful protected
+deployment with a completed acceptance record takes precedence.
+
+## Historical completed production release — November 3, 2026 UTC
 
 PR #172 merged as `701ab6295f033105ec306f7878a85e294cba0f6d`, preserving preview-tested tree `6251804e5463ef279a29e9134971bac5166de57a` and exact parents `8a0ad10c53d81b1e575dfd6b4b3df876d77ed5dc` / `e705f8d9d123fa6503745abd9ad7fb5cb4c108ca`. [Protected production run 41645812927](https://github.com/TJ-Frederick/TheologAI/actions/runs/41645812927), attempt 1, passed the canonical plan, source-bound preview prerequisite, all five validation suites, separate owner-authenticated production admission, complete fresh proof, deployment, live audits and final routing/isolation checks. Independent final review accepted all 56 retained evidence hashes and reconciled both phase costs.
 
-## Active production assignment
+### November 3 production assignment
 
 | Environment | Deployment | Worker | D1 |
 | --- | --- | --- | --- |
 | Production — sole 100% assignment | `f6c9a995-0940-4758-a9a9-14f1389a9ab3` | `d2e2bd87-1213-4ba5-891d-e0f9b3293cb9` (#142) | `theologai-production-20260811-schema0009-a` / `9bc79346-338b-439e-a2a5-424f4418eb21` |
 
-## Preview control
+### November 20 preview control
 
-On November 20 the protected preview verification observed deployment `62da1803-b313-4dc7-94bf-80d3394957b1`, Worker `8fb1be2c-72f7-4a4e-bbd6-117adfc30410` (#169), and D1 `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48`. The hosted check stopped at 222/370 with HTTP 503. The production assignment above continued serving. Its separately prepared candidate is D1 `74f456e2-6951-4003-bb6f-91951342bf8f`. [Protected preview run](https://github.com/TJ-Frederick/TheologAI/actions/runs/44791989825) · [Candidate and deployment procedure](NORTON-AQUINAS-RELEASE-CANDIDATE.md)
+On November 20 the protected preview verification observed deployment `62da1803-b313-4dc7-94bf-80d3394957b1`, Worker `8fb1be2c-72f7-4a4e-bbd6-117adfc30410` (#169), and D1 `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48`. The hosted check stopped at 222/370 with HTTP 503. The November 3 production assignment continued serving at that time. The separately prepared production candidate was D1 `74f456e2-6951-4003-bb6f-91951342bf8f`. [Protected preview run](https://github.com/TJ-Frederick/TheologAI/actions/runs/44791989825) · [Candidate and deployment procedure](NORTON-AQUINAS-RELEASE-CANDIDATE.md)
 
 ### Preview control during the November 3 production release
 
@@ -25,7 +53,7 @@ On November 20 the protected preview verification observed deployment `62da1803-
 | --- | --- | --- | --- |
 | Preview — unchanged across production deployment/audits | `52a5387c-9367-457a-8a85-14b23d5dd629` | `3312716e-d347-4f47-8753-787e4aa1808f` (#165) | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
 
-## Deployment gate and release evidence
+### November 3 deployment gate and release evidence
 
 The final workflow observations are point-in-time evidence, not a later live inventory. Both existing D1 assignments, account, permissions and custom domains were preserved. Full proof matched 39 tables / 1,625,092 canonical rows: **3,299,468 reads / four diagnostic writes / 3,293 requests**, zero SQL retries or unknown attempts. The protected reader wrote zero rows. Original-language 11/11, historical core 8/8, historical spine 10/10 and two consecutive edge probes passed; preview controls before/after/post-audit were identical. Live-audit D1 reads are outside the proof meter.
 

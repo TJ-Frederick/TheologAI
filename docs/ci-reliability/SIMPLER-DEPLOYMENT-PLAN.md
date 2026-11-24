@@ -1,6 +1,6 @@
 # Release a Worker or change its corpus
 
-Use **PR Checks** for preview and **Deploy Production** to promote the accepted build. The person approving a release chooses when to start. The outstanding Norton and Thomas Aquinas release uses the corpus path.
+Use **PR Checks** for preview and **Deploy Production** to promote the accepted build. The person approving a release chooses when to start.
 
 | What changed | Before promotion | After promotion |
 | --- | --- | --- |
@@ -10,11 +10,11 @@ Use **PR Checks** for preview and **Deploy Production** to promote the accepted 
 
 ## Run a release
 
-1. Review the proposed change against the version actually serving production. GitHub supplies the source of the last successful protected production release. The workflow checks the actual production Worker and database against that baseline. For the first release after this cleanup, `release/serving.json` supplies the reviewed starting assignment. It also declares the intended database for each role. In a clean checkout, `node scripts/release-promotion.mjs classify` uses this starting point. Pass the workflow’s production baseline JSON as the final argument to reproduce its decision after subsequent releases. A pull request containing only documentation can still be on top of an unreleased corpus change.
+1. Review the proposed change against the version serving production. Deploy Production starts from the reviewed assignment in [`release/serving.json`](../../release/serving.json). A later successful protected deployment with a recorded acceptance takes precedence. Validation-only runs leave the baseline in place. The workflow compares the live Worker and D1 with its selected baseline. The serving record also declares the intended database for each role. Locally, `node scripts/release-promotion.mjs classify` uses the reviewed assignment. Pass the workflow’s production baseline JSON to classify against a later accepted release. A documentation pull request can still sit on top of unreleased corpus changes.
 2. Run normal CI on the same-repository pull request to main. For a release, authorize preview and apply the existing `deploy-preview` label to the ready PR. **PR Checks** builds the Worker once and exercises that bundle in real local Workerd. The preview job requires its protected environment approval. Removing the label, moving the source or changing the candidate can revoke approval.
 3. For a corpus release, complete the owner steps below. For an application release, the workflow goes directly to the small MCP check. Read the preview result. A successful protected job records the build, database and serving version in the accepted preview artifact.
 4. After authorization to publish, merge the tested head using a merge commit, preserving its tree. In Actions open **Deploy Production → Run workflow** on main. Enter the reason and the successful **PR Checks run ID**. The job verifies the exact tree, protected preview job and native artifacts, then downloads the preview-tested Worker. A corpus release needs a separate production grant. Review the target database and predecessor in the summary and approve the production environment.
-5. After final routing and acceptance pass, retain the previous Worker with its database. Record the accepted pair in [CURRENT-RELEASE](../CURRENT-RELEASE.md). Subsequent jobs use the successful protected release as their starting point. Change the target declarations when an intended database changes.
+5. After final routing and acceptance pass, retain the previous Worker with its database. Record the accepted pair in [CURRENT-RELEASE](../CURRENT-RELEASE.md). Subsequent jobs select that release once its protected workflow succeeds and records acceptance. Change the target declarations when an intended database changes.
 
 ## Corpus owner steps
 
