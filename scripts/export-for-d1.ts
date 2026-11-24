@@ -3,16 +3,20 @@
 
 import { execFileSync } from 'child_process';
 import {
+  accessSync,
+  chmodSync,
+  constants,
   existsSync,
   lstatSync,
-  mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 import {
@@ -20,11 +24,9 @@ import {
   D1_SEED_FILE_BYTES,
   assertSafeStatement,
   batchInsertValueTuples,
-  insertedRows,
   sha256Buffer,
   sha256File,
   splitGeneratedSql,
-  statementBytes,
 } from './d1-seed-utils.js';
 import { genesisOneOneLemmaReadinessPredicate, johnOneOneReadinessPredicate } from './data-integrity.js';
 import {
@@ -36,20 +38,12 @@ import {
 import { D1_SEED_BASE_TABLES, D1_SEED_EXPORT_ORDER } from './d1-seed-order.js';
 import { assertCanonicalTransform12FtsMatchSentinels } from './transform12-candidate-c-storage.js';
 import { assertSqliteCorpusMarkers } from './sqlite-corpus-markers.js';
+import { publishDirectoryAtomically, type PublicationOperations } from './atomic-publication.js';
+import { loadAndVerifyD1SeedManifest, type SeedManifest, type SeedManifestFile } from './d1-seed-manifest.js';
 
 export interface SeedStatement {
   sql: string;
   rows: number;
-}
-
-interface SeedFile {
-  path: string;
-  table: string;
-  chunk: number;
-  sha256: string;
-  byteSize: number;
-  statementCount: number;
-  rowCount: number;
 }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -88,22 +82,59 @@ function parseArguments(argv: string[]): { database: string; clean: boolean } {
     throw new Error(`Source database not found: ${resolved}. Run npm run build:db first.`);
   }
   if (lstatSync(resolved).isSymbolicLink()) throw new Error(`Refusing symlinked source database: ${resolved}`);
-  if (resolved === OUTPUT || resolved.startsWith(`${OUTPUT}${sep}`)) {
+  const actualDatabase = realpathSync(resolved);
+  const actualOutput = join(realpathSync(dirname(OUTPUT)), basename(OUTPUT));
+  if (actualDatabase === actualOutput || actualDatabase.startsWith(`${actualOutput}${sep}`)) {
     throw new Error('Source database cannot be inside the generated seed directory');
   }
   return { database: resolved, clean };
 }
 
-function prepareOutput(clean: boolean): void {
-  if (existsSync(OUTPUT)) {
-    if (lstatSync(OUTPUT).isSymbolicLink()) throw new Error(`Refusing symlinked output directory: ${OUTPUT}`);
-    const entries = readdirSync(OUTPUT);
-    if (entries.length > 0 && !clean) {
-      throw new Error(`${relative(ROOT, OUTPUT)} is not empty; inspect it, then rerun with --clean`);
+function assertDestinationAvailable(root: string, output: string, clean: boolean) {
+  const status = lstatSync(output, { throwIfNoEntry: false });
+  if (!status) return undefined;
+  if (status.isSymbolicLink()) throw new Error(`Refusing symlinked output directory: ${output}`);
+  if (!status.isDirectory()) throw new Error(`Seed output is not a directory: ${output}`);
+  if (!clean) {
+    if (readdirSync(output).length > 0) {
+      throw new Error(`${relative(root, output)} is not empty; inspect it, then rerun with --clean`);
     }
-    if (clean) rmSync(OUTPUT, { recursive: true });
+    accessSync(output, constants.W_OK | constants.X_OK);
   }
-  mkdirSync(OUTPUT, { recursive: true });
+  return status;
+}
+
+export function stageAndPublishD1Seed(
+  root: string,
+  output: string,
+  clean: boolean,
+  writeStage: (stage: string) => void,
+  operations?: PublicationOperations,
+): SeedManifest {
+  assertDestinationAvailable(root, output, clean);
+  const stage = mkdtempSync(join(dirname(output), `.${basename(output)}-stage-`));
+  try {
+    writeStage(stage);
+    const verified = loadAndVerifyD1SeedManifest(root, stage);
+    const destination = assertDestinationAvailable(root, output, clean);
+    // Keep staging private until verified, then match the old destination policy.
+    chmodSync(stage, !clean && destination ? destination.mode & 0o777 : 0o777 & ~process.umask());
+    publishDirectoryAtomically(stage, output, operations);
+    return verified;
+  } catch (error) {
+    // The publisher owns its separate recovery directory. Only clean our stage.
+    try {
+      if (lstatSync(stage, { throwIfNoEntry: false })) chmodSync(stage, 0o700);
+      rmSync(stage, { recursive: true, force: true });
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        `${String(error)}. Could not clean seed staging directory ${stage}: ${String(cleanupError)}`,
+        { cause: error },
+      );
+    }
+    throw error;
+  }
 }
 
 function sqlite(database: string, sql: string, json = false): string {
@@ -273,8 +304,8 @@ function emptyTargetGuard(): SeedStatement {
   };
 }
 
-function writeChunks(table: string, ordinal: number, statements: SeedStatement[]): SeedFile[] {
-  const files: SeedFile[] = [];
+function writeChunks(stage: string, table: string, ordinal: number, statements: SeedStatement[]): SeedManifestFile[] {
+  const files: SeedManifestFile[] = [];
   let chunk: SeedStatement[] = [];
   let chunkBytes = 0;
 
@@ -284,7 +315,7 @@ function writeChunks(table: string, ordinal: number, statements: SeedStatement[]
     const filename = `${String(ordinal).padStart(2, '0')}-${table.replaceAll('_', '-')}-${String(chunkNumber).padStart(3, '0')}.sql`;
     const content = `${chunk.map(item => item.sql).join('\n')}\n`;
     const buffer = Buffer.from(content, 'utf8');
-    writeFileSync(join(OUTPUT, filename), buffer);
+    writeFileSync(join(stage, filename), buffer);
     files.push({
       path: filename,
       table,
@@ -308,125 +339,121 @@ function writeChunks(table: string, ordinal: number, statements: SeedStatement[]
   return files;
 }
 
+function writeSeed(
+  stage: string,
+  database: string,
+  sourceManifestBytes: Buffer,
+  sourceManifest: DataManifest,
+  d1CorpusIdentity: string,
+): void {
+  const files: SeedManifestFile[] = [];
+  files.push(...writeChunks(stage, 'empty-target-check', 0, [emptyTargetGuard()]));
+
+  for (let index = 0; index < D1_SEED_BASE_TABLES.length; index++) {
+    const table = D1_SEED_BASE_TABLES[index];
+    console.error(`[d1-seed] Exporting ${table}...`);
+    const statements = exportTable(database, table);
+    const rows = statements.reduce((sum, statement) => sum + statement.rows, 0);
+    if (rows !== sourceManifest.expectedCounts[table]) {
+      throw new Error(`Exported ${rows} ${table} rows; expected ${sourceManifest.expectedCounts[table]}`);
+    }
+    files.push(...writeChunks(stage, table, index + 1, statements));
+  }
+
+  const ftsStatements: SeedStatement[] = [
+    {
+      sql: 'INSERT INTO "strongs_fts"("strongs_number","lemma","transliteration","definition") SELECT "strongs_number","lemma","transliteration","definition" FROM "strongs" ORDER BY "strongs_number";',
+      rows: sourceManifest.expectedCounts.strongs_fts,
+    },
+    {
+      sql: 'INSERT INTO "sections_fts"("sections_fts") VALUES (\'rebuild\');',
+      rows: sourceManifest.expectedCounts.sections_fts,
+    },
+    {
+      sql: 'INSERT INTO "historical_edition_sections_fts"("historical_edition_sections_fts") VALUES (\'rebuild\');',
+      rows: sourceManifest.expectedCounts.historical_edition_sections_fts,
+    },
+    {
+      sql: 'INSERT INTO "historical_edition_hierarchy_bodies_fts"("historical_edition_hierarchy_bodies_fts") VALUES (\'rebuild\');',
+      rows: sourceManifest.expectedCounts.historical_edition_hierarchy_bodies_fts,
+    },
+    ...['strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts'].map(table => ({
+      sql: `INSERT INTO "${table}"("${table}","rank") VALUES ('integrity-check',1);`,
+      rows: 0,
+    })),
+    {
+      sql: 'INSERT INTO "historical_corpus_seal"("seal_id","transform_version","storage_contract") VALUES (1,12,\'candidate_c_seed_base_rebuild_all_fts_integrity_check_then_seal_v1\');',
+      rows: sourceManifest.expectedCounts.historical_corpus_seal,
+    },
+  ];
+  files.push(...writeChunks(stage, 'fts', D1_SEED_EXPORT_ORDER.length, ftsStatements));
+
+  const seedManifest = {
+    manifestVersion: 2,
+    algorithm: 'sha256',
+    sourceManifest: {
+      path: relative(ROOT, SOURCE_MANIFEST_PATH),
+      sha256: computeSourceInventoryIdentity(sourceManifestBytes),
+    },
+    d1Materialization: {
+      identityVersion: sourceManifest.materializations.d1.identityVersion,
+      transformVersion: sourceManifest.materializations.d1.transformVersion,
+      sha256: d1CorpusIdentity,
+    },
+    migrations: sourceManifest.materializations.d1.migrations.map(migration => ({ ...migration })),
+    limits: {
+      maximumStatementBytes: D1_MAX_STATEMENT_BYTES,
+      targetFileBytes: D1_SEED_FILE_BYTES,
+    },
+    tableOrder: D1_SEED_EXPORT_ORDER,
+    expectedCounts: Object.fromEntries(
+      [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts', 'historical_corpus_seal'].map(table => [table, sourceManifest.expectedCounts[table]]),
+    ),
+    files,
+    totals: {
+      fileCount: files.length,
+      byteSize: files.reduce((sum, file) => sum + file.byteSize, 0),
+      statementCount: files.reduce((sum, file) => sum + file.statementCount, 0),
+      rowCount: files.reduce((sum, file) => sum + file.rowCount, 0),
+    },
+  };
+  writeFileSync(join(stage, 'seed-manifest.json'), `${JSON.stringify(seedManifest, null, 2)}\n`);
+}
+
 function main(): void {
-const { database, clean } = parseArguments(process.argv.slice(2));
-const sourceManifestBytes = readFileSync(SOURCE_MANIFEST_PATH);
-const sourceManifest = parseDataManifest(sourceManifestBytes);
-verifyD1Migrations(ROOT, sourceManifest);
-validateCanonicalSources(sourceManifest);
-const sentinelDatabase = new Database(database, { readonly: true, fileMustExist: true });
-let d1CorpusIdentity: string;
-try {
-  d1CorpusIdentity = assertSqliteCorpusMarkers(sentinelDatabase, sourceManifest);
-  assertSemanticSource(database);
-  assertCanonicalTransform12FtsMatchSentinels(sentinelDatabase);
-} finally {
-  sentinelDatabase.close();
-}
-
-for (const table of [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts', 'historical_corpus_seal']) {
-  const expected = sourceManifest.expectedCounts[table];
-  if (!Number.isSafeInteger(expected) || expected < 0) {
-    throw new Error(`Source manifest has no valid expected count for ${table}`);
+  const { database, clean } = parseArguments(process.argv.slice(2));
+  const sourceManifestBytes = readFileSync(SOURCE_MANIFEST_PATH);
+  const sourceManifest = parseDataManifest(sourceManifestBytes);
+  verifyD1Migrations(ROOT, sourceManifest);
+  validateCanonicalSources(sourceManifest);
+  const sentinelDatabase = new Database(database, { readonly: true, fileMustExist: true });
+  let d1CorpusIdentity: string;
+  try {
+    d1CorpusIdentity = assertSqliteCorpusMarkers(sentinelDatabase, sourceManifest);
+    assertSemanticSource(database);
+    assertCanonicalTransform12FtsMatchSentinels(sentinelDatabase);
+  } finally {
+    sentinelDatabase.close();
   }
-  const actual = queryNumber(database, `SELECT count(*) FROM ${sqlIdentifier(table)};`);
-  if (actual !== expected) {
-    throw new Error(`Source database ${table} count is ${actual}; manifest requires ${expected}`);
+
+  for (const table of [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts', 'historical_corpus_seal']) {
+    const expected = sourceManifest.expectedCounts[table];
+    if (!Number.isSafeInteger(expected) || expected < 0) {
+      throw new Error(`Source manifest has no valid expected count for ${table}`);
+    }
+    const actual = queryNumber(database, `SELECT count(*) FROM ${sqlIdentifier(table)};`);
+    if (actual !== expected) {
+      throw new Error(`Source database ${table} count is ${actual}; manifest requires ${expected}`);
+    }
   }
-}
 
-prepareOutput(clean);
-const files: SeedFile[] = [];
-files.push(...writeChunks('empty-target-check', 0, [emptyTargetGuard()]));
-
-for (let index = 0; index < D1_SEED_BASE_TABLES.length; index++) {
-  const table = D1_SEED_BASE_TABLES[index];
-  console.error(`[d1-seed] Exporting ${table}...`);
-  const statements = exportTable(database, table);
-  const rows = statements.reduce((sum, statement) => sum + statement.rows, 0);
-  if (rows !== sourceManifest.expectedCounts[table]) {
-    throw new Error(`Exported ${rows} ${table} rows; expected ${sourceManifest.expectedCounts[table]}`);
-  }
-  files.push(...writeChunks(table, index + 1, statements));
-}
-
-const ftsStatements: SeedStatement[] = [
-  {
-    sql: 'INSERT INTO "strongs_fts"("strongs_number","lemma","transliteration","definition") SELECT "strongs_number","lemma","transliteration","definition" FROM "strongs" ORDER BY "strongs_number";',
-    rows: sourceManifest.expectedCounts.strongs_fts,
-  },
-  {
-    sql: 'INSERT INTO "sections_fts"("sections_fts") VALUES (\'rebuild\');',
-    rows: sourceManifest.expectedCounts.sections_fts,
-  },
-  {
-    sql: 'INSERT INTO "historical_edition_sections_fts"("historical_edition_sections_fts") VALUES (\'rebuild\');',
-    rows: sourceManifest.expectedCounts.historical_edition_sections_fts,
-  },
-  {
-    sql: 'INSERT INTO "historical_edition_hierarchy_bodies_fts"("historical_edition_hierarchy_bodies_fts") VALUES (\'rebuild\');',
-    rows: sourceManifest.expectedCounts.historical_edition_hierarchy_bodies_fts,
-  },
-  ...['strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts'].map(table => ({
-    sql: `INSERT INTO "${table}"("${table}","rank") VALUES ('integrity-check',1);`,
-    rows: 0,
-  })),
-  {
-    sql: 'INSERT INTO "historical_corpus_seal"("seal_id","transform_version","storage_contract") VALUES (1,12,\'candidate_c_seed_base_rebuild_all_fts_integrity_check_then_seal_v1\');',
-    rows: sourceManifest.expectedCounts.historical_corpus_seal,
-  },
-];
-files.push(...writeChunks('fts', D1_SEED_EXPORT_ORDER.length, ftsStatements));
-
-for (const file of files) {
-  const sql = readFileSync(join(OUTPUT, file.path), 'utf8');
-  const statements = splitGeneratedSql(sql);
-  if (statements.length !== file.statementCount) throw new Error(`Internal statement-count error: ${file.path}`);
-  for (const [index, statement] of statements.entries()) {
-    assertSafeStatement(statement, `${file.path} statement ${index + 1}`);
-  }
-  const derivedRows = statements.reduce(
-    (sum, statement) => sum + insertedRows(statement, sourceManifest.expectedCounts),
-    0,
+  const verified = stageAndPublishD1Seed(ROOT, OUTPUT, clean, stage => {
+    writeSeed(stage, database, sourceManifestBytes, sourceManifest, d1CorpusIdentity);
+  });
+  console.error(
+    `[d1-seed] Wrote ${verified.totals.fileCount} files (${verified.totals.rowCount.toLocaleString()} rows) to ` +
+    `${relative(ROOT, OUTPUT)}/`,
   );
-  if (derivedRows !== file.rowCount) throw new Error(`Internal row-count error: ${file.path}`);
-  if (statementBytes(sql) !== file.byteSize) throw new Error(`Internal byte-count error: ${file.path}`);
-}
-
-const seedManifest = {
-  manifestVersion: 2,
-  algorithm: 'sha256',
-  sourceManifest: {
-    path: relative(ROOT, SOURCE_MANIFEST_PATH),
-    sha256: computeSourceInventoryIdentity(sourceManifestBytes),
-  },
-  d1Materialization: {
-    identityVersion: sourceManifest.materializations.d1.identityVersion,
-    transformVersion: sourceManifest.materializations.d1.transformVersion,
-    sha256: d1CorpusIdentity,
-  },
-  migrations: sourceManifest.materializations.d1.migrations.map(migration => ({ ...migration })),
-  limits: {
-    maximumStatementBytes: D1_MAX_STATEMENT_BYTES,
-    targetFileBytes: D1_SEED_FILE_BYTES,
-  },
-  tableOrder: D1_SEED_EXPORT_ORDER,
-  expectedCounts: Object.fromEntries(
-    [...D1_SEED_BASE_TABLES, 'strongs_fts', 'sections_fts', 'historical_edition_sections_fts', 'historical_edition_hierarchy_bodies_fts', 'historical_corpus_seal'].map(table => [table, sourceManifest.expectedCounts[table]]),
-  ),
-  files,
-  totals: {
-    fileCount: files.length,
-    byteSize: files.reduce((sum, file) => sum + file.byteSize, 0),
-    statementCount: files.reduce((sum, file) => sum + file.statementCount, 0),
-    rowCount: files.reduce((sum, file) => sum + file.rowCount, 0),
-  },
-};
-writeFileSync(join(OUTPUT, 'seed-manifest.json'), `${JSON.stringify(seedManifest, null, 2)}\n`);
-console.error(
-  `[d1-seed] Wrote ${files.length} files (${seedManifest.totals.rowCount.toLocaleString()} rows) to ` +
-  `${relative(ROOT, OUTPUT)}/`,
-);
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
