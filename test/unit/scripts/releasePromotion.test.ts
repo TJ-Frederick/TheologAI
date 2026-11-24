@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
+import { hostedCorpusCheckIds, hostedCorpusProfile } from '../../../scripts/hosted-corpus-profile.mjs';
 
 const cli = join(process.cwd(), 'scripts/release-promotion.mjs');
 const roots: string[] = [];
@@ -101,6 +102,17 @@ it('records and consumes a passing protected receipt, refusing a different tree,
   audit.checks[222]!.passed = false;
   f.write('audit.json',JSON.stringify(audit));
   expect(() => record('failed.json')).toThrow();
+
+  const focused = { ...audit, profile: hostedCorpusProfile, checks: ['2025-11-25', '2026-07-28']
+    .flatMap(era => hostedCorpusCheckIds.map(id => ({ era, id, passed: true }))) };
+  f.write('audit.json', JSON.stringify(focused));
+  record('focused.json');
+  expect(JSON.parse(f.run('verify','corpus',sha,'focused.json',tree))).toMatchObject({
+    checks:24, corpusProfile:hostedCorpusProfile,
+  });
+  focused.checks[0]!.id = 'unexpected-check';
+  f.write('audit.json', JSON.stringify(focused));
+  expect(() => record('missing-focused-probe.json')).toThrow();
 });
 
 it('rehearses each rollback with its actual database and rejects a mixed pair', () => {

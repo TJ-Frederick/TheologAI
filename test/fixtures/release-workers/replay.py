@@ -43,7 +43,7 @@ def replay(case, role, mode, wrong=False, ambiguous=False, stale=False, tamper=F
         (root / ".github").symlink_to(repo / ".github")
         (root / "scripts").mkdir()
         for script in (repo / "scripts").iterdir():
-            if script.name in ("worker-release-artifact.mjs", "release-promotion.mjs", "classify-ci-changes.mjs", "classify-production-deployment.mjs"):
+            if script.name in ("worker-release-artifact.mjs", "release-promotion.mjs", "classify-ci-changes.mjs", "classify-production-deployment.mjs", "hosted-corpus-profile.mjs"):
                 shutil.copyfile(script, root / "scripts" / script.name)
             elif script.is_file():
                 (root / "scripts" / script.name).symlink_to(script)

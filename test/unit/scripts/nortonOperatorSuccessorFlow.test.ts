@@ -1,4 +1,5 @@
 import {corpusGrant} from '../../helpers/corpusTransportFixture.js';
+import { rehearseHostedRecovery } from '../../helpers/hostedCorpusRecoveryFixture.js';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -26,25 +27,39 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
       git('init','-q');git('config','user.name','Flow fixture');git('config','user.email','fixture@example.invalid');
       git('commit','--allow-empty','-m','Baseline');
       const base=git('rev-parse','HEAD');
-      for(const name of ['scripts','src','migrations','.github/scripts','release/serving.json','data/data-manifest.json','package.json'])cpSync(resolve(name),join(root,name),{recursive:true});
+      for(const name of ['scripts','src','migrations','.github/scripts','release/serving.json','data/data-manifest.json','package.json','package-lock.json','wrangler.toml'])cpSync(resolve(name),join(root,name),{recursive:true});
       git('add','.');git('commit','-m','Corpus candidate');
       const previewSource=git('rev-parse','HEAD'),tree=git('rev-parse','HEAD^{tree}');
-      symlinkSync(resolve('node_modules'),join(root,'node_modules'),'dir');writeFileSync(join(root,'.git/info/exclude'),'\n/node_modules\n',{flag:'a'});symlinkSync(resolve('node_modules'),join(directory,'node_modules'),'dir');
+      symlinkSync(resolve('test'),join(root,'test'),'dir');symlinkSync(resolve('node_modules'),join(root,'node_modules'),'dir');writeFileSync(join(root,'.git/info/exclude'),'\n/node_modules\n/test\n',{flag:'a'});symlinkSync(resolve('node_modules'),join(directory,'node_modules'),'dir');
       const db=new Database(join(directory,'source.db'));
       db.exec(`CREATE TABLE documents(id INTEGER PRIMARY KEY,title TEXT);
         CREATE TABLE document_sections(id INTEGER PRIMARY KEY,document_id INTEGER REFERENCES documents(id),content TEXT);
         CREATE TABLE historical_edition_sections(id INTEGER PRIMARY KEY,content TEXT);
-        CREATE TABLE historical_edition_hierarchy_bodies(id INTEGER PRIMARY KEY,content TEXT);
+        CREATE TABLE historical_edition_hierarchy_bodies(id INTEGER PRIMARY KEY,content TEXT,hierarchy_id INTEGER,body_key TEXT);
+        CREATE TABLE historical_section_identities(id INTEGER PRIMARY KEY,document_id TEXT,section_key TEXT,source_ordinal INTEGER,document_section_id INTEGER);
+        CREATE TABLE historical_hierarchy_publications(hierarchy_id INTEGER PRIMARY KEY,public_slug TEXT);
+        CREATE TABLE historical_edition_hierarchy_nodes(id INTEGER PRIMARY KEY,node_kind TEXT,node_key TEXT,flat_ordinal INTEGER,hierarchy_id INTEGER,body_key TEXT);
         CREATE VIRTUAL TABLE strongs_fts USING fts5(strongs_number,lemma,transliteration,definition);
         CREATE VIRTUAL TABLE sections_fts USING fts5(content,content='document_sections',content_rowid='id');
         CREATE VIRTUAL TABLE historical_edition_sections_fts USING fts5(content,content='historical_edition_sections',content_rowid='id');
         CREATE VIRTUAL TABLE historical_edition_hierarchy_bodies_fts USING fts5(content,content='historical_edition_hierarchy_bodies',content_rowid='id');
         INSERT INTO documents VALUES(1,'one');INSERT INTO document_sections VALUES(1,1,'one two');
-        INSERT INTO historical_edition_sections VALUES(1,'one two');INSERT INTO historical_edition_hierarchy_bodies VALUES(1,'one two');
+        INSERT INTO historical_edition_sections VALUES(1,'one two');INSERT INTO historical_edition_hierarchy_bodies VALUES(1,'one two',1,'body');
+        INSERT INTO historical_section_identities VALUES
+          (1,'calvin-institutes-of-the-christian-religion','norton-fixture',1,1),
+          (2,'wesley-standard-sermons','sermon-01',1,1),
+          (3,'hooker-laws-of-ecclesiastical-polity-book-1','section-001',1,1);
+        INSERT INTO historical_hierarchy_publications VALUES(1,'summa-theologiae');
+        INSERT INTO historical_edition_hierarchy_nodes VALUES
+          (1,'article','article:prima.1.1',1,1,'body'),
+          (2,'article','article:prima-secundae.1.1',2,1,'body'),
+          (3,'article','article:secunda-secundae.1.1',3,1,'body'),
+          (4,'article','article:tertia.1.1',4,1,'body');
         INSERT INTO strongs_fts VALUES('G25','agape','agape','love');`);
       for(const t of ALL_FTS.slice(1))db.exec(`INSERT INTO ${t}(${t}) VALUES('rebuild')`);
-      const tables=['documents','document_sections','historical_edition_sections','historical_edition_hierarchy_bodies','strongs_fts'];
-      for(let n=0;n<34;n++){const t=n===0?'cross_references':'fixture_'+String(n).padStart(2,'0');db.exec(`CREATE TABLE ${t}(id INTEGER PRIMARY KEY,value TEXT);INSERT INTO ${t} VALUES(1,'fixture')`);tables.push(t);}
+      const tables=['documents','document_sections','historical_edition_sections','historical_edition_hierarchy_bodies',
+        'strongs_fts','historical_section_identities','historical_hierarchy_publications','historical_edition_hierarchy_nodes'];
+      for(let n=0;n<31;n++){const t=n===0?'cross_references':'fixture_'+String(n).padStart(2,'0');db.exec(`CREATE TABLE ${t}(id INTEGER PRIMARY KEY,value TEXT);INSERT INTO ${t} VALUES(1,'fixture')`);tables.push(t);}
       tables.sort();
       const expected={tables,catalog:db.prepare(CATALOG_SQL).all(),digests:Object.fromEntries(tables.map(t=>[t,canonicalTableDigest(db,t)])),foreignKeyWitnessSha256:'a'.repeat(64),schemaVersion:'bounded-fixture',migrationNames:['0001.sql'],quickCheckReadCeiling:5000};
       db.close();const sourceHash=sha(readFileSync(join(directory,'source.db')));
@@ -111,7 +126,13 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
             canonicalInterrupted=true;return Response.json({success:false,errors:[{code:7429}]},{status:429,headers:{'Retry-After':'2'}});
           }
           const rows=write?(db.prepare(sql).run(),[]):db.prepare(sql).all();return{rows,rowsRead:process.env.LOW_CAP==='true'&&sql==='PRAGMA quick_check'?14_000:Math.max(rows.length,1),rowsWritten:write?1:0};}}).fetch;
-          globalThis.fetch=async(...args)=>{const response=await fetcher(...args);if(process.env.DRIFT_AFTER_CLOSING==='true'&&closingInterrupted&&String(args[0]).endsWith('/settings')){const body=await response.json();body.result.bindings[0].id='wrong';return Response.json(body);}return response;};`);
+          globalThis.fetch=async(...args)=>{const response=await fetcher(...args);
+          if(process.argv[2]==='complete'&&String(args[0]).endsWith('/graphql')) {
+            const body=await response.json();const account=body.data.viewer.accounts[0];
+            for(const group of account.databases??account.d1AnalyticsAdaptiveGroups)group.sum.rowsWritten=4;
+            return Response.json(body);
+          }
+          if(process.env.DRIFT_AFTER_CLOSING==='true'&&closingInterrupted&&String(args[0]).endsWith('/settings')){const body=await response.json();body.result.bindings[0].id='wrong';return Response.json(body);}return response;};`);
         const invoke=(args:string[],extra:Record<string,string>={})=>spawnSync(process.execPath,['--import','tsx','--import',preload,'scripts/operator-corpus-proof.ts',...args],{cwd:root,encoding:'utf8',timeout:45000,env:{...env,PATH:join(work,'bin')+':'+process.env.PATH,FIXTURE_NOW:String(now+1000),CLOUDFLARE_ACCOUNT_ID:ACCOUNT,CLOUDFLARE_API_TOKEN:'synthetic-reader',...extra}});
         const challenge=join(work,'challenge.json');let result=invoke(['challenge',role,work,digest,challenge]);expect(result.status,result.stderr).toBe(0);
         const c=JSON.parse(readFileSync(challenge,'utf8')),ledger=join(work,'ledger.json'),integrity=join(work,'integrity.json');
@@ -169,7 +190,15 @@ describe('successor operation flow with real CLIs and bounded local SQLite trans
           expect(events).toContainEqual(expect.objectContaining({kind:'closing-read-interrupted',cooldownMs:2000,reservedUnknownReads:4096}));
         }
         const calls=readFileSync(log,'utf8').trim().split('\n').map(s=>JSON.parse(s));expect(calls.filter(v=>v.kind==='diagnostic')).toHaveLength(4);expect(calls.filter(v=>v.kind==='read').every(v=>v.credential==='reader')).toBe(true);
-        if(role==='production'){expect(receipt.sourceTree).toBe(priorPreview.sourceTree);expect(receipt.sourceCommit).not.toBe(priorPreview.sourceCommit);expect(c.authorization.authorization.role).toBe('production');}
+        if (role === 'production') {
+          expect(receipt.sourceTree).toBe(priorPreview.sourceTree);
+          expect(receipt.sourceCommit).not.toBe(priorPreview.sourceCommit);
+          expect(c.authorization.authorization.role).toBe('production');
+          await rehearseHostedRecovery({
+            root, work, authority:join(work,'operator-authorization.json'), challenge, proof:complete,
+            planDigest:digest, now:now+4000, env,
+          });
+        }
       }
     } finally {rmSync(directory,{recursive:true,force:true});}
   },120000);

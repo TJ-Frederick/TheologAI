@@ -135,11 +135,15 @@ retains a separate full receipt at the flat downstream artifact path, together
 with the nested operator evidence and failure-cost journal. Partial proofs,
 ambiguous results, altered sources and multiple submissions fail closed.
 
-The normal Deploy Preview job consumes the protected stage's same-run envelope
-and independently checks its hash, full receipt and current controls. It then
-uses the unchanged custom-domain deployment command and all existing live tests.
-The operator stage and Deploy Preview retain the existing separate approvals.
-No new token, secret, account, permission, environment or approval policy is added.
+Each protected release job consumes its own same-run envelope and checks its
+hash, full receipt and current controls before the custom-domain cutover.
+The focused hosted checks use the operation's live/control reservation after
+cutover. A verification-only recovery in the same protected job retains the
+first attempt's reservation and rechecks the proof journal, source, assignments,
+write custody and headroom. Account analytics lack an ingestion watermark, so
+the observed write counts corroborate the owner's continuous custody declaration.
+For a later authorized operation with uncertain custody, verify the candidate
+again. [Hosted checks and recovery](ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md#corpus-owner-steps)
 
 Live GitHub authorization observations use only allowlisted metadata GET routes.
 For HTTP 502/503/504, retry that GET once after 250 ms; each CLI call has a

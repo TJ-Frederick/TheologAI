@@ -5,6 +5,8 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { versionNegotiationFor } from './audit-dual-era-mcp-preview.js';
 import { releaseReadFetch, auditCorpusRelease, createCorpusRequestPacer, type CorpusRequestPacer } from './audit-corpus-release.js';
 
+import { hasHostedCorpusChecks, hostedCorpusProfile } from './hosted-corpus-profile.mjs';
+
 export const RELEASE_PROTOCOLS = ['2025-11-25', '2026-07-28'] as const;
 const KEMPIS = { work: 'kempis-imitation-of-christ', text: 'imitation Christ contempt world' };
 export const WESLEY = { work: 'wesley-standard-sermons', text: 'salvation by faith' };
@@ -24,6 +26,7 @@ export interface AcceptanceOptions {
   guard?: () => void;
   pace?: CorpusRequestPacer;
   search?: boolean;
+  profile?: typeof hostedCorpusProfile;
 }
 
 function releaseEndpoint(value: string): URL {
@@ -200,7 +203,9 @@ export async function runCorpusAcceptance(options: Omit<AcceptanceOptions, 'mode
     ...options, databasePath: options.databasePath, root: options.root ?? process.cwd(),
     fetch: releaseReadFetch(options.endpoint, 'corpus', options.fetch ?? fetch),
   });
-  if (!result.failure) {
+  if (!result.failure && options.profile === hostedCorpusProfile) {
+    if (!hasHostedCorpusChecks({ ...result, passed: true })) throw new Error('Focused corpus acceptance incomplete');
+  } else if (!result.failure) {
     for (const era of RELEASE_PROTOCOLS) {
       const checks = result.checks.filter(check => check.era === era);
       if (checks.length !== 185 || checks.some(check => !check.passed)) {
@@ -215,14 +220,18 @@ async function main() {
   const { values } = parseArgs({ options: {
     mode: { type: 'string' }, role: { type: 'string' }, endpoint: { type: 'string' },
     version: { type: 'string' }, database: { type: 'string' }, bundle: { type: 'string' }, output: { type: 'string' },
-    search: { type: 'boolean' }, wesley: { type: 'boolean' },
+    search: { type: 'boolean' }, wesley: { type: 'boolean' }, focused: { type: 'boolean' },
   } });
   if ((values.mode !== 'application' && values.mode !== 'corpus') ||
       (values.role !== 'preview' && values.role !== 'production') || !values.endpoint || !values.version) {
     throw new Error('Required arguments are --mode application|corpus --role preview|production --endpoint and --version');
   }
+  if (values.focused && (!values.bundle || values.mode !== 'corpus')) {
+    throw new Error('Focused diagnostics require a local corpus Worker bundle');
+  }
   const options = { mode: values.mode, role: values.role, endpoint: releaseEndpoint(values.endpoint).href,
-    serverVersion: values.version, databasePath: values.database, search: values.search } satisfies AcceptanceOptions;
+    serverVersion: values.version, databasePath: values.database, search: values.search,
+    profile: values.focused ? hostedCorpusProfile : undefined } satisfies AcceptanceOptions;
   if (values.wesley && !values.bundle) throw new Error('Wesley diagnostics require a local Worker bundle');
   if (values.bundle && options.endpoint !== 'https://worker.test/mcp') {
     throw new Error('Local acceptance requires the worker.test endpoint');
