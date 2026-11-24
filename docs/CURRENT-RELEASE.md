@@ -3,11 +3,39 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. The November 24 verification established the current
-Norton and Thomas Aquinas production release and preview control. The November 3
-release and earlier custody records below preserve dated historical evidence.
+identity authority. The latest November 24 verification established the
+application release on the Norton and Thomas Aquinas corpus and the observed
+preview control. Earlier releases and custody records below preserve dated
+historical evidence.
 
 ## Latest verified production release — November 24, 2026
+
+[PR #187](https://github.com/TJ-Frederick/TheologAI/pull/187) bound
+donation verification to the requested transaction evidence.
+[PR #188](https://github.com/TJ-Frederick/TheologAI/pull/188) removed the
+unnecessary transliteration query for full Strong's search pages. Production
+source `94352f2a2c65b11c5756a69a3f7b0318ef8c8230` has the exact tree
+`e1315f775601b9404e95a2ced6de89ed5f034fc5` accepted by
+[protected preview run 45481065009](https://github.com/TJ-Frederick/TheologAI/actions/runs/45481065009).
+
+[Protected production run 45488723004](https://github.com/TJ-Frederick/TheologAI/actions/runs/45488723004),
+attempt 1, deployed the preview-tested application bundle on the existing
+schema-0010 production D1. Preview and production each passed **8/8** checks,
+four per MCP protocol version. The production workflow confirmed final routing,
+preview isolation, and the exact source tag before recording acceptance.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — verified serving assignment | `bbc8d4b1-a8bc-4af9-8adf-cf4e07669afb` | `3a74b8d2-03aa-4667-bffa-f18be5c850af` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control at production verification | `c8936eb6-cf5e-4e7f-8e3b-5041be5fb492` | `df51d773-8960-4c0b-8148-7064c6738a7d` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The run retained the accepted production receipt
+(SHA-256 `5d49b7f11c5afccd9c8753095cbf1a5974e4569fcfe7e24c9c321f931afe20b1`)
+and the matched predecessor. The [reviewed serving record](../release/serving.json)
+remains the starting baseline. The later successful protected deployment takes
+precedence for subsequent release classification.
+
+## Historical corpus release — November 24, 2026
 
 PR #184 merged as `9e479e723d96a12c61063e28781f084f0b574fb6` with tree
 `75ebacf612cdc743c202ddaff7376d56794c32b3`. Protected production run
