@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -168,14 +169,21 @@ it('replays the protected Worker shell and blocks unsafe provider operations', (
     encoding: 'utf8',
     timeout: 120_000,
   });
-  expect(output.match(/: PASS /g)).toHaveLength(15);
+  expect(output.match(/: PASS /g)).toHaveLength(21);
 }, 125_000);
 
 it('uses the newest approved production deployment and ignores validation-only runs', async () => {
   const {resolveProductionBaseline} = createRequire(import.meta.url)('../../../.github/scripts/production-baseline.cjs');
-  const deployed = 'a'.repeat(40);
+  const deployed = '94352f2a2c65b11c5756a69a3f7b0318ef8c8230';
+  const sourceTree = 'e1315f775601b9404e95a2ced6de89ed5f034fc5';
+  const productionAssignment = {
+    deploymentId:'bbc8d4b1-a8bc-4af9-8adf-cf4e07669afb',
+    versionId:'3a74b8d2-03aa-4667-bffa-f18be5c850af',
+    ...config.targets.production,
+  };
+  const receipt = {productionSource:deployed, sourceTree, ...productionAssignment};
   const run = {
-    id:21, repository:{full_name:'owner/repo'}, path:'.github/workflows/deploy.yml', head_branch:'main',
+    id:45488723004, repository:{full_name:'owner/repo'}, path:'.github/workflows/deploy.yml', head_branch:'main',
     head_sha:deployed, status:'completed', conclusion:'success', event:'workflow_dispatch', run_attempt:1,
     run_number:config.productionRunNumber + 1,
   };
@@ -184,9 +192,35 @@ it('uses the newest approved production deployment and ignores validation-only r
   const reviewedCutover = {...run, id:45324148171, run_number:config.productionRunNumber, head_sha:config.productionSource};
   const validation = {...run, id:22, run_number:run.run_number + 1};
   const docs = {...run, id:23, run_number:run.run_number + 2};
+  const upload = {name:'Retain sanitized release evidence',conclusion:'success'};
   const protectedJob = {name:'Test, Build & Deploy', conclusion:'success', head_sha:deployed,
-    steps:[{name:'Record accepted production source and assignment',conclusion:'success'}]};
+    steps:[{name:'Record accepted production source and assignment',conclusion:'success'},upload]};
   const approved = [{state:'approved',user:{id:40179660},environments:[{name:'production'}]}];
+  const now = Date.parse('2026-11-24T19:00:00Z');
+  const member = 'release-evidence/accepted-production.json';
+  function zip(members: Array<[string, string]>): Buffer {
+    return execFileSync('python3', ['-c', `
+import io, json, sys, warnings, zipfile
+warnings.filterwarnings('ignore', category=UserWarning)
+out = io.BytesIO()
+with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as archive:
+    for name, value in json.load(sys.stdin):
+        archive.writestr(name, value)
+sys.stdout.buffer.write(out.getvalue())
+`], {input:JSON.stringify(members)});
+  }
+  const archiveFor = (value = receipt) => zip([
+    ['release-evidence/production-final-routing.json', '{}'],
+    ['operator-corpus-challenge.json.admission.jsonl', '{}\n'],
+    [member, JSON.stringify(value)],
+  ]);
+  const artifactFor = (bytes: Buffer) => ({
+    id:100, name:`production-release-evidence-${run.id}`, expired:false, expires_at:'2026-12-24T19:00:00Z',
+    workflow_run:{id:run.id,head_sha:deployed},
+    size_in_bytes:bytes.length, digest:'sha256:' + createHash('sha256').update(bytes).digest('hex'),
+  });
+  let archive = archiveFor();
+  let artifacts = [artifactFor(archive)];
   let jobs = [protectedJob];
   let history = [docs, validation, reviewedCutover, older];
   let reviews = approved;
@@ -202,14 +236,28 @@ it('uses the newest approved production deployment and ignores validation-only r
       return {data:{total_count:roster.length,jobs:roster}};
     },
     getReviewsForRun: () => ({data:reviews}),
+    listWorkflowRunArtifacts: ({run_id}: {run_id:number}) => {
+      expect(run_id).toBe(run.id);
+      return {data:{artifacts,total_count:artifacts.length}};
+    },
+    downloadArtifact: ({artifact_id,archive_format}: {artifact_id:number;archive_format:string}) => {
+      expect(artifact_id).toBe(100);
+      expect(archive_format).toBe('zip');
+      return {data:archive};
+    },
   }}};
-  const args = {github,context:{repo:{owner:'owner',repo:'repo'},runId:50},reviewed:config,
+  const args = {github,context:{repo:{owner:'owner',repo:'repo'},runId:50},reviewed:config,now,
+    readTree:(source:string) => {
+      expect(source).toBe(deployed);
+      return sourceTree;
+    },
     readSource:(source:string) => {
       expect(source).toBe(deployed);
       return config;
     }};
   const reviewedBaseline = {
     productionSource:config.productionSource,targets:config.targets,requireVersionTag:false,
+    productionAssignment:config.predecessors.production,
   };
   expect(await resolveProductionBaseline(args)).toEqual(reviewedBaseline);
   // The failed cutover is normally absent from the success-filtered response.
@@ -218,7 +266,8 @@ it('uses the newest approved production deployment and ignores validation-only r
 
   history = [older, validation, run, docs];
   expect(await resolveProductionBaseline(args)).toEqual({
-    productionSource:deployed,targets:config.targets,requireVersionTag:true,
+    productionSource:deployed,targets:config.targets,requireVersionTag:true,sourceTree,productionAssignment,
+    artifactProvenance:{runId:run.id,artifactId:100,digest:artifacts[0].digest},
   });
 
   reviews = [];
@@ -226,6 +275,58 @@ it('uses the newest approved production deployment and ignores validation-only r
   reviews = approved;
   jobs = [{...protectedJob,steps:[]}];
   await expect(resolveProductionBaseline(args)).rejects.toThrow('exact reviewed rebaseline');
+
+  jobs = [{...protectedJob,steps:[protectedJob.steps[0],{...upload,conclusion:'failure'}]}];
+  await expect(resolveProductionBaseline(args)).rejects.toThrow(/45488723004.*upload did not succeed/);
+  jobs = [protectedJob];
+  artifacts = [];
+  await expect(resolveProductionBaseline(args)).rejects.toThrow(/45488723004.*Missing or ambiguous native/);
+  const good = artifactFor(archive);
+  for (const [bad, error] of [
+    [{...good, expired:true}, /45488723004.*expired/],
+    [{...good, expires_at:'2026-11-24T19:00:00Z'}, /45488723004.*expired/],
+    [{...good, workflow_run:{...good.workflow_run,id:21}}, /45488723004.*unrelated/],
+    [{...good, workflow_run:{...good.workflow_run,head_sha:'2'.repeat(40)}}, /45488723004.*unrelated/],
+    [{...good, size_in_bytes:32 * 1024 * 1024}, /45488723004.*size is out of bounds/],
+  ] as const) {
+    artifacts = [bad];
+    await expect(resolveProductionBaseline(args)).rejects.toThrow(error);
+  }
+  artifacts = [good, {...good,id:101}];
+  await expect(resolveProductionBaseline(args)).rejects.toThrow(/45488723004.*Missing or ambiguous native/);
+  artifacts = [{...good,digest:'sha256:'+'0'.repeat(64)}];
+  await expect(resolveProductionBaseline(args)).rejects.toThrow(/45488723004.*digest/);
+
+  for (const path of [member, 'accepted-production.json', 'other/accepted-production.json']) {
+    archive = zip([[member,JSON.stringify(receipt)],[path,JSON.stringify(receipt)]]);
+    artifacts = [artifactFor(archive)];
+    await expect(resolveProductionBaseline(args)).rejects.toThrow(/45488723004.*ambiguous accepted-production.json/);
+  }
+  archive = zip([['accepted-production.json',JSON.stringify(receipt)]]);
+  artifacts = [artifactFor(archive)];
+  await expect(resolveProductionBaseline(args)).rejects.toThrow(/45488723004.*ambiguous accepted-production.json/);
+
+  for (const [patch, message] of [
+    [{productionSource:'0'.repeat(40)}, 'source or tree'],
+    [{sourceTree:'0'.repeat(40)}, 'source or tree'],
+    [{databaseId:config.targets.preview.databaseId}, 'D1 identity'],
+    [{databaseName:config.targets.preview.databaseName}, 'D1 identity'],
+    [{deploymentId:'invalid'}, 'Worker or deployment'],
+    [{versionId:'invalid'}, 'Worker or deployment'],
+  ] as const) {
+    archive = archiveFor({...receipt,...patch});
+    artifacts = [artifactFor(archive)];
+    await expect(resolveProductionBaseline(args)).rejects.toThrow(message);
+  }
+
+  const rebaseline = {
+    ...config, productionSource:deployed, productionRunNumber:run.run_number,
+    predecessors:{...config.predecessors,production:productionAssignment},
+  };
+  artifacts = [];
+  expect(await resolveProductionBaseline({...args,reviewed:rebaseline})).toEqual({
+    ...reviewedBaseline, productionSource:deployed, productionAssignment,
+  });
 
   history = [docs, validation];
   expect(await resolveProductionBaseline(args)).toEqual(reviewedBaseline);
