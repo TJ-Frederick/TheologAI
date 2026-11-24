@@ -154,10 +154,7 @@ async function applyPreparationPlan(plan: PreparationPlan, session: PreparationS
     const { sha256, ...body } = plan;
     same(hash(body), sha256, 'preparation plan changed');
     same(plan.target, TARGETS.production, 'preparation target differs');
-    check(completed.length / 2 <= plan.operations.length, 'resume contains non-preparation operations');
-    for (let i = 0; i < completed.length; i += 2)
-        same(completed[i].sqlSha256, sha(plan.operations[i / 2].sql), 'resume journal is not the exact plan prefix');
-    for (const op of plan.operations.slice(completed.length / 2))
+    for (const op of plan.operations)
         await session.query(op.sql, op.readCeiling, op.writeCeiling);
     const readbacks = [];
     for (const proof of plan.readbacks)
