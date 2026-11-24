@@ -2,12 +2,7 @@
 /** Deterministic public-SDK process-boundary test for the compiled Node stdio server. */
 
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { promisify } from 'node:util';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/client';
 import {
   DEFAULT_INHERITED_ENV_VARS,
@@ -18,22 +13,20 @@ import {
   assertMcpTransportContract,
   captureMcpTransportSnapshot,
 } from '../test/helpers/mcpTransportContract.js';
+import {
+  COMPILED_SERVER,
+  MAX_LOG_CHARS,
+  SHUTDOWN_TIMEOUT_MS,
+  withCleanup,
+  withNodeE2eFixture,
+  withTimeout,
+  type NodeE2eWorkspace,
+} from './node-e2e-fixture.js';
 
-const execFileAsync = promisify(execFile);
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const TSX_CLI = join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs');
-const MAX_STDERR_CHARS = 64 * 1024;
 const OPERATION_TIMEOUT_MS = 180_000;
 
-function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => {
-      const timer = setTimeout(() => reject(new Error(`${label} exceeded ${OPERATION_TIMEOUT_MS}ms`)), OPERATION_TIMEOUT_MS);
-      timer.unref();
-    }),
-  ]);
-}
+const withOperationTimeout = <T>(promise: Promise<T>, label: string) =>
+  withTimeout(promise, OPERATION_TIMEOUT_MS, label);
 
 function assertSafeSdkEnvironment(): void {
   const expected = process.platform === 'win32'
@@ -45,68 +38,67 @@ function assertSafeSdkEnvironment(): void {
   assert(inheritedNames.every(name => !/(API_KEY|TOKEN|SECRET|RPC_URL|PRIVATE_KEY|DOTENV_CONFIG_|PORT)/i.test(name)));
 }
 
-async function main(): Promise<void> {
-  assert.equal(Number(process.versions.node.split('.')[0]), 22, `Node stdio E2E requires Node 22; received ${process.version}`);
+export async function withStdioClient(
+  workspace: NodeE2eWorkspace,
+  serverEntry: string,
+  client: Client,
+  connectLabel: string,
+  run: () => Promise<void>,
+): Promise<void> {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [serverEntry],
+    cwd: workspace.directory,
+    env: { NODE_ENV: 'test', THEOLOGAI_DATABASE_PATH: workspace.databasePath },
+    stderr: 'pipe',
+  });
+  assert(transport.stderr, 'public stderr stream must exist before client.connect');
+  let stderr = '';
+  transport.stderr.on('data', chunk => { stderr = `${stderr}${String(chunk)}`.slice(-MAX_LOG_CHARS); });
+
+  const closed = new Promise<void>(resolve => { transport.onclose = resolve; });
+  let spawned = false;
+  // Keep the SDK's base transport so modern discovery still uses its own probe sibling.
+  const start = transport.start.bind(transport);
+  transport.start = () => {
+    const starting = start();
+    spawned = transport.pid !== null;
+    return starting;
+  };
+  const connection = client.connect(transport);
+  // The SDK reaps its modern probe before connect settles. Session close can
+  // return after sending SIGKILL, so also wait for the actual child close event.
+  const exited = connection.catch(() => undefined).then(() => spawned ? closed : undefined);
+  workspace.trackExit(exited);
+
+  await withCleanup(async () => {
+    await withOperationTimeout(connection, connectLabel);
+    await run();
+    assert(stderr.length <= MAX_LOG_CHARS, 'stdio stderr capture exceeded its bound');
+  }, async () => {
+    const close = client.transport === transport ? client.close() : transport.close();
+    await withTimeout(Promise.all([close, exited]), SHUTDOWN_TIMEOUT_MS, `${connectLabel} child shutdown`);
+  }).catch(error => {
+    if (stderr) console.error(stderr);
+    throw error;
+  });
+}
+
+export async function runNodeStdioE2e(workspace: NodeE2eWorkspace, serverEntry = COMPILED_SERVER): Promise<void> {
   assertSafeSdkEnvironment();
 
-  const workspace = await mkdtemp(join(tmpdir(), 'theologai-node-stdio-e2e-'));
-  const databasePath = join(workspace, 'theologai.db');
-  let client: Client | undefined;
-
-  try {
-    await withTimeout(execFileAsync(process.execPath, [
-      TSX_CLI,
-      join(ROOT, 'scripts', 'build-database.ts'),
-      '--output',
-      databasePath,
-    ], { cwd: workspace, maxBuffer: 64 * 1024 }), 'database build');
-    await withTimeout(execFileAsync(process.execPath, [
-      TSX_CLI,
-      join(ROOT, 'scripts', 'verify-database.ts'),
-      '--database',
-      databasePath,
-    ], { cwd: workspace, maxBuffer: 64 * 1024 }), 'database verification');
-
-    const transport = new StdioClientTransport({
-      command: process.execPath,
-      args: [join(ROOT, 'dist', 'index.js')],
-      cwd: workspace,
-      env: {
-        NODE_ENV: 'test',
-        THEOLOGAI_DATABASE_PATH: databasePath,
-      },
-      stderr: 'pipe',
-    });
-    assert(transport.stderr, 'public stderr stream must exist before client.connect');
-    let stderr = '';
-    transport.stderr.on('data', chunk => {
-      stderr = `${stderr}${String(chunk)}`.slice(-MAX_STDERR_CHARS);
-    });
-
-    client = new Client({ name: 'theologai-node-stdio-e2e', version: '1.0.0' }, { capabilities: {} });
-    await withTimeout(client.connect(transport), 'MCP initialize');
-    await withTimeout(client.setLoggingLevel('warning'), 'logging/setLevel');
-    const contract = await withTimeout(captureMcpTransportSnapshot(client), 'MCP transport contract');
+  const legacy = new Client({ name: 'theologai-node-stdio-e2e', version: '1.0.0' }, { capabilities: {} });
+  await withStdioClient(workspace, serverEntry, legacy, 'MCP initialize', async () => {
+    await withOperationTimeout(legacy.setLoggingLevel('warning'), 'logging/setLevel');
+    const contract = await withOperationTimeout(captureMcpTransportSnapshot(legacy), 'MCP transport contract');
     await assertMcpTransportContract(contract, { contractVersion: '6', logging: true });
-    assert(stderr.length <= MAX_STDERR_CHARS, 'stdio stderr capture exceeded its bound');
-    await withTimeout(client.close(), 'legacy MCP client close');
-    client = undefined;
+  });
 
-    const modernTransport = new StdioClientTransport({
-      command: process.execPath,
-      args: [join(ROOT, 'dist', 'index.js')],
-      cwd: workspace,
-      env: {
-        NODE_ENV: 'test',
-        THEOLOGAI_DATABASE_PATH: databasePath,
-      },
-      stderr: 'pipe',
-    });
-    client = new Client(
-      { name: 'theologai-node-stdio-e2e-modern', version: '1.0.0' },
-      { versionNegotiation: { mode: { pin: '2026-07-28' } } },
-    );
-    await withTimeout(client.connect(modernTransport), 'modern MCP discovery');
+  const client = new Client(
+    { name: 'theologai-node-stdio-e2e-modern', version: '1.0.0' },
+    { versionNegotiation: { mode: { pin: '2026-07-28' } } },
+  );
+  await withStdioClient(workspace, serverEntry, client, 'modern MCP discovery', async () => {
     assert.equal(client.getProtocolEra(), 'modern');
     assert.equal(client.getNegotiatedProtocolVersion(), '2026-07-28');
     assert.deepEqual(client.getDiscoverResult()?.capabilities, {
@@ -114,12 +106,12 @@ async function main(): Promise<void> {
     });
     assert.equal(client.getDiscoverResult()?.ttlMs, 0);
     assert.equal(client.getDiscoverResult()?.cacheScope, 'private');
-    const modernContract = await withTimeout(
+    const modernContract = await withOperationTimeout(
       captureMcpTransportSnapshot(client),
       'modern MCP transport contract',
     );
     await assertMcpTransportContract(modernContract, { contractVersion: '6', logging: false });
-    const modernDonation = await withTimeout(
+    const modernDonation = await withOperationTimeout(
       client.callTool({ name: 'donation_config', arguments: {} }),
       'modern tools/call',
     );
@@ -130,14 +122,13 @@ async function main(): Promise<void> {
       /logging/i,
       'modern clients must not be offered deprecated MCP Logging',
     );
-    console.error('[node-stdio-e2e] Compiled Node stdio MCP server passed legacy and modern public transport checks.');
-  } finally {
-    if (client) await withTimeout(client.close(), 'MCP client close').catch(() => undefined);
-    await rm(workspace, { recursive: true, force: true });
-  }
+  });
+  console.error('[node-stdio-e2e] Compiled Node stdio MCP server passed legacy and modern public transport checks.');
 }
 
-main().catch(error => {
-  console.error('[node-stdio-e2e] Failed:', error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  withNodeE2eFixture(runNodeStdioE2e).catch(error => {
+    console.error('[node-stdio-e2e] Failed:', error);
+    process.exitCode = 1;
+  });
+}
