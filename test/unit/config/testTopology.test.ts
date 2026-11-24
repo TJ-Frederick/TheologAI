@@ -83,7 +83,7 @@ describe('test topology manifest', () => {
     const expectedActive = testTypeScriptFiles.filter((file) =>
       (file.startsWith('test/unit/') && file.endsWith('.test.ts')) ||
       file === 'test/integration/current/mcp-protocol.test.ts' ||
-      file === 'test/worker-runtime/workerMcp.test.ts' ||
+      (file.startsWith('test/worker-runtime/') && file.endsWith('.test.ts')) ||
       file === 'test/ccel-coordinator-runtime/ccelCoordinator.test.ts'
     );
     expect(manifest.partitions.activeVitest).toEqual(expectedActive);
@@ -141,6 +141,7 @@ describe('test topology manifest', () => {
       file === 'test/unit/scripts/originalLanguageContextCapacityRuntime.d.mts' ||
       file === 'test/ccel-coordinator-runtime/setup.ts' ||
       file === 'test/worker-runtime/setup.ts' ||
+      file === 'test/worker-runtime/workDiverseFixture.ts' ||
       file === 'test/unit/adapters/data/fakeSqlite.ts'
     );
     expect(manifest.partitions.support).toEqual(expectedSupport);
