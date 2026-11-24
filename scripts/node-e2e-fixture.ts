@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -129,4 +130,26 @@ export async function withNodeE2eFixture(
     await withTimeout(Promise.all(exits), SHUTDOWN_TIMEOUT_MS, `E2E child exit before removing ${directory}`);
     await rm(directory, { recursive: true, force: true });
   });
+}
+
+export async function withIsolatedNodeE2eFixtures(
+  http: (workspace: NodeE2eWorkspace) => Promise<void>,
+  stdio: (workspace: NodeE2eWorkspace) => Promise<void>,
+  provision = provisionDatabase,
+): Promise<void> {
+  await withNodeE2eFixture(async fixture => {
+    async function copyFor(transport: 'http' | 'stdio'): Promise<NodeE2eWorkspace> {
+      const directory = join(fixture.directory, transport);
+      const databasePath = join(directory, 'theologai.db');
+      await mkdir(directory, { mode: 0o700 });
+      // Prefer copy-on-write where supported, with an independent full copy as fallback.
+      await copyFile(fixture.databasePath, databasePath, constants.COPYFILE_FICLONE);
+      return { directory, databasePath, trackExit: fixture.trackExit };
+    }
+
+    const httpWorkspace = await copyFor('http');
+    const stdioWorkspace = await copyFor('stdio');
+    await http(httpWorkspace);
+    await stdio(stdioWorkspace);
+  }, provision);
 }

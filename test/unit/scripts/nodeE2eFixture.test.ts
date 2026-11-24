@@ -3,10 +3,12 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
+import Database from 'better-sqlite3';
 import { expect, it, vi } from 'vitest';
 import {
   runNodeE2eCommand,
   withCleanup,
+  withIsolatedNodeE2eFixtures,
   withNodeE2eFixture,
   type NodeE2eWorkspace,
 } from '../../../scripts/node-e2e-fixture.js';
@@ -38,6 +40,47 @@ it('gives concurrent invocations distinct, private workspace and database paths'
   await Promise.all([run(), run()]);
   expect(new Set(paths)).toHaveLength(2);
   expect(paths.some(path => existsSync(path))).toBe(false);
+});
+
+it('isolates HTTP database writes and dotenv from stdio after provisioning once', async () => {
+  let httpWorkspace: NodeE2eWorkspace | undefined;
+  const provision = vi.fn(async (workspace: NodeE2eWorkspace) => {
+    const db = new Database(workspace.databasePath);
+    try {
+      db.exec("CREATE TABLE fixture (value TEXT); INSERT INTO fixture VALUES ('verified')");
+    } finally {
+      db.close();
+    }
+  });
+  const dotenvLoader = import.meta.resolve('dotenv/config');
+  await withIsolatedNodeE2eFixtures(async workspace => {
+    httpWorkspace = workspace;
+    const db = new Database(workspace.databasePath);
+    try {
+      db.exec("UPDATE fixture SET value = 'http changed this'");
+    } finally {
+      db.close();
+    }
+    await writeFile(join(workspace.directory, '.env'), 'THEOLOGAI_FIXTURE_HTTP_SENTINEL=http\n');
+    await runNodeE2eCommand(workspace, 'HTTP dotenv positive control', [
+      '--import', dotenvLoader, '-e', 'if (process.env.THEOLOGAI_FIXTURE_HTTP_SENTINEL !== "http") process.exit(42)',
+    ]);
+  }, async workspace => {
+    expect(workspace.directory).not.toBe(httpWorkspace?.directory);
+    expect(workspace.databasePath).not.toBe(httpWorkspace?.databasePath);
+    const db = new Database(workspace.databasePath, { readonly: true });
+    try {
+      expect(db.prepare('SELECT value FROM fixture').get()).toEqual({ value: 'verified' });
+    } finally {
+      db.close();
+    }
+    await runNodeE2eCommand(workspace, 'stdio dotenv isolation', [
+      '--import', dotenvLoader, '-e', 'if (process.env.THEOLOGAI_FIXTURE_HTTP_SENTINEL !== undefined) process.exit(42)',
+    ]);
+  }, provision);
+
+  expect(provision).toHaveBeenCalledTimes(1);
+  expect(existsSync(httpWorkspace!.directory)).toBe(false);
 });
 
 it('keeps the initial failure as the cause if teardown also fails', async () => {

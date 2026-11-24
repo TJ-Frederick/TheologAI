@@ -15,6 +15,7 @@ import {
   spawnNodeE2eProcess,
   stopNodeE2eProcess,
   withCleanup,
+  withIsolatedNodeE2eFixtures,
   withNodeE2eFixture,
   withTimeout,
   type NodeE2eWorkspace,
@@ -228,14 +229,17 @@ function expectModernDiscovery(): Record<string, unknown> {
   };
 }
 
+async function main(): Promise<void> {
+  if (process.argv[2] === '--with-stdio') {
+    const { runNodeStdioE2e } = await import('./test-node-stdio-e2e.js');
+    await withIsolatedNodeE2eFixtures(runNodeHttpE2e, runNodeStdioE2e);
+  } else {
+    await withNodeE2eFixture(runNodeHttpE2e);
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  withNodeE2eFixture(async workspace => {
-    await runNodeHttpE2e(workspace);
-    if (process.argv[2] === '--with-stdio') {
-      const { runNodeStdioE2e } = await import('./test-node-stdio-e2e.js');
-      await runNodeStdioE2e(workspace);
-    }
-  }).catch(error => {
+  main().catch(error => {
     console.error('[node-http-e2e] Failed:', error);
     process.exitCode = 1;
   });
