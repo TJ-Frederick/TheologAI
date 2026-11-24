@@ -28,6 +28,14 @@ import { CLASSIC_TEXT_LIMITS } from '../../kernel/classicTextContract.js';
 
 export type { DocumentInfo, DocumentSection } from '../../kernel/repositories.js';
 
+const DOCUMENT_CATALOG_SQL = `SELECT d.id AS id, d.title, d.type, d.date, d.metadata,
+  p.document_id AS document_id, p.work_id, p.edition_id, p.immutable_corpus_identity,
+  p.section_package_identity, p.delivery_mode, p.section_count, p.landing_max_bytes,
+  p.browse_page_size, p.cursor_version, p.provenance_json, p.rights_json
+  FROM documents d
+  LEFT JOIN historical_document_delivery_profiles p ON p.document_id = d.id
+  ORDER BY d.title, d.id`;
+
 export class HistoricalDocumentRepository implements IHistoricalDocumentRepository {
   private db: Database.Database;
   private stmtAllDocs: Database.Statement;
@@ -105,6 +113,14 @@ export class HistoricalDocumentRepository implements IHistoricalDocumentReposito
     }>;
 
     return rows.map(mapDocumentDatabaseRow);
+  }
+
+  listDocumentsWithProfiles() {
+    const rows = this.db.prepare(DOCUMENT_CATALOG_SQL).all() as CatalogDatabaseRow[];
+    return rows.map(row => ({
+      document: mapDocumentDatabaseRow(row),
+      profile: row.document_id === null ? undefined : mapDeliveryProfile(row),
+    }));
   }
 
   /** Get a document by its slug ID */
@@ -270,6 +286,9 @@ interface DeliveryProfileDatabaseRow {
   landing_max_bytes: 0 | 16_384; browse_page_size: 0 | 32; cursor_version: 0 | 1;
   provenance_json: string; rights_json: string;
 }
+
+type CatalogDatabaseRow = Parameters<typeof mapDocumentDatabaseRow>[0]
+  & (DeliveryProfileDatabaseRow | { document_id: null });
 
 interface ResolvedSectionDatabaseRow {
   id: number; document_id: string; section_number: string; title: string; content: string; topics: string;

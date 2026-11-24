@@ -697,7 +697,8 @@ describe('classic_text_lookup handler', () => {
 
   function createServices() {
     const historical = {
-      listDocuments: vi.fn<HistoricalDocumentService['listDocuments']>().mockResolvedValue([document]),
+      listDocumentsWithProfiles: vi.fn<HistoricalDocumentService['listDocumentsWithProfiles']>()
+        .mockResolvedValue([{ document, profile }]),
       getDocument: vi.fn<HistoricalDocumentService['getDocument']>().mockResolvedValue(document),
       getSections: vi.fn<HistoricalDocumentService['getSections']>().mockResolvedValue([section]),
       getDeliveryProfile: vi.fn<HistoricalDocumentService['getDeliveryProfile']>().mockResolvedValue(profile),
@@ -720,7 +721,8 @@ describe('classic_text_lookup handler', () => {
 
     const result = await handler.handler({ listWorks: true });
 
-    expect(historical.listDocuments).toHaveBeenCalledOnce();
+    expect(historical.listDocumentsWithProfiles).toHaveBeenCalledOnce();
+    expect(historical.getDeliveryProfile).not.toHaveBeenCalled();
     expect(textOf(result)).toContain('Available Historical Documents');
     expect(textOf(result)).toContain('`nicene-creed`');
     expect(result.structuredContent).toMatchObject({
@@ -743,8 +745,9 @@ describe('classic_text_lookup handler', () => {
 
   it('lists more than 32 catalog entries without reading bodies or silently omitting metadata', async () => {
     const { handler, historical } = createServices();
-    historical.listDocuments.mockResolvedValue(Array.from({ length: 40 }, (_, index) => ({
-      ...document, id: `document-${index + 1}`, title: `Document ${index + 1}`,
+    historical.listDocumentsWithProfiles.mockResolvedValue(Array.from({ length: 40 }, (_, index) => ({
+      document: { ...document, id: `document-${index + 1}`, title: `Document ${index + 1}` },
+      profile: { ...profile, documentId: `document-${index + 1}` },
     })));
 
     const result = await handler.handler({ listWorks: true });
@@ -761,14 +764,15 @@ describe('classic_text_lookup handler', () => {
   it('returns exactly 100 works and fails rather than truncating 101', async () => {
     const { handler, historical } = createServices();
     const works = Array.from({ length: 101 }, (_, index) => ({
-      ...document, id: `document-${index + 1}`, title: `Document ${index + 1}`,
+      document: { ...document, id: `document-${index + 1}`, title: `Document ${index + 1}` },
+      profile: { ...profile, documentId: `document-${index + 1}` },
     }));
-    historical.listDocuments.mockResolvedValueOnce(works.slice(0, 100));
+    historical.listDocumentsWithProfiles.mockResolvedValueOnce(works.slice(0, 100));
     const atLimit = await handler.handler({ listWorks: true });
     expect((atLimit.structuredContent as any).catalog.works).toHaveLength(100);
     expect(atLimit.isError).not.toBe(true);
 
-    historical.listDocuments.mockResolvedValueOnce(works);
+    historical.listDocumentsWithProfiles.mockResolvedValueOnce(works);
     const overLimit = await handler.handler({ listWorks: true });
     expect(overLimit.isError).toBe(true);
     expect(overLimit.structuredContent).toBeUndefined();
@@ -995,7 +999,7 @@ describe('classic_text_lookup handler', () => {
 
     expect(result).toMatchObject({ isError: true });
     expect(textOf(result)).toBe('Invalid input: cursor requires work and browseSections=true.');
-    expect(historical.listDocuments).not.toHaveBeenCalled();
+    expect(historical.listDocumentsWithProfiles).not.toHaveBeenCalled();
     expect(historical.searchResolvedSections).not.toHaveBeenCalled();
     expect(historical.browseHistoricalSectionSummaries).not.toHaveBeenCalled();
   });
@@ -1094,7 +1098,7 @@ describe('classic_text_lookup handler', () => {
 
   it('returns service failures as tool errors', async () => {
     const { handler, historical } = createServices();
-    historical.listDocuments.mockRejectedValue(new Error('database unavailable'));
+    historical.listDocumentsWithProfiles.mockRejectedValue(new Error('database unavailable'));
 
     const result = await handler.handler({ listWorks: true });
 

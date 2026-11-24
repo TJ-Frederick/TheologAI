@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import Database from 'better-sqlite3';
+import { D1HistoricalDocumentRepository } from '../../../../src/adapters/d1/D1HistoricalDocumentRepository.js';
 import { HistoricalDocumentRepository } from '../../../../src/adapters/data/HistoricalDocumentRepository.js';
 import { FakeSqliteDatabase } from './fakeSqlite.js';
 
@@ -191,5 +193,88 @@ describe('HistoricalDocumentRepository', () => {
   it('propagates invalid stored JSON instead of concealing corrupt data', () => {
     const db = new FakeSqliteDatabase([{ match: 'ORDER BY title', all: [{ ...documentRow, metadata: '{' }] }]);
     expect(() => new HistoricalDocumentRepository(db.asDatabase()).listDocuments()).toThrow(SyntaxError);
+  });
+});
+
+describe('joined flat catalog on both adapters', () => {
+  function fixture() {
+    const db = new Database(':memory:');
+    db.exec(`CREATE TABLE documents (id TEXT PRIMARY KEY, title TEXT, type TEXT, date TEXT, metadata TEXT);
+      CREATE TABLE historical_document_delivery_profiles (
+        document_id TEXT PRIMARY KEY, work_id TEXT, edition_id TEXT, immutable_corpus_identity TEXT,
+        section_package_identity TEXT, delivery_mode TEXT, section_count INTEGER, landing_max_bytes INTEGER,
+        browse_page_size INTEGER, cursor_version INTEGER, provenance_json TEXT, rights_json TEXT
+      );`);
+    const statements: string[] = [];
+    const prepare = (sql: string) => ({
+      all: (...args: unknown[]) => { statements.push(sql); return db.prepare(sql).all(...args); },
+      get: (...args: unknown[]) => { statements.push(sql); return db.prepare(sql).get(...args); },
+    });
+    const native = new HistoricalDocumentRepository({ prepare } as unknown as Database.Database);
+    const d1 = new D1HistoricalDocumentRepository({
+      prepare(sql: string) {
+        const run = prepare(sql);
+        return {
+          all: async () => ({ results: run.all() }),
+          bind: (...args: unknown[]) => ({ first: async () => run.get(...args) }),
+        };
+      },
+    } as unknown as D1Database);
+    const insertDocument = db.prepare('INSERT INTO documents VALUES (?, ?, ?, ?, ?)');
+    const insertProfile = db.prepare('INSERT INTO historical_document_delivery_profiles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    function insert(id: string, sectioned = false) {
+      insertDocument.run(id, 'Tied title', 'creed', null, documentRow.metadata);
+      insertProfile.run(
+        id, sectioned ? 'work' : null, sectioned ? id : null, 'a'.repeat(64),
+        sectioned ? 'b'.repeat(64) : null, sectioned ? 'sectioned_only' : 'complete_document',
+        5, sectioned ? 16_384 : 0, sectioned ? 32 : 0, Number(sectioned),
+        '{"source":"reviewed"}', '{"label":"Public Domain"}',
+      );
+    }
+    return { db, statements, adapters: [native, d1], insert, insertDocument };
+  }
+
+  it('matches point reads in title and ID order with one executed statement regardless of work count', async () => {
+    const { db, statements, adapters, insert } = fixture();
+    try {
+      for (const ids of [[], ['z', 'a'], ['y', 'b', 'c']]) {
+        ids.forEach((id, index) => insert(id, index % 2 === 1));
+        for (const adapter of adapters) {
+          const docs = await adapter.listDocuments();
+          expect(docs.map(doc => doc.id)).toEqual(docs.map(doc => doc.id).sort());
+          const expected = await Promise.all(docs.map(async document => ({
+            document, profile: await adapter.getDeliveryProfile(document.id),
+          })));
+          statements.length = 0;
+          expect(await adapter.listDocumentsWithProfiles()).toEqual(expected);
+          expect(statements).toHaveLength(1);
+          expect(statements[0]).toContain('LEFT JOIN historical_document_delivery_profiles');
+          expect(statements[0]).not.toMatch(/document_sections|hierarchy|content/);
+        }
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  it.each(['provenance_json', 'rights_json'])('keeps a missing profile visible and rejects malformed %s', async field => {
+    const { db, adapters, insert, insertDocument } = fixture();
+    try {
+      insert('a');
+      insert('z', true);
+      insertDocument.run('missing', 'Tied title', 'creed', null, '{}');
+      for (const adapter of adapters) {
+        const result = await adapter.listDocumentsWithProfiles();
+        expect(result.map(({ document }) => document.id)).toEqual(['a', 'missing', 'z']);
+        expect(result[1].profile).toBeUndefined();
+      }
+      db.prepare(`UPDATE historical_document_delivery_profiles SET ${field} = ? WHERE document_id = ?`)
+        .run('[', 'a');
+      for (const adapter of adapters) {
+        await expect((async () => adapter.listDocumentsWithProfiles())()).rejects.toBeInstanceOf(SyntaxError);
+      }
+    } finally {
+      db.close();
+    }
   });
 });

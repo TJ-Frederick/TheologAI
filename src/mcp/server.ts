@@ -65,7 +65,8 @@ export class TheologAiMcpServer extends Server {
 export interface McpServerServices {
   bibleService: Pick<BibleService, 'getSupportedTranslations'>;
   commentaryService: Pick<CommentaryService, 'getAvailableCommentators'>;
-  historicalService: Pick<HistoricalDocumentService, 'listDocuments' | 'getDocument' | 'getSections' | 'getDeliveryProfile' | 'resolveSection'>;
+  historicalService: Pick<HistoricalDocumentService, 'listDocuments' | 'getDocument' | 'getSections' | 'getDeliveryProfile' | 'resolveSection'>
+    & Partial<Pick<HistoricalDocumentService, 'listDocumentsWithProfiles'>>;
   historicalHierarchyService: Pick<HistoricalHierarchyService, 'listPublications' | 'resolveCanonicalUri'>;
   strongsService: Pick<StrongsService, 'lookup'>;
 }
@@ -145,15 +146,19 @@ export function createTheologAiMcpServer(
 
     // Individual historical documents
     try {
-      const docs = await services.historicalService.listDocuments();
+      const historical = services.historicalService;
+      // Legacy stdio returns the successfully assembled prefix if a point read fails.
+      const entries = !legacyLogging && historical.listDocumentsWithProfiles
+        ? await historical.listDocumentsWithProfiles()
+        : (await historical.listDocuments()).map(document => ({ document, profile: undefined }));
       resources.push({
         uri: PRIMARY_SOURCE_CATALOG_URI,
         name: 'Local Primary-source Catalog',
         description: 'Reviewed metadata for works hosted in the local primary-source collection',
         mimeType: 'application/json',
       });
-      for (const doc of docs) {
-        const profile = await services.historicalService.getDeliveryProfile(doc.id);
+      for (const { document: doc, profile: batchedProfile } of entries) {
+        const profile = batchedProfile ?? await historical.getDeliveryProfile(doc.id);
         resources.push({
           uri: `theologai://documents/${doc.id}`,
           name: doc.title,
