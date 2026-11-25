@@ -61,23 +61,33 @@ export class HttpClient {
       : null;
   }
 
-  /** GET request, returning parsed JSON */
-  async getJSON<T = unknown>(path: string, options?: { headers?: Record<string, string> }): Promise<T> {
+  /** Decode and optionally validate/project JSON before admitting its bytes to the cache. */
+  async getJSON<T = unknown>(
+    path: string,
+    options?: { headers?: Record<string, string> },
+    decode?: (value: unknown) => T,
+  ): Promise<T> {
     const url = this.baseUrl + path;
     const cacheKey = url;
 
-    if (this.cache) {
-      const cached = this.cache.get(cacheKey);
-      if (cached !== undefined) return JSON.parse(cached) as T;
+    const parse = (body: string): T => {
+      const value: unknown = JSON.parse(body);
+      return decode ? decode(value) : value as T;
+    };
+    const cached = this.cache?.get(cacheKey);
+    if (cached !== undefined) {
+      try {
+        return parse(cached);
+      } catch (error) {
+        this.cache?.evict(cacheKey);
+        throw error;
+      }
     }
 
     const body = await this.fetchWithRetry(url, options?.headers);
-
-    if (this.cache) {
-      this.cache.set(cacheKey, body);
-    }
-
-    return JSON.parse(body) as T;
+    const result = parse(body);
+    this.cache?.set(cacheKey, body);
+    return result;
   }
 
   /** GET request, returning raw text */
@@ -241,6 +251,11 @@ class ResponseCache {
   clear(): void {
     this.values.clear();
     this.totalBytes = 0;
+  }
+
+  evict(key: string): void {
+    const entry = this.values.get(key);
+    if (entry) this.delete(key, entry);
   }
 
   dispose(): void { this.clear(); }
