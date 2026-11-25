@@ -55,29 +55,37 @@ export function localPrimarySourceSearchSql(selection: PrimarySourceSelection, d
  * Deterministic round-robin selection: the best section from every matching
  * work precedes every second-best section, then every third-best section.
  * Relevance and the stable section row id break ties within each round.
+ * Check canonical eligibility before ranking and load text only for winners.
+ * CROSS JOIN keeps the bounded winner set on the outside of SQLite's lookups.
  */
 function workDiverseSql(scope = ''): string {
   return `WITH matching_sections AS (
-    SELECT ds.id, ds.document_id, ds.section_number, ds.title, ds.content, ds.topics,
-           i.section_key, i.source_ordinal,
-           d.title AS document_title, d.type AS document_type, d.date AS document_date,
-           d.metadata AS document_metadata, bm25(sections_fts) AS relevance_rank
+    SELECT ds.id, ds.document_id, bm25(sections_fts) AS relevance_rank
       FROM sections_fts
       JOIN document_sections ds ON ds.id = sections_fts.rowid
       JOIN historical_section_identities i ON i.document_section_id = ds.id AND i.document_id = ds.document_id
       JOIN documents d ON d.id = ds.document_id
      WHERE sections_fts MATCH ?${scope}
   ), ranked_sections AS (
-    SELECT *, ROW_NUMBER() OVER (
+    SELECT id, document_id, relevance_rank, ROW_NUMBER() OVER (
       PARTITION BY document_id ORDER BY relevance_rank, id
     ) AS work_rank
       FROM matching_sections
+  ), winners AS (
+    SELECT id, document_id, work_rank, relevance_rank
+      FROM ranked_sections
+     ORDER BY work_rank, relevance_rank, id
+     LIMIT ?
   )
-  SELECT id, document_id, section_number, title, content, topics, section_key, source_ordinal,
-         document_title, document_type, document_date, document_metadata
-    FROM ranked_sections
-   ORDER BY work_rank, relevance_rank, id
-   LIMIT ?`;
+  SELECT ds.id, ds.document_id, ds.section_number, ds.title, ds.content, ds.topics,
+         i.section_key, i.source_ordinal,
+         d.title AS document_title, d.type AS document_type, d.date AS document_date,
+         d.metadata AS document_metadata
+    FROM winners w
+    CROSS JOIN document_sections ds ON ds.id = w.id
+    CROSS JOIN historical_section_identities i ON i.document_section_id = w.id AND i.document_id = w.document_id
+    CROSS JOIN documents d ON d.id = w.document_id
+   ORDER BY w.work_rank, w.relevance_rank, w.id`;
 }
 
 /** Compose only quoted FTS5 literals; caller text can never become FTS syntax. */
