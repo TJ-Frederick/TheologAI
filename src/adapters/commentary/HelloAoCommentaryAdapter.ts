@@ -84,9 +84,10 @@ export class HelloAoCommentaryAdapter implements CommentaryProviderPort {
     }
 
     const hao = toHelloAO(ref);
-    let data: unknown;
+    let chapter: ReturnType<HelloAoCommentaryAdapter['decodeChapter']>;
     try {
-      data = await this.client.getJSON<unknown>(`/${meta.providerWorkId}/${hao.bookCode}/${hao.chapter}.json`);
+      chapter = await this.client.getJSON(`/${meta.providerWorkId}/${hao.bookCode}/${hao.chapter}.json`, undefined,
+        data => this.decodeChapter(data, meta, hao));
     } catch (error) {
       if (error instanceof SyntaxError) {
         throw new AdapterIntegrityError('HelloAO', 'Malformed commentary JSON payload', error);
@@ -94,25 +95,7 @@ export class HelloAoCommentaryAdapter implements CommentaryProviderPort {
       throw error;
     }
 
-    const payload = this.validateProviderPayload(
-      data,
-      meta.providerWorkId,
-      hao.bookCode,
-      hao.chapter,
-    );
-    if (payload.kind === 'invalid') {
-      throw new AdapterIntegrityError('HelloAO', payload.reason);
-    }
-
-    const extraction = this.extractCommentaryText(
-      payload.content,
-      payload.chapterNumber,
-      hao.verse,
-      meta.scalarPolicy,
-    );
-    if (extraction.kind === 'invalid') {
-      throw new AdapterIntegrityError('HelloAO', extraction.reason);
-    }
+    const { extraction, providerRevision } = chapter;
     if (extraction.kind === 'absent') {
       if (hao.verse != null) {
         throw new CommentaryScalarNotFoundError(
@@ -130,7 +113,7 @@ export class HelloAoCommentaryAdapter implements CommentaryProviderPort {
       text: extraction.text,
       citation: { ...meta.citation },
       coverage: extraction.coverage,
-      providerRevision: payload.providerRevision,
+      providerRevision,
     };
   }
 
@@ -144,6 +127,14 @@ export class HelloAoCommentaryAdapter implements CommentaryProviderPort {
 
   private resolveCommentator(name: string): CommentaryCatalogEntry | undefined {
     return resolveCommentaryCatalogEntry(name);
+  }
+
+  private decodeChapter(data: unknown, meta: CommentaryCatalogEntry, hao: ReturnType<typeof toHelloAO>) {
+    const payload = this.validateProviderPayload(data, meta.providerWorkId, hao.bookCode, hao.chapter);
+    if (payload.kind === 'invalid') throw new AdapterIntegrityError('HelloAO', payload.reason);
+    const extraction = this.extractCommentaryText(payload.content, payload.chapterNumber, hao.verse, meta.scalarPolicy);
+    if (extraction.kind === 'invalid') throw new AdapterIntegrityError('HelloAO', extraction.reason);
+    return { extraction, providerRevision: payload.providerRevision };
   }
 
   private extractCommentaryText(

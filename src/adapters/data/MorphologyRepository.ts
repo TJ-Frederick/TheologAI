@@ -9,6 +9,7 @@ import type Database from 'better-sqlite3';
 import { getDatabase } from '../shared/Database.js';
 import type {
   IMorphologyRepository,
+  ExpandedMorphWord,
   MorphWord,
   WordOccurrence,
   BookDistribution,
@@ -20,6 +21,11 @@ import type {
   TokenOccurrencePage,
 } from '../../kernel/repositories.js';
 import { expandHebrewMorphCode } from '../shared/hebrewMorphExpander.js';
+import {
+  EXPANDED_VERSE_MORPHOLOGY_SQL,
+  mapExpandedMorphologyRow,
+  type ExpandedMorphologyDatabaseRow,
+} from '../shared/morphologyExpansion.js';
 import { CANONICAL_BOOK_ORDER_SQL, sortByCanonicalBook } from '../shared/repositoryUtils.js';
 import { parseStrongsIdentity } from '../../kernel/strongs.js';
 import {
@@ -35,6 +41,7 @@ export type { MorphWord } from '../../kernel/repositories.js';
 export class MorphologyRepository implements IMorphologyRepository {
   private db: Database.Database;
   private stmtVerse: Database.Statement;
+  private stmtExpandedVerse: Database.Statement;
   private stmtMorphExpand: Database.Statement;
   private stmtBookList: Database.Statement;
   private stmtOccurrences: Database.Statement;
@@ -51,6 +58,7 @@ export class MorphologyRepository implements IMorphologyRepository {
     this.stmtVerse = this.db.prepare(
       'SELECT position, word_text, lemma, strongs_number, morph_code, gloss FROM morphology WHERE book = ? AND chapter = ? AND verse = ? ORDER BY position'
     );
+    this.stmtExpandedVerse = this.db.prepare(EXPANDED_VERSE_MORPHOLOGY_SQL);
     this.stmtMorphExpand = this.db.prepare(
       'SELECT expansion FROM morph_codes WHERE code = ?'
     );
@@ -99,6 +107,11 @@ export class MorphologyRepository implements IMorphologyRepository {
   /** Get word-by-word morphology for a specific verse */
   getVerseMorphology(book: string, chapter: number, verse: number): MorphWord[] {
     return this.stmtVerse.all(book, chapter, verse) as MorphWord[];
+  }
+
+  getExpandedVerseMorphology(book: string, chapter: number, verse: number): ExpandedMorphWord[] {
+    const rows = this.stmtExpandedVerse.all(book, chapter, verse) as ExpandedMorphologyDatabaseRow[];
+    return rows.map(mapExpandedMorphologyRow);
   }
 
   /** Expand a morphology code to human-readable form */

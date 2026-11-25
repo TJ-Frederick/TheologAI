@@ -232,6 +232,44 @@ describe('HttpClient requests, caching, and errors', () => {
     client.dispose();
   });
 
+  it('refetches malformed JSON once and caches the first decoded body', async () => {
+    globalThis.fetch = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('not-json'))
+      .mockResolvedValueOnce(Response.json({ answer: 42 }));
+    const client = new HttpClient({ source: 'Test' });
+    const read = () => client.getJSON('https://example.test/data');
+    await expect(read()).rejects.toBeInstanceOf(SyntaxError);
+    await expect(read()).resolves.toEqual({ answer: 42 });
+    await expect(read()).resolves.toEqual({ answer: 42 });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([true, false])('retains valid cached data across concurrent misses when invalid finishes first: %s', async invalidFirst => {
+    const responses: Array<(response: Response) => void> = [];
+    globalThis.fetch = vi.fn<typeof fetch>().mockImplementation(() => new Promise(resolve => { responses.push(resolve); }));
+    const client = new HttpClient({ source: 'Test' });
+    const reject = new Error('provider rejected its identity');
+    const read = () => client.getJSON('https://example.test/data', undefined, value => {
+      if (value !== 'valid') throw reject;
+      return value;
+    });
+    const invalid = expect(read()).rejects.toBe(reject);
+    const valid = expect(read()).resolves.toBe('valid');
+    if (invalidFirst) {
+      responses[0](Response.json('invalid'));
+      await invalid;
+      responses[1](Response.json('valid'));
+      await valid;
+    } else {
+      responses[1](Response.json('valid'));
+      await valid;
+      responses[0](Response.json('invalid'));
+      await invalid;
+    }
+    await expect(read()).resolves.toBe('valid');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('does not retry a non-retriable HTTP status', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(
       new Response('missing', { status: 404, statusText: 'Not Found' }),

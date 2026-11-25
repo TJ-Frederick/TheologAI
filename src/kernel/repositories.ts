@@ -74,6 +74,10 @@ export interface MorphWord {
   gloss: string | null;
 }
 
+export interface ExpandedMorphWord extends MorphWord {
+  expansion: string | undefined;
+}
+
 export interface WordOccurrence {
   book: string;
   chapter: number;
@@ -134,6 +138,7 @@ export interface TokenOccurrencePage {
 
 export interface IMorphologyRepository {
   getVerseMorphology(book: string, chapter: number, verse: number): RepositoryResult<MorphWord[]>;
+  getExpandedVerseMorphology(book: string, chapter: number, verse: number): RepositoryResult<ExpandedMorphWord[]>;
   expandMorphCode(code: string): RepositoryResult<string | undefined>;
   getAvailableBooks(): RepositoryResult<string[]>;
   hasVerse(book: string, chapter: number, verse: number): RepositoryResult<boolean>;

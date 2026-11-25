@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { env, SELF } from 'cloudflare:test';
 import { createWorkerCompositionRoot } from '../../src/tools/worker/index.js';
+import { D1MorphologyRepository } from '../../src/adapters/d1/D1MorphologyRepository.js';
+import { MorphologyService } from '../../src/services/languages/MorphologyService.js';
+import { createVerseMorphologyHandler } from '../../src/tools/v2/verseMorphology.js';
+import { formatMorphologyResult } from '../../src/formatters/languagesFormatter.js';
+import { presentVerseMorphologyStructured } from '../../src/presenters/verseMorphologyStructured.js';
+import { EXPANDED_MORPHOLOGY_FIXTURE } from '../fixtures/expandedMorphology.js';
 import type { Env } from '../../src/worker-env.js';
 import { encodeParallelGroupCursor } from '../../src/kernel/parallelGroupCursor.js';
 import { parseSourceAttestedLookupReference } from '../../src/kernel/sourceAttestedReference.js';
@@ -615,6 +621,70 @@ describe('Worker MCP endpoint in workerd', () => {
         },
       },
     });
+  });
+
+  it.each(['John 3:16', 'Genesis 1:1'])('returns the same expanded %s tool output from one local D1 query', async reference => {
+    const db = env.THEOLOGAI_DB;
+    const scalar = new D1MorphologyRepository(db);
+    const plain = await new MorphologyService(scalar).getVerseMorphology(reference);
+    const baseline = { ...plain, words: await Promise.all(plain.words.map(async word => (
+      word.morph ? { ...word, morphExpanded: await scalar.expandMorphCode(word.morph) } : word
+    ))) };
+    const expected = {
+      content: [{ type: 'text', text: formatMorphologyResult(baseline) }],
+      structuredContent: presentVerseMorphologyStructured(baseline),
+    };
+    const statements: string[] = [];
+    const measured = new D1MorphologyRepository({
+      prepare(sql: string) {
+        statements.push(sql);
+        return db.prepare(sql);
+      },
+    } as D1Database);
+    const handler = createVerseMorphologyHandler(new MorphologyService(measured));
+
+    const args = { reference, expand_morphology: true };
+    expect(await handler.handler(args)).toEqual(expected);
+    expect(statements).toHaveLength(1);
+    expect(statements[0]).toContain('LEFT JOIN morph_codes');
+    statements.length = 0;
+    const omitted = await handler.handler({ reference });
+    expect(statements).toHaveLength(1);
+    expect(statements[0]).not.toContain('JOIN');
+    statements.length = 0;
+    expect(await handler.handler({ reference, expand_morphology: false })).toEqual(omitted);
+    expect(statements).toHaveLength(1);
+    expect(statements[0]).not.toContain('JOIN');
+    statements.length = 0;
+    expect((await handler.handler({ reference: 'John 3:16-17', expand_morphology: true })).isError).toBe(true);
+    expect(statements).toEqual([]);
+
+    const rpcResult = await rpc('tools/call', { name: 'bible_verse_morphology', arguments: args });
+    expect(rpcResult.message.error).toBeUndefined();
+    expect(rpcResult.message.result).toEqual(expected);
+  });
+
+  it('keeps repeated raw codes and mixed expansion cases on real local D1', async () => {
+    const db = env.THEOLOGAI_DB;
+    const insertWord = db.prepare(`INSERT INTO morphology
+      (book, chapter, verse, position, word_text, lemma, strongs_number, morph_code, gloss, book_order)
+      VALUES ('Genesis', 1, 2, ?, 'מִלָּה', 'מִלָּה', 'H4405', ?, 'word', 1)`);
+    await db.batch([
+      ...[...EXPANDED_MORPHOLOGY_FIXTURE].reverse().map(({ position, code }) => insertWord.bind(position, code)),
+      db.prepare(`INSERT INTO morph_codes VALUES ('HVqp3ms', 'Stored Hebrew override'), ('HNpl', ''), ('', 'Ignored empty code')`),
+    ]);
+    try {
+      const repo = new D1MorphologyRepository(db);
+      const expanded = await repo.getExpandedVerseMorphology('Genesis', 1, 2);
+      expect(expanded.map(word => ({
+        position: word.position, code: word.morph_code, expansion: word.expansion,
+      }))).toEqual(EXPANDED_MORPHOLOGY_FIXTURE);
+    } finally {
+      await db.batch([
+        db.prepare("DELETE FROM morphology WHERE book = 'Genesis' AND chapter = 1 AND verse = 2"),
+        db.prepare("DELETE FROM morph_codes WHERE code IN ('HVqp3ms', 'HNpl', '')"),
+      ]);
+    }
   });
 
   it('lists the document fixture dynamically and reads its D1-backed resource', async () => {

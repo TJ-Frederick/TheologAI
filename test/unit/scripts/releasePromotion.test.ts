@@ -22,9 +22,10 @@ function repo() {
     mkdirSync(dirname(join(root, path)), {recursive: true});
     writeFileSync(join(root, path), body);
   };
-  const commit = (path: string, body: string) => {
-    write(path, body);
-    git('add', path);
+  const commit = (paths: string | readonly string[], body: string) => {
+    const files = typeof paths === 'string' ? [paths] : paths;
+    for (const path of files) write(path, body);
+    git('add', '--', ...files);
     git('-c','user.name=Fixture','-c','user.email=fixture@localhost','commit','--quiet','-m','fixture');
     return git('rev-parse','HEAD');
   };
@@ -36,9 +37,9 @@ function repo() {
   record.productionSource = productionSource;
   record.predecessors.production = {...record.predecessors.production, ...record.targets.production};
   commit('release/serving.json',JSON.stringify(record));
-  const mergeCandidate = (base: string, path: string, contents: string, branchPoint = base) => {
+  const mergeCandidate = (base: string, paths: string | readonly string[], contents: string, branchPoint = base) => {
     git('checkout', '--quiet', '--detach', branchPoint);
-    const head = commit(path, contents);
+    const head = commit(paths, contents);
     git('checkout', '--quiet', '--detach', base);
     git('merge', '--quiet', '--no-ff', '-m', 'Synthetic PR merge', head);
     return {base, head, merge: git('rev-parse', 'HEAD')};
@@ -57,6 +58,111 @@ function repo() {
   };
   return {root, write, git, run, commit, record, mergeCandidate, classifyCandidate};
 }
+
+const exactMorphologyPaths = [
+  'src/adapters/shared/morphologyExpansion.ts',
+  'src/kernel/repositories.ts',
+  'test/fixtures/expandedMorphology.ts',
+  'test/fixtures/mcpCompositionRoot.ts',
+] as const;
+const exactCachePath = 'src/adapters/shared/HttpClient.ts';
+const narrowRuntimePaths = [...exactMorphologyPaths, exactCachePath];
+const morphologyPaths = [
+  ...exactMorphologyPaths,
+  'src/adapters/d1/D1MorphologyRepository.ts',
+  'src/adapters/data/MorphologyRepository.ts',
+  'src/services/languages/MorphologyService.ts',
+  'test/test-topology.json',
+  'test/unit/adapters/data/MorphologyRepository.test.ts',
+  'test/unit/adapters/repositoryParity.test.ts',
+  'test/unit/services/async-compat/asyncParity.test.ts',
+  'test/unit/services/languages/MorphologyService.test.ts',
+  'test/unit/services/languages/OriginalLanguageStudyService.test.ts',
+  'test/unit/services/languages/StrongsUsageService.test.ts',
+  'test/worker-runtime/workerMcp.test.ts',
+];
+const cachePaths = [
+  exactCachePath,
+  'src/adapters/bible/EsvAdapter.ts',
+  'src/adapters/bible/HelloAoAdapter.ts',
+  'src/adapters/bible/NetBibleAdapter.ts',
+  'src/adapters/commentary/HelloAoCommentaryAdapter.ts',
+  'test/unit/adapters/bible/EsvAdapter.test.ts',
+  'test/unit/adapters/bible/HelloAoAdapter.test.ts',
+  'test/unit/adapters/bible/NetBibleAdapter.test.ts',
+  'test/unit/adapters/commentary/HelloAoCommentaryAdapter.test.ts',
+  'test/unit/adapters/shared/HttpClient.test.ts',
+];
+
+it.each(narrowRuntimePaths)('classifies the exact runtime path %s on its own as application', path => {
+  const f = repo();
+  f.commit(path, 'runtime change');
+  expect(f.run('classify')).toBe('application');
+});
+
+it.each([
+  ['expanded morphology', morphologyPaths],
+  ['provider cache', cachePaths],
+  ['expanded morphology and provider cache', [...morphologyPaths, ...cachePaths]],
+] as const)('classifies %s as application while ordinary PR CI still selects full validation', (_slice, paths) => {
+  const f = repo();
+  const pr = f.mergeCandidate(f.git('rev-parse', 'HEAD'), paths, 'runtime changes');
+  const release = f.classifyCandidate(pr, {productionSource: f.record.productionSource, targets: f.record.predecessors});
+  expect(release.status, release.stderr).toBe(0);
+  expect(release.outputs).toContain('mode=application\n');
+
+  const ci = spawnSync(process.execPath, [join(process.cwd(), 'scripts/classify-ci-changes.mjs')], {
+    cwd: f.root, encoding: 'utf8', env: {...process.env,
+      CI_EVENT_NAME: 'pull_request', CI_EXPECTED_HEAD: pr.merge, CI_PR_HEAD: pr.head, CI_FORCE_FULL: 'false',
+      GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: ''},
+  });
+  expect(ci.status, ci.stderr).toBe(0);
+  expect(JSON.parse(ci.stdout)).toEqual({
+    mode: 'full', data: true, serving: true, reason: 'corpus-delivery-or-unclassified-path',
+  });
+});
+
+it.each([
+  'data/data-manifest.json',
+  'data/biblical-languages/stepbible-lexicons/tbesh-hebrew.txt',
+  'src/databases/strongs-schema.sql',
+  'migrations/0001_initial_schema.sql',
+  'scripts/build-database.ts',
+  'scripts/prepare-production-d1-candidate.ts',
+  'src/kernel/books.ts',
+  'src/adapters/shared/morphologyExpansionHelper.ts',
+  'test/fixtures/anotherFixture.ts',
+])('preserves corpus classification when runtime changes include %s', path => {
+  const f = repo();
+  f.commit([...narrowRuntimePaths, path], 'mixed changes');
+  expect(f.run('classify')).toBe('corpus');
+});
+
+const unknownRenamePath = 'src/adapters/shared/OtherClient.ts';
+it.each([
+  [exactCachePath, unknownRenamePath],
+  [unknownRenamePath, exactCachePath],
+])('treats the rename %s to %s as corpus when either endpoint is unclassified', (from, to) => {
+  const f = repo();
+  const accepted = f.commit(from, 'same content on both sides of rename');
+  f.write('accepted.json', JSON.stringify({productionSource: accepted, targets: f.record.targets}));
+  f.git('mv', from, to);
+  f.git('commit', '--quiet', '-m', 'rename fixture');
+  expect(f.git('diff', '--name-status', '--find-renames', accepted, 'HEAD')).toBe(`R100\t${from}\t${to}`);
+  expect(f.run('classify', 'accepted.json')).toBe('corpus');
+});
+
+it.each([
+  ['production', 'databaseId', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
+  ['preview', 'databaseName', 'different-preview-database'],
+])('keeps a %s %s change on the corpus route alongside runtime changes', (role, field, value) => {
+  const f = repo();
+  f.commit(narrowRuntimePaths, 'runtime changes');
+  expect(f.run('classify')).toBe('application');
+  f.record.targets[role][field] = value;
+  f.commit('release/serving.json', JSON.stringify(f.record));
+  expect(f.run('classify')).toBe('corpus');
+});
 
 it('classifies the cumulative delta to the serving release through the actual CLI', () => {
   const f = repo();

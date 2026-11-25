@@ -15,7 +15,7 @@ describe('MorphologyRepository', () => {
   it('prepares all reusable morphology queries', () => {
     const db = new FakeSqliteDatabase();
     new MorphologyRepository(db.asDatabase());
-    expect(db.prepare).toHaveBeenCalledTimes(11);
+    expect(db.prepare).toHaveBeenCalledTimes(12);
     expect(db.statement('COUNT(DISTINCT').sql).toContain('GROUP BY book');
   });
 
@@ -29,6 +29,20 @@ describe('MorphologyRepository', () => {
     expect(repo.getVerseMorphology('John', 1, 1)).toEqual([word]);
     expect(repo.hasVerse('John', 1, 1)).toBe(true);
     expect(repo.hasVerse('John', 1, 2)).toBe(false);
+  });
+
+  it('reads expanded morphology with one ordered join and no scalar reads', () => {
+    const db = new FakeSqliteDatabase([{
+      match: 'LEFT JOIN morph_codes', all: [{ ...word, stored_expansion: 'Preposition' }],
+    }]);
+    const repo = new MorphologyRepository(db.asDatabase());
+    expect(repo.getExpandedVerseMorphology('John', 1, 1)).toEqual([{ ...word, expansion: 'Preposition' }]);
+    const joined = db.statement('LEFT JOIN morph_codes');
+    expect(joined.sql).toContain('ON c.code = m.morph_code');
+    expect(joined.sql).toContain('ORDER BY m.position');
+    expect(joined.all).toHaveBeenCalledExactlyOnceWith('John', 1, 1);
+    expect(db.statement('FROM morphology WHERE book').all).not.toHaveBeenCalled();
+    expect(db.statement('FROM morph_codes').get).not.toHaveBeenCalled();
   });
 
   it('expands known morphology codes and returns undefined for unknown codes', () => {
