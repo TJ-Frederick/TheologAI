@@ -35,6 +35,14 @@ const releaseOperations = new Set([
   'test/unit/scripts/prReleaseEligibility.test.ts',
   'test/unit/scripts/releasePromotion.test.ts',
 ]);
+const runtimeOnlyPaths = new Set([
+  'src/adapters/shared/primarySourceSearchSql.ts',
+  'src/adapters/shared/morphologyExpansion.ts',
+  'src/adapters/shared/HttpClient.ts',
+  'src/kernel/repositories.ts',
+  'test/fixtures/expandedMorphology.ts',
+  'test/fixtures/mcpCompositionRoot.ts',
+]);
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
 const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
 function requireValue(value, message) {
@@ -85,7 +93,7 @@ export function classifyRelease(root = process.cwd(), baselineFile) {
   // CI also exercises the data suite for database readers and historical search. Those
   // runtime-only changes do not modify the stored corpus. Keep shared builders conservative.
   const runtimeOnly = path => /^src\/(?:services\/historical|adapters\/(?:bible|commentary|donation|d1|data))\/.*\.ts$/.test(path)
-    || path === 'src/adapters/shared/primarySourceSearchSql.ts'
+    || runtimeOnlyPaths.has(path)
     || /^test\/unit\/.*\.test\.ts$/.test(path);
   const application = substantive.every(change => change.paths.every(path =>
     runtimeOnly(path) || ['docs','serving'].includes(classifyCiChanges('M\0' + path + '\0').mode)));
