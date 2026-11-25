@@ -13,6 +13,11 @@ import { UbsParallelPassageRepository } from '../../../src/adapters/shared/UbsPa
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY, UBS_PARALLEL_PASSAGE_PROVENANCE } from '../../../src/kernel/ubsParallelSource.js';
 import generatedUbsCorpus from '../../../src/data/ubs-parallel-passages.generated.json';
 import { StrongsService } from '../../../src/services/languages/StrongsService.js';
+import { MorphologyService } from '../../../src/services/languages/MorphologyService.js';
+import { createVerseMorphologyHandler } from '../../../src/tools/v2/verseMorphology.js';
+import { formatMorphologyResult } from '../../../src/formatters/languagesFormatter.js';
+import { presentVerseMorphologyStructured } from '../../../src/presenters/verseMorphologyStructured.js';
+import { EXPANDED_MORPHOLOGY_FIXTURE } from '../../fixtures/expandedMorphology.js';
 
 function sqliteAsD1(db: Database.Database): D1Database {
   return {
@@ -334,6 +339,41 @@ describe('SQLite and D1 repository parity with identical real data', () => {
       .resolves.toEqual(sqliteMorphology.getTokenOccurrences('G0025'));
     expect(sqliteMorphology.getAvailableBooks()).toEqual(['Genesis', 'Psalms', 'John', 'Romans']);
     expect(sqliteMorphology.getDistribution('G0025').map(row => row.book)).toEqual(['John', 'Romans']);
+  });
+
+  it('matches scalar expansions and full tool results for exact codes, repeated tokens and Hebrew fallback', async () => {
+    const insert = db.prepare(`INSERT INTO morphology
+      (book, chapter, verse, position, word_text, lemma, strongs_number, morph_code, gloss, book_order)
+      VALUES ('Genesis', 1, 2, ?, 'מִלָּה', 'מִלָּה', 'H4405', ?, 'word', 1)`);
+    for (const { position, code } of [...EXPANDED_MORPHOLOGY_FIXTURE].reverse()) insert.run(position, code);
+    db.exec(`INSERT INTO morph_codes VALUES ('HVqp3ms', 'Stored Hebrew override'), ('HNpl', ''), ('', 'Ignored empty code')`);
+    try {
+      for (const repo of [sqliteMorphology, d1Morphology]) {
+        const words = await repo.getVerseMorphology('Genesis', 1, 2);
+        const expected = await Promise.all(words.map(async word => ({
+          ...word, expansion: word.morph_code ? await repo.expandMorphCode(word.morph_code) : undefined,
+        })));
+        expect(expected.map(word => ({
+          position: word.position, code: word.morph_code, expansion: word.expansion,
+        }))).toEqual(EXPANDED_MORPHOLOGY_FIXTURE);
+        expect(await repo.getExpandedVerseMorphology('Genesis', 1, 2)).toEqual(expected);
+
+        const service = new MorphologyService(repo);
+        const plain = await service.getVerseMorphology('Genesis 1:2', false);
+        const baseline = { ...plain, words: plain.words.map((word, index) => (
+          word.morph ? { ...word, morphExpanded: expected[index].expansion } : word
+        )) };
+        const result = await createVerseMorphologyHandler(service)
+          .handler({ reference: 'Genesis 1:2', expand_morphology: true });
+        expect(result).toEqual({
+          content: [{ type: 'text', text: formatMorphologyResult(baseline) }],
+          structuredContent: presentVerseMorphologyStructured(baseline),
+        });
+      }
+    } finally {
+      db.exec(`DELETE FROM morphology WHERE book = 'Genesis' AND chapter = 1 AND verse = 2;
+        DELETE FROM morph_codes WHERE code IN ('HVqp3ms', 'HNpl', '')`);
+    }
   });
 
   it('produces identical Node and D1 public usage pages and opaque cursors', async () => {

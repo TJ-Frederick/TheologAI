@@ -2,7 +2,7 @@
  * Verse morphology service using SQLite repository.
  */
 
-import type { IMorphologyRepository } from '../../kernel/repositories.js';
+import type { ExpandedMorphWord, IMorphologyRepository, MorphWord } from '../../kernel/repositories.js';
 import type { VerseMorphologyResult, VerseWord, Citation } from '../../kernel/types.js';
 import { parseReference, toStepBible, formatReference } from '../../kernel/reference.js';
 import { NotFoundError, ValidationError } from '../../kernel/errors.js';
@@ -36,7 +36,9 @@ export class MorphologyService {
     }
 
     const sb = toStepBible(ref);
-    const words = await this.repo.getVerseMorphology(sb.book, ref.chapter, ref.startVerse);
+    const words: Array<MorphWord | ExpandedMorphWord> = expandMorphology
+      ? await this.repo.getExpandedVerseMorphology(sb.book, ref.chapter, ref.startVerse)
+      : await this.repo.getVerseMorphology(sb.book, ref.chapter, ref.startVerse);
 
     if (words.length === 0) {
       throw new NotFoundError('morphology', `No morphology data for ${formatReference(ref)}`);
@@ -53,8 +55,8 @@ export class MorphologyService {
         gloss: w.gloss ?? '',
       };
 
-      if (expandMorphology && w.morph_code) {
-        vw.morphExpanded = await this.repo.expandMorphCode(w.morph_code);
+      if (expandMorphology && w.morph_code && 'expansion' in w) {
+        vw.morphExpanded = w.expansion;
       }
 
       verseWords.push(vw);
