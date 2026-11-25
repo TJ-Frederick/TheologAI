@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { MorphologyService } from '../../../../src/services/languages/MorphologyService.js';
 import { NotFoundError, ValidationError } from '../../../../src/kernel/errors.js';
 import type { MorphWord } from '../../../../src/adapters/data/MorphologyRepository.js';
-import { expandHebrewMorphCode } from '../../../../src/adapters/shared/hebrewMorphExpander.js';
 
 // ── Mock repository ──
 
@@ -14,13 +13,11 @@ const mockWords: MorphWord[] = [
 function makeMockRepo() {
   return {
     getVerseMorphology: vi.fn().mockReturnValue(mockWords),
-    expandMorphCode: vi.fn().mockImplementation((code: string) => {
-      const map: Record<string, string> = {
-        'PREP': 'Preposition',
-        'N-DSF': 'Noun, Dative, Singular, Feminine',
-      };
-      return map[code];
-    }),
+    getExpandedVerseMorphology: vi.fn().mockReturnValue([
+      { ...mockWords[0], expansion: 'Preposition' },
+      { ...mockWords[1], expansion: 'Noun, Dative, Singular, Feminine' },
+    ]),
+    expandMorphCode: vi.fn(),
     getAvailableBooks: vi.fn().mockReturnValue(['Genesis', 'John', 'Romans']),
     hasVerse: vi.fn().mockReturnValue(true),
   };
@@ -33,6 +30,7 @@ describe('MorphologyService', () => {
       const service = new MorphologyService(repo as any);
       await service.getVerseMorphology('John 1:1');
       expect(repo.getVerseMorphology).toHaveBeenCalledWith('John', 1, 1);
+      expect(repo.getExpandedVerseMorphology).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundError for chapter-only reference', async () => {
@@ -45,15 +43,18 @@ describe('MorphologyService', () => {
       const repo = makeMockRepo();
       const service = new MorphologyService(repo as any);
 
-      await expect(service.getVerseMorphology('John 1:1-2')).rejects.toThrow(ValidationError);
+      await expect(service.getVerseMorphology('John 1:1-2', true)).rejects.toThrow(ValidationError);
       expect(repo.getVerseMorphology).not.toHaveBeenCalled();
+      expect(repo.getExpandedVerseMorphology).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundError when repo returns empty array', async () => {
       const repo = makeMockRepo();
       repo.getVerseMorphology.mockReturnValue([]);
+      repo.getExpandedVerseMorphology.mockReturnValue([]);
       const service = new MorphologyService(repo as any);
       await expect(service.getVerseMorphology('John 1:1')).rejects.toThrow(NotFoundError);
+      await expect(service.getVerseMorphology('John 1:1', true)).rejects.toThrow(NotFoundError);
     });
 
     it('maps MorphWord to VerseWord correctly', async () => {
@@ -77,6 +78,9 @@ describe('MorphologyService', () => {
       const result = await service.getVerseMorphology('John 1:1', true);
       expect(result.words[0].morphExpanded).toBe('Preposition');
       expect(result.words[1].morphExpanded).toBe('Noun, Dative, Singular, Feminine');
+      expect(repo.getExpandedVerseMorphology).toHaveBeenCalledExactlyOnceWith('John', 1, 1);
+      expect(repo.getVerseMorphology).not.toHaveBeenCalled();
+      expect(repo.expandMorphCode).not.toHaveBeenCalled();
     });
 
     it('does not expand when expandMorphology is false', async () => {
@@ -84,6 +88,7 @@ describe('MorphologyService', () => {
       const service = new MorphologyService(repo as any);
       const result = await service.getVerseMorphology('John 1:1', false);
       expect(result.words[0].morphExpanded).toBeUndefined();
+      expect(repo.getExpandedVerseMorphology).not.toHaveBeenCalled();
     });
 
     it('handles null strongs_number and morph_code', async () => {
@@ -127,13 +132,24 @@ describe('MorphologyService', () => {
 
     it('propagates compound Hebrew morphology expansion into verse output', async () => {
       const repo = makeMockRepo();
-      repo.getVerseMorphology.mockReturnValue([
-        { position: 5, word_text: 'הַ/שָּׁמַ֖יִם', lemma: 'שָׁמַיִם', strongs_number: 'H8064', morph_code: 'HTd/Ncmpa', gloss: 'the/ heavens' },
+      repo.getExpandedVerseMorphology.mockReturnValue([
+        {
+          position: 5, word_text: 'הַ/שָּׁמַ֖יִם', lemma: 'שָׁמַיִם', strongs_number: 'H8064', morph_code: 'HTd/Ncmpa', gloss: 'the/ heavens',
+          expansion: 'Particle Definite Article / Noun Common Masculine Plural Absolute',
+        },
       ]);
-      repo.expandMorphCode.mockImplementation(expandHebrewMorphCode);
       const result = await new MorphologyService(repo as any).getVerseMorphology('Genesis 1:1', true);
       expect(result.words[0].morphExpanded)
         .toBe('Particle Definite Article / Noun Common Masculine Plural Absolute');
+    });
+
+    it('propagates the joined read failure without retrying through point reads', async () => {
+      const repo = makeMockRepo();
+      const error = new Error('database read failed');
+      repo.getExpandedVerseMorphology.mockRejectedValue(error);
+      await expect(new MorphologyService(repo as any).getVerseMorphology('Genesis 1:1', true)).rejects.toBe(error);
+      expect(repo.getVerseMorphology).not.toHaveBeenCalled();
+      expect(repo.expandMorphCode).not.toHaveBeenCalled();
     });
   });
 

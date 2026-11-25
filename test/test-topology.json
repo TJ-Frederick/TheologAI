@@ -10,9 +10,9 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 309,
+    "totalTestTypeScript": 310,
     "activeVitest": 228,
-    "support": 26,
+    "support": 27,
     "manual": 4,
     "legacyOrphan": 50,
     "conformance": 1
@@ -254,6 +254,7 @@
       "test/fixtures/biblicalLanguagesFixtures.ts",
       "test/fixtures/commentaryFixtures.ts",
       "test/fixtures/editionProvenanceFoundation.ts",
+      "test/fixtures/expandedMorphology.ts",
       "test/fixtures/historicalFixtures.ts",
       "test/fixtures/mcpCompositionRoot.ts",
       "test/fixtures/ubsParallelCorpus.ts",

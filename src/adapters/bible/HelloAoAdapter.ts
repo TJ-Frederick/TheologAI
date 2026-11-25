@@ -11,7 +11,7 @@ import type { BibleReference } from '../../kernel/reference.js';
 import { formatReference, toHelloAO } from '../../kernel/reference.js';
 import type { HttpClient } from '../shared/HttpClient.js';
 import { createBibleHttpClient } from './createBibleHttpClient.js';
-import { AdapterError } from '../../kernel/errors.js';
+import { AdapterError, APIError } from '../../kernel/errors.js';
 
 interface TranslationMeta {
   id: string;
@@ -30,6 +30,24 @@ const TRANSLATIONS: Record<string, TranslationMeta> = {
 };
 
 type VerseContent = string | { lineBreak: true } | { noteId: number } | { text: string; wordsOfJesus?: boolean };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function providerNumber(value: unknown): number {
+  return typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+}
+
+function isVerseContent(value: unknown): value is VerseContent {
+  if (typeof value === 'string') return true;
+  if (!isRecord(value)) return false;
+  if ('text' in value) {
+    return typeof value.text === 'string' && !('lineBreak' in value) && !('noteId' in value);
+  }
+  if ('lineBreak' in value) return value.lineBreak === true && !('noteId' in value);
+  return typeof value.noteId === 'number' && Number.isSafeInteger(value.noteId) && value.noteId >= 0;
+}
 
 export class HelloAoAdapter implements BibleProviderPort {
   readonly supportedTranslations = Object.keys(TRANSLATIONS);
@@ -52,36 +70,16 @@ export class HelloAoAdapter implements BibleProviderPort {
     }
 
     const hao = toHelloAO(ref);
-    const data = await this.client.getJSON<any>(`/${meta.id}/${hao.bookCode}/${hao.chapter}.json`);
-    this.assertResponseMatchesRequest(data, ref, hao.bookCode, meta.id);
-
-    // Extract verses
-    const verses = this.extractVerses(data.chapter.content, hao.verse, hao.endVerse);
-    if (verses.length === 0) {
+    const passage = await this.client.getJSON(`/${meta.id}/${hao.bookCode}/${hao.chapter}.json`, undefined,
+      data => this.decodePassage(data, ref, hao, meta.id, options?.includeFootnotes));
+    if (!passage) {
       throw new AdapterError('HelloAO', `No verses found for ${formatReference(ref)}`);
-    }
-    if (hao.verse != null) {
-      const endVerse = hao.endVerse ?? hao.verse;
-      const returnedVerses = new Set(verses.map(v => Number(v.number)));
-      for (let verse = hao.verse; verse <= endVerse; verse++) {
-        if (!returnedVerses.has(verse)) {
-          throw new AdapterError('HelloAO', `No verses found for ${formatReference(ref)}`);
-        }
-      }
-    }
-
-    const text = verses.map(v => this.extractVerseText(v.content)).join(' ');
-
-    let footnotes: Footnote[] | undefined;
-    if (options?.includeFootnotes && data.chapter.footnotes) {
-      footnotes = this.extractFootnotes(data.chapter.footnotes, hao.verse, hao.endVerse);
     }
 
     return {
       reference: formatReference(ref),
       translation: key,
-      text,
-      footnotes,
+      ...passage,
       citation: { source: meta.name, copyright: meta.copyright, url: meta.url },
     };
   }
@@ -99,31 +97,66 @@ export class HelloAoAdapter implements BibleProviderPort {
     return this.client;
   }
 
-  private assertResponseMatchesRequest(
-    data: any,
+  private decodePassage(
+    data: unknown,
     ref: BibleReference,
-    bookCode: string,
+    hao: ReturnType<typeof toHelloAO>,
     translationId: string,
-  ): void {
-    if (data.translation?.id && data.translation.id !== translationId) {
+    includeFootnotes?: boolean,
+  ): Pick<BibleResult, 'text' | 'footnotes'> | undefined {
+    if (!isRecord(data) || !isRecord(data.chapter) || !Array.isArray(data.chapter.content)) {
+      throw new AdapterError('HelloAO', 'Malformed Bible chapter payload.');
+    }
+    const { translation, book, chapter } = data;
+    if ((translation != null && !isRecord(translation)) || (book != null && !isRecord(book))) {
+      throw new AdapterError('HelloAO', 'Malformed Bible chapter metadata.');
+    }
+    if (isRecord(translation) && translation.id != null && translation.id !== translationId) {
       throw new AdapterError('HelloAO', 'Provider returned a different translation.');
     }
-    if (data.book?.id && data.book.id !== bookCode) {
+    if (isRecord(book) && ((book.id != null && book.id !== hao.bookCode)
+      || (book.number != null && providerNumber(book.number) !== ref.book.number))) {
       throw new AdapterError('HelloAO', 'Provider returned a different book.');
     }
-    if (data.book?.number != null && Number(data.book.number) !== ref.book.number) {
-      throw new AdapterError('HelloAO', 'Provider returned a different book.');
-    }
-    if (data.chapter?.number != null && Number(data.chapter.number) !== ref.chapter) {
+    if (chapter.number != null && providerNumber(chapter.number) !== ref.chapter) {
       throw new AdapterError('HelloAO', 'Provider returned a different chapter.');
     }
-  }
 
-  private extractVerses(content: any[], startVerse?: number, endVerse?: number): any[] {
-    const allVerses = content.filter((item: any) => item.type === 'verse');
-    if (!startVerse) return allVerses;
-    const end = endVerse ?? startVerse;
-    return allVerses.filter((v: any) => v.number >= startVerse && v.number <= end);
+    const verses: Array<{ number: number; text: string }> = [];
+    for (const item of data.chapter.content as unknown[]) {
+      if (!isRecord(item) || typeof item.type !== 'string') {
+        throw new AdapterError('HelloAO', 'Malformed Bible chapter entry.');
+      }
+      if (item.type !== 'verse') continue;
+
+      const { number, content } = item;
+      const verseNumber = providerNumber(number);
+      if (!Number.isSafeInteger(verseNumber) || verseNumber < 1 || !Array.isArray(content)
+        || !content.every(isVerseContent)) {
+        throw new AdapterError('HelloAO', 'Malformed Bible verse entry.');
+      }
+      if (hao.verse == null || (verseNumber >= hao.verse && verseNumber <= (hao.endVerse ?? hao.verse))) {
+        const text = this.extractVerseText(content);
+        if (!text) throw new APIError(502, 'Bible provider returned an empty passage.');
+        verses.push({ number: verseNumber, text });
+      }
+    }
+
+    if (chapter.footnotes != null && !Array.isArray(chapter.footnotes)) {
+      throw new AdapterError('HelloAO', 'Malformed Bible chapter footnotes.');
+    }
+    if (verses.length === 0) return undefined;
+    if (hao.verse != null) {
+      const returned = new Set(verses.map(verse => verse.number));
+      for (let verse = hao.verse; verse <= (hao.endVerse ?? hao.verse); verse++) {
+        if (!returned.has(verse)) return undefined;
+      }
+    }
+    const text = verses.map(verse => verse.text).join(' ');
+    const footnotes = includeFootnotes && Array.isArray(chapter.footnotes)
+      ? this.extractFootnotes(chapter.footnotes, hao.verse, hao.endVerse)
+      : undefined;
+    return { text, footnotes };
   }
 
   private extractVerseText(content: VerseContent[]): string {
@@ -155,19 +188,24 @@ export class HelloAoAdapter implements BibleProviderPort {
     return `${current} ${fragment}`;
   }
 
-  private extractFootnotes(footnotes: any[], startVerse?: number, endVerse?: number): Footnote[] {
-    const filtered = startVerse
-      ? footnotes.filter((n: any) => {
-          const v = n.reference?.verse;
-          return v >= startVerse && v <= (endVerse ?? startVerse);
-        })
-      : footnotes;
-
-    return filtered.map((n: any) => ({
-      id: n.noteId,
-      caller: n.caller,
-      text: n.text,
-      reference: n.reference,
-    }));
+  private extractFootnotes(footnotes: unknown[], startVerse?: number, endVerse?: number): Footnote[] {
+    const result: Footnote[] = [];
+    for (const note of footnotes) {
+      if (!isRecord(note) || !isRecord(note.reference)) {
+        throw new AdapterError('HelloAO', 'Malformed Bible chapter footnote.');
+      }
+      const { chapter, verse } = note.reference;
+      if (typeof verse !== 'number' || !Number.isSafeInteger(verse)) {
+        throw new AdapterError('HelloAO', 'Malformed Bible chapter footnote.');
+      }
+      if (startVerse && (verse < startVerse || verse > (endVerse ?? startVerse))) continue;
+      const { noteId, caller, text } = note;
+      if (typeof noteId !== 'number' || typeof caller !== 'string' || typeof text !== 'string'
+        || typeof chapter !== 'number' || !Number.isSafeInteger(chapter)) {
+        throw new AdapterError('HelloAO', 'Malformed Bible chapter footnote.');
+      }
+      result.push({ id: noteId, caller, text, reference: { ...note.reference, chapter, verse } });
+    }
+    return result;
   }
 }

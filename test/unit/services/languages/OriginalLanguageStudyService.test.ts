@@ -11,7 +11,8 @@ const loved: MorphWord = { position: 3, word_text: 'ἠγάπησεν', lemma: '
 
 function repos(words: MorphWord[] = [loved], options: { dictionary?: boolean; lexicon?: boolean; expansion?: string } = {}) {
   const morphology: IMorphologyRepository = {
-    getVerseMorphology: () => words, expandMorphCode: () => options.expansion,
+    getVerseMorphology: () => words, getExpandedVerseMorphology: () => [],
+    expandMorphCode: () => options.expansion,
     getAvailableBooks: () => [], hasVerse: () => true, getOccurrences: () => [], getDistribution: () => [],
     getUsageStats: () => undefined, getBookUsage: () => [], getFormUsage: () => [],
     getTokenOccurrences: () => ({ occurrences: [] }),
@@ -328,6 +329,7 @@ describe('OriginalLanguageStudyService', () => {
     const { morphology, strongs } = repos([loved], { expansion: 'Verb' });
     const asyncMorphology: IMorphologyRepository = {
       getVerseMorphology: async (...args) => await morphology.getVerseMorphology(...args),
+      getExpandedVerseMorphology: async (...args) => await morphology.getExpandedVerseMorphology(...args),
       expandMorphCode: async code => await morphology.expandMorphCode(code),
       getAvailableBooks: async () => [], hasVerse: async () => true,
       getOccurrences: async () => [], getDistribution: async () => [],

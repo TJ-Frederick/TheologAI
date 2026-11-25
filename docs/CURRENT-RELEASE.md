@@ -3,12 +3,37 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. The latest November 24 verification established the
+identity authority. The latest November 25 verification established the
 application release on the Norton and Thomas Aquinas corpus and the observed
 preview control. Earlier releases and custody records below preserve dated
 historical evidence.
 
-## Latest verified production release — November 24, 2026
+## Latest verified production release — November 25, 2026
+
+[PR #199](https://github.com/TJ-Frederick/TheologAI/pull/199) combined the
+provider response-cache validation fix, the indexed expanded-morphology query
+from [#192](https://github.com/TJ-Frederick/TheologAI/pull/192), and the narrow
+release classifier update from [#204](https://github.com/TJ-Frederick/TheologAI/pull/204).
+
+Production source `677a04432f3377f2e5da03c5a51dde0663123277` matches the
+tree `ae0bbfcbe91a83ca82ab0529afb539dfc2926a2e` accepted by
+[protected preview run 45706369705](https://github.com/TJ-Frederick/TheologAI/actions/runs/45706369705).
+[Protected production run 45717106994](https://github.com/TJ-Frederick/TheologAI/actions/runs/45717106994),
+attempt 1, promoted that application bundle on the existing schema-0010
+production D1. Preview and production each passed **8/8** checks across both
+MCP protocol versions. The production workflow confirmed final routing and
+preview isolation before recording acceptance.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — verified serving assignment | `552a8ab9-c6c7-4a00-acbc-0f0d3bc880a4` | `86541c84-23a3-4ef2-86dd-d63667b29ea5` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control at production verification | `3e701289-43e8-4291-9bf7-4dd50fe0a4ad` | `3a64ff6f-e2dd-4376-8a08-0f113a92e400` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The protected run retained its matched predecessor and acceptance receipt.
+The receipt SHA-256 is
+`b8dd88b01283bfe4237977d0440a2814ec03cfed2a6d9488f1f656de03a7c7ee`.
+
+## Historical application release — November 24, 2026
 
 [PR #190](https://github.com/TJ-Frederick/TheologAI/pull/190) restored
 footnotes in Bible translation comparisons, and
