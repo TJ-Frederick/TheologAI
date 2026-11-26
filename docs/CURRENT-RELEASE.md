@@ -3,12 +3,37 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. The latest November 26 verification established the UBS
-single-segment lookup release on the Norton and Thomas Aquinas corpus and the
-observed preview control. Earlier releases and custody records below preserve
-dated historical evidence.
+identity authority. The latest November 26 verification established the
+language-study token-selection release on the Norton and Thomas Aquinas corpus
+and the observed preview control. Earlier releases and custody records below
+preserve dated historical evidence.
 
 ## Latest verified production release — November 26, 2026
+
+[PR #221](https://github.com/TJ-Frederick/TheologAI/pull/221) gives the internal
+original-language study result separate types for selected tokens and
+disambiguation candidates. All 370 local Workerd response hashes matched the
+prior application release on the same corpus.
+
+Production source `51845bc6cca2b3fb14607f0feca37eed7ce97783` matches tree
+`572811fc4ad299e4385622d33bb114ad04a5395a`, accepted by
+[protected preview run 45848741953](https://github.com/TJ-Frederick/TheologAI/actions/runs/45848741953).
+[Protected production run 45853620634](https://github.com/TJ-Frederick/TheologAI/actions/runs/45853620634),
+attempt 1, promoted that bundle on the existing schema-0010 production D1.
+Preview and production each passed **8/8** checks across both MCP protocol
+versions. Final routing matched the accepted Worker and D1, and the preview
+control stayed stable throughout production promotion.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — verified serving assignment | `e80046dd-fa37-4d6d-9298-e659b655e77f` | `d0be9ff2-eed5-4605-8ab9-83e7186da402` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control at production verification | `a80e926b-fdd2-46be-bc02-05148e98ea26` | `342a6677-fe4a-4d8c-b82c-b625ab43daa1` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The protected run retained its matched predecessor and acceptance receipt.
+The receipt SHA-256 is
+`ffd40a42d8725405956b76c15fd4aca41a55fff03af217e41e89967abba373ed`.
+
+## Historical application release — November 26, 2026
 
 [PR #218](https://github.com/TJ-Frederick/TheologAI/pull/218) starts
 single-segment UBS parallel lookahead from the matching segments. Multi-segment
