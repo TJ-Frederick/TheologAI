@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -90,4 +92,68 @@ describe('Transform 12 actual FTS corruption gates', () => {
       db.close();
     }
   });
+});
+
+describe('standalone D1 seed source identity', () => {
+  it('rejects stale or missing markers before --clean can alter the existing seed', () => {
+    const sandbox = join(workspace, 'export-worktree');
+    const scripts = join(sandbox, 'scripts');
+    const output = join(scripts, 'd1-seed');
+    mkdirSync(output, { recursive: true });
+    for (const entry of ['data', 'migrations', 'node_modules', 'src', 'package.json']) {
+      symlinkSync(join(ROOT, entry), join(sandbox, entry));
+    }
+    for (const entry of readdirSync(join(ROOT, 'scripts'))) {
+      if (entry === 'd1-seed' || entry === 'export-for-d1.ts') continue;
+      symlinkSync(join(ROOT, 'scripts', entry), join(scripts, entry));
+    }
+    const exporter = join(scripts, 'export-for-d1.ts');
+    copyFileSync(join(ROOT, 'scripts/export-for-d1.ts'), exporter);
+    writeFileSync(join(output, 'seed-manifest.json'), '{"previous":"seed"}\n');
+    writeFileSync(join(output, '001-documents-001.sql'), '-- previous seed bytes\n');
+    const snapshot = () => readdirSync(output).sort()
+      .map(file => [file, readFileSync(join(output, file))]);
+    const before = snapshot();
+
+    const source = join(workspace, 'marker-test.db');
+    copyFileSync(canonicalPath, source);
+    const db = new Database(source);
+    try {
+      const get = db.prepare('SELECT value FROM theologai_metadata WHERE key = ?');
+      const update = db.prepare('UPDATE theologai_metadata SET value = ? WHERE key = ?');
+      const move = db.prepare('UPDATE theologai_metadata SET key = ? WHERE key = ?');
+      for (const [key, message] of [
+        ['schema_version', 'Schema version marker mismatch'],
+        ['corpus_manifest_sha256', 'D1 corpus identity marker mismatch'],
+      ]) {
+        const { value } = get.get(key) as { value: string };
+        update.run('stale', key);
+        assertRejected(message);
+        update.run(value, key);
+        move.run(`missing_${key}`, key);
+        assertRejected(message);
+        move.run(key, `missing_${key}`);
+      }
+    } finally {
+      db.close();
+    }
+
+    const contained = join(output, 'contained.db');
+    writeFileSync(contained, 'existing data bytes\n');
+    const alias = join(scripts, 'alias-to-seed');
+    symlinkSync(output, alias);
+    const includingSource = snapshot();
+    assertRejected('Source database cannot be inside the generated seed directory', contained, includingSource);
+    assertRejected('Source database cannot be inside the generated seed directory', join(alias, 'contained.db'), includingSource);
+
+    function assertRejected(message: string, database = source, expected = before) {
+      const result = spawnSync(process.execPath, ['--import', 'tsx', realpathSync(exporter), '--database', database, '--clean'], {
+        cwd: ROOT, encoding: 'utf8', timeout: 30_000,
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(message);
+      expect(snapshot()).toEqual(expected);
+    }
+  }, 120_000);
 });

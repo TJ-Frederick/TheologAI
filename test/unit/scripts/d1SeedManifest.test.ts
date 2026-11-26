@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -16,6 +18,7 @@ import {
   type SeedManifest,
 } from '../../../scripts/d1-seed-manifest.js';
 import { D1_SEED_EXPORT_ORDER } from '../../../scripts/d1-seed-order.js';
+import { stageAndPublishD1Seed } from '../../../scripts/export-for-d1.js';
 
 const schemaSha = 'a'.repeat(64);
 
@@ -198,18 +201,40 @@ describe('standalone D1 seed manifest binding', () => {
   });
 
   it('independently verifies canonical schema, listed seed files, checksums, statements, and totals', () => {
-    const root = mkdtempSync(join(tmpdir(), 'theologai-seed-binding-'));
-    try {
-      const value = fixture();
-      const schema = 'CREATE TABLE stable(id INTEGER);\n';
-      value.source.materializations.d1.migrations[0].sha256 = createHash('sha256').update(schema).digest('hex');
-      value.bytes = Buffer.from(JSON.stringify(value.source));
-      value.seed.sourceManifest.sha256 = computeSourceInventoryIdentity(value.bytes);
-      value.seed.d1Materialization.sha256 = computeD1CorpusIdentity(value.source);
-      value.seed.migrations[0].sha256 = value.source.materializations.d1.migrations[0].sha256;
-      const sql = 'SELECT 1;\n';
+    withSeedFixture(({ root, output, chunkPath }) => {
+      expect(() => loadAndVerifyD1SeedManifest(root, output)).not.toThrow();
+      writeFileSync(join(output, chunkPath), 'SELECT 2;\n');
+      expect(() => loadAndVerifyD1SeedManifest(root, output)).toThrow('does not match its manifest');
+    });
+  });
+});
+
+function withSeedFixture(run: (value: {
+  root: string;
+  output: string;
+  chunkPath: string;
+  writeSeed: (directory: string, sql: string) => void;
+}) => void): void {
+  const root = mkdtempSync(join(tmpdir(), 'theologai-seed-binding-'));
+  try {
+    const value = fixture();
+    const schema = 'CREATE TABLE stable(id INTEGER);\n';
+    value.source.materializations.d1.migrations[0].sha256 = createHash('sha256').update(schema).digest('hex');
+    value.bytes = Buffer.from(JSON.stringify(value.source));
+    value.seed.sourceManifest.sha256 = computeSourceInventoryIdentity(value.bytes);
+    value.seed.d1Materialization.sha256 = computeD1CorpusIdentity(value.source);
+    value.seed.migrations[0].sha256 = value.source.materializations.d1.migrations[0].sha256;
+    mkdirSync(join(root, 'data'));
+    mkdirSync(join(root, 'migrations'));
+    writeFileSync(join(root, 'data', 'data-manifest.json'), value.bytes);
+    writeFileSync(join(root, value.source.materializations.d1.migrations[0].path), schema);
+    const output = join(root, 'scripts', 'd1-seed');
+    mkdirSync(output, { recursive: true });
+    const chunkPath = '00-empty-target-check-000.sql';
+
+    function writeSeed(directory: string, sql: string) {
       const file = {
-        path: '00-empty-target-check-000.sql',
+        path: chunkPath,
         table: 'empty-target-check',
         chunk: 0,
         sha256: createHash('sha256').update(sql).digest('hex'),
@@ -219,19 +244,172 @@ describe('standalone D1 seed manifest binding', () => {
       };
       value.seed.files = [file];
       value.seed.totals = { fileCount: 1, byteSize: file.byteSize, statementCount: 1, rowCount: 0 };
-      mkdirSync(join(root, 'data'), { recursive: true });
-      mkdirSync(join(root, 'migrations'), { recursive: true });
-      const seedRoot = join(root, 'scripts', 'd1-seed');
-      mkdirSync(seedRoot, { recursive: true });
-      writeFileSync(join(root, 'data', 'data-manifest.json'), value.bytes);
-      writeFileSync(join(root, value.source.materializations.d1.migrations[0].path), schema);
-      writeFileSync(join(seedRoot, 'seed-manifest.json'), `${JSON.stringify(value.seed)}\n`);
-      writeFileSync(join(seedRoot, file.path), sql);
-      expect(() => loadAndVerifyD1SeedManifest(root, seedRoot)).not.toThrow();
-      writeFileSync(join(seedRoot, file.path), 'SELECT 2;\n');
-      expect(() => loadAndVerifyD1SeedManifest(root, seedRoot)).toThrow('does not match its manifest');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
+      writeFileSync(join(directory, file.path), sql);
+      writeFileSync(join(directory, 'seed-manifest.json'), `${JSON.stringify(value.seed)}\n`);
     }
+
+    writeSeed(output, 'SELECT 1;\n');
+    run({ root, output, chunkPath, writeSeed });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function directoryDigests(path: string): Record<string, string> {
+  return Object.fromEntries(readdirSync(path).map(name => [
+    name, createHash('sha256').update(readFileSync(join(path, name))).digest('hex'),
+  ]));
+}
+
+describe('staged D1 seed publication', () => {
+  it('refuses nonempty output without --clean before invoking the writer', () => {
+    withSeedFixture(({ root, output }) => {
+      const original = directoryDigests(output);
+      expect(() => stageAndPublishD1Seed(root, output, false, () => {
+        throw new Error('unexpected seed generation');
+      })).toThrow('is not empty');
+      expect(directoryDigests(output)).toEqual(original);
+      expect(readdirSync(join(root, 'scripts'))).toEqual(['d1-seed']);
+    });
+  });
+
+  it.skipIf(process.platform === 'win32' || process.geteuid?.() === 0)
+    .each([0o555, 0o666])('requires write and search access before staging into an empty destination with mode %i', mode => {
+      withSeedFixture(({ root, output }) => {
+        rmSync(output, { recursive: true });
+        mkdirSync(output);
+        chmodSync(output, mode);
+        const before = lstatSync(output);
+        let writerCalled = false;
+        try {
+          expect(() => stageAndPublishD1Seed(root, output, false, () => {
+            writerCalled = true;
+            throw new Error('unexpected seed generation');
+          })).toThrow('EACCES');
+          expect(writerCalled).toBe(false);
+          expect(lstatSync(output)).toMatchObject({ ino: before.ino, mode: before.mode });
+          expect(readdirSync(output)).toEqual([]);
+          expect(readdirSync(join(root, 'scripts'))).toEqual(['d1-seed']);
+        } finally {
+          chmodSync(output, 0o700);
+        }
+      });
+    });
+
+  it.skipIf(process.platform === 'win32' || process.geteuid?.() === 0)
+    ('rechecks access after validation and preserves the empty destination on denial', () => {
+      withSeedFixture(({ root, output, writeSeed }) => {
+        rmSync(output, { recursive: true });
+        mkdirSync(output);
+        const before = lstatSync(output);
+        try {
+          expect(() => stageAndPublishD1Seed(root, output, false, stage => {
+            writeSeed(stage, 'SELECT 2;\n');
+            chmodSync(output, 0o555);
+          })).toThrow('EACCES');
+          expect(lstatSync(output).ino).toBe(before.ino);
+          expect(lstatSync(output).mode & 0o777).toBe(0o555);
+          expect(readdirSync(output)).toEqual([]);
+          expect(readdirSync(join(root, 'scripts'))).toEqual(['d1-seed']);
+        } finally {
+          chmodSync(output, 0o700);
+        }
+      });
+    });
+
+  it.each(['live', 'dangling'])('refuses a %s symlink as the output directory', kind => {
+    withSeedFixture(({ root, output }) => {
+      const link = join(root, 'scripts', 'output-link');
+      const original = directoryDigests(output);
+      symlinkSync(kind === 'live' ? output : join(root, 'missing'), link);
+      expect(() => stageAndPublishD1Seed(root, link, true, () => {
+        throw new Error('unexpected seed generation');
+      })).toThrow('Refusing symlinked output directory');
+      expect(lstatSync(link).isSymbolicLink()).toBe(true);
+      expect(directoryDigests(output)).toEqual(original);
+    });
+  });
+
+  it.each([
+    ['chunk', 'chunk write failed'],
+    ['manifest', 'EISDIR'],
+    ['same-size edit', 'does not match its manifest'],
+    ['extra file', 'missing or unlisted files'],
+  ])('preserves the old seed on a %s failure', (failure, message) => {
+    withSeedFixture(({ root, output, chunkPath, writeSeed }) => {
+      const original = directoryDigests(output);
+      expect(() => stageAndPublishD1Seed(root, output, true, stage => {
+        if (failure === 'chunk') {
+          writeFileSync(join(stage, chunkPath), 'SELECT 2;\n');
+          throw new Error(message);
+        }
+        if (failure === 'manifest') mkdirSync(join(stage, 'seed-manifest.json'));
+        writeSeed(stage, 'SELECT 2;\n');
+        if (failure === 'same-size edit') writeFileSync(join(stage, chunkPath), 'SELECT 3;\n');
+        if (failure === 'extra file') writeFileSync(join(stage, 'unlisted.sql'), 'SELECT 3;\n');
+      })).toThrow(message);
+      expect(directoryDigests(output)).toEqual(original);
+      expect(readdirSync(join(root, 'scripts'))).toEqual(['d1-seed']);
+    });
+  });
+
+  it.each(['nonempty', 'empty', 'absent'])('installs exactly the verified generation over a %s destination', prior => {
+    withSeedFixture(({ root, output, writeSeed }) => {
+      if (prior === 'empty' || prior === 'absent') rmSync(output, { recursive: true });
+      if (prior === 'empty') {
+        mkdirSync(output);
+        chmodSync(output, 0o750);
+      }
+      if (prior === 'nonempty') writeFileSync(join(output, 'old-only.txt'), 'previous generation');
+      let expected: Record<string, string> | undefined;
+      const verified = stageAndPublishD1Seed(root, output, prior === 'nonempty', stage => {
+        writeSeed(stage, 'SELECT 2;\n');
+        expected = directoryDigests(stage);
+      });
+      expect(verified).toEqual(loadAndVerifyD1SeedManifest(root, output));
+      expect(directoryDigests(output)).toEqual(expected);
+      expect(lstatSync(output).mode & 0o777).toBe(prior === 'empty' ? 0o750 : 0o777 & ~process.umask());
+      expect(readdirSync(join(root, 'scripts'))).toEqual(['d1-seed']);
+    });
+  });
+
+  it.each(['restored', 'recovery required', 'committed'])('reports installation outcome as %s with intact seed bytes', outcome => {
+    withSeedFixture(({ root, output, writeSeed }) => {
+      const original = directoryDigests(output);
+      const parent = join(root, 'scripts');
+      let stagePath: string | undefined;
+      let expected: Record<string, string> | undefined;
+      const publish = () => stageAndPublishD1Seed(root, output, true, stage => {
+        writeSeed(stage, 'SELECT 2;\n');
+        stagePath = stage;
+        expected = directoryDigests(stage);
+      }, {
+        rename(source, destination) {
+          if (source === stagePath && outcome !== 'committed') throw new Error('install failed');
+          if (destination === output && outcome === 'recovery required') throw new Error('restore failed');
+          renameSync(source, destination);
+        },
+        remove(path, options) {
+          if (outcome === 'committed') throw new Error('transaction cleanup failed');
+          rmSync(path, options);
+        },
+      });
+
+      if (outcome === 'restored') {
+        expect(publish).toThrow('install failed');
+        expect(directoryDigests(output)).toEqual(original);
+        expect(readdirSync(parent)).toEqual(['d1-seed']);
+      } else {
+        expect(publish).toThrow(outcome === 'committed'
+          ? /Publication committed.*transaction cleanup failed/
+          : /Publication failed.*install failed.*Recovery required.*restore failed/);
+        const backup = readdirSync(parent).find(name => name.startsWith('.d1-seed-transaction-'))!;
+        expect(directoryDigests(join(parent, backup, 'previous'))).toEqual(original);
+        if (outcome === 'committed') expect(directoryDigests(output)).toEqual(expected);
+        else expect(existsSync(output)).toBe(false);
+      }
+      expect(stagePath).toBeDefined();
+      expect(existsSync(stagePath!)).toBe(false);
+    });
   });
 });

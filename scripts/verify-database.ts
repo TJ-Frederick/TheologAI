@@ -10,7 +10,8 @@ import {
   assertHebrewLemmaCoverageDatabase,
   assertJohnOneOneDatabase,
 } from './data-integrity.js';
-import { computeD1CorpusIdentity, parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
+import { parseDataManifest, verifyD1Migrations } from './d1-corpus-identity.js';
+import { assertSqliteCorpusMarkers } from './sqlite-corpus-markers.js';
 import { verifyBiblicalLanguageUnicodeD1 } from './verify-biblical-language-unicode-d1.js';
 import { UBS_SEMANTICS_DATABASE_CEILING_BYTES } from './ubs-semantics/capacity.js';
 import { verifyHistoricalSectionCompatibilityAttestationFromDisk } from './historical-section-compatibility-compiler.js';
@@ -369,17 +370,7 @@ try {
     }
   }
 
-  const metadata = Object.fromEntries(
-    (db.prepare('SELECT key, value FROM theologai_metadata').all() as Array<{ key: string; value: string }>)
-      .map(row => [row.key, row.value]),
-  );
-  if (metadata.schema_version !== manifest.schemaVersion) {
-    throw new Error(`Schema version marker mismatch: ${metadata.schema_version ?? 'missing'}`);
-  }
-  const d1CorpusIdentity = computeD1CorpusIdentity(manifest);
-  if (metadata.corpus_manifest_sha256 !== d1CorpusIdentity) {
-    throw new Error('D1 corpus identity marker mismatch');
-  }
+  assertSqliteCorpusMarkers(db, manifest);
   assertTransform12CandidateCSchema(db);
   assertTransform12CorpusSealed(db);
   assertCanonicalTransform12FtsMatchSentinels(db);

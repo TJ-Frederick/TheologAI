@@ -89,27 +89,52 @@ const nodeE2eEntries = [
   ['test/unit/scripts/nodeE2eFixture.test.ts', null, '4b4957ce01ef2784fda529dafef4a833bb631efa'],
 ] as const;
 
-function nodeE2eTransition(f: ReturnType<typeof repo>, additionalPath?: string, mutation?: 'package' | 'mode' | 'partial') {
+const corpusPreparationEntries = [
+  ['scripts/atomic-publication.ts', '2dd1781bad7806b62c3aa7f9a86b8c02f1ac94da', '9c1f6f82084f0edca35bd717a02a4849e984652c'],
+  ['scripts/export-for-d1.ts', '7ee672c6e568795e6237e7a8ea372f28ee6c9aa1', '9444efe472cf3f183ad77af9e4274724920a8501'],
+  ['scripts/norton-aquinas-preparation.ts', '5297bdd3cd7c7142c739f78b81eaba5c24c7d875', 'd2bfd0eae7073524e7d0f799cd17884c73586a5a'],
+  ['scripts/sqlite-corpus-markers.ts', null, 'f0df49dd3da1f21a5f6dd4af012966f1eb3dbe29'],
+  ['scripts/verify-database.ts', 'c3a0b142f1688e5c496f900286b27bc416387c9c', '0d6b30e3a09bb3329e7dc865b77441a3054fe83a'],
+  ['test/unit/scripts/d1SeedManifest.test.ts', '69f68ffbb516d38003e23d209eead23412af050e', '41f07a28192fc07542c35e49546f4939880ecaf1'],
+  ['test/unit/scripts/languageBuildInfrastructure.test.ts', '6eef2b680c449967eb221c270e25cc4841b4f2ec', '5c4b1e0190a70bb463760cd6885a9e4e853747cc'],
+  ['test/unit/scripts/nortonAquinasPreparation.test.ts', '2126b796ed3ad721c447315c1c0e9c2de6c684e6', 'f076d97107ef6c9d4ce735bb4633beee5f62e2ed'],
+  ['test/unit/scripts/transform12FtsCorruption.test.ts', '07578fcbc2aeec852ffe134e5ced84c2a96d70cd', 'caf6c822ef0ca6c01b512fbc262f640e42a295b6'],
+] as const;
+
+function reviewedTransition(
+  f: ReturnType<typeof repo>,
+  entries: ReadonlyArray<readonly [string, string | null, string]>,
+  {additionalPath, additionalContents = 'additional change', changedBefore, changedAfter, executable, omitted}: {
+    additionalPath?: string;
+    additionalContents?: string;
+    changedBefore?: string;
+    changedAfter?: string;
+    executable?: string;
+    omitted?: string;
+  } = {},
+) {
   // Classification uses commit tree entries. Supply those directly so this test
   // works without the historical harness files or a full checkout's history.
   const entry = (path: string, blob: string, mode = '100644') =>
     f.git('update-index', '--add', '--info-only', '--cacheinfo', mode, blob, path);
   const commitTree = (parent: string, ...additionalParents: string[]) => {
     const tree = f.git('write-tree', '--missing-ok');
-    return f.git('commit-tree', tree, '-p', parent, ...additionalParents.flatMap(sha => ['-p', sha]), '-m', 'Node E2E fixture');
+    return f.git('commit-tree', tree, '-p', parent, ...additionalParents.flatMap(sha => ['-p', sha]), '-m', 'Reviewed transition fixture');
   };
-  for (const [path, before] of nodeE2eEntries) if (before) entry(path, before);
+  for (const [path, before] of entries) {
+    if (before) entry(path, path === changedBefore ? 'a'.repeat(40) : before);
+  }
   const base = commitTree(f.git('rev-parse', 'HEAD'));
-  for (const [path, , after] of nodeE2eEntries) {
-    if (path === 'package.json' && mutation === 'package') {
-      f.write(path, '{"version":"9.9.9"}');
+  for (const [path, , after] of entries) {
+    if (path === changedAfter) {
+      f.write(path, 'unreviewed change');
       f.git('add', '--', path);
-    } else if (path !== 'scripts/node-e2e-fixture.ts' || mutation !== 'partial') {
-      entry(path, after, path === 'scripts/test-node-http-e2e.ts' && mutation === 'mode' ? '100755' : '100644');
+    } else if (path !== omitted) {
+      entry(path, after, path === executable ? '100755' : '100644');
     }
   }
   if (additionalPath) {
-    f.write(additionalPath, 'additional change');
+    f.write(additionalPath, additionalContents);
     f.git('add', '--', additionalPath);
   }
   const head = commitTree(base);
@@ -125,7 +150,7 @@ it.each([
   ['scripts/another-build-script.ts', 'corpus'],
 ] as const)('classifies the exact Node E2E transition plus %s as %s', (additionalPath, mode) => {
   const f = repo();
-  const pr = nodeE2eTransition(f, additionalPath);
+  const pr = reviewedTransition(f, nodeE2eEntries, {additionalPath});
   const baseline = {productionSource: pr.base, targets: f.record.targets};
   const release = f.classifyCandidate(pr, baseline);
   expect(release.status, release.stderr).toBe(0);
@@ -143,7 +168,69 @@ it('keeps ordinary PR CI full for Node E2E maintenance', () => {
 
 it.each(['package', 'mode', 'partial'] as const)('keeps a %s mismatch in the Node E2E transition on the corpus route', mutation => {
   const f = repo();
-  const pr = nodeE2eTransition(f, undefined, mutation);
+  const pr = reviewedTransition(f, nodeE2eEntries, {
+    changedAfter: mutation === 'package' ? 'package.json' : undefined,
+    executable: mutation === 'mode' ? 'scripts/test-node-http-e2e.ts' : undefined,
+    omitted: mutation === 'partial' ? 'scripts/node-e2e-fixture.ts' : undefined,
+  });
+  const release = f.classifyCandidate(pr, {productionSource: pr.base, targets: f.record.targets});
+  expect(release.status, release.stderr).toBe(0);
+  expect(release.outputs).toContain('mode=corpus\n');
+});
+
+it.each([
+  [undefined, 'docs'],
+  ['src/formatters/bible.ts', 'application'],
+  ['data/manifest.json', 'corpus'],
+  ['migrations/0011_example.sql', 'corpus'],
+  ['scripts/another-build-script.ts', 'corpus'],
+] as const)('classifies exact corpus preparation maintenance plus %s as %s', (additionalPath, mode) => {
+  const f = repo();
+  const pr = reviewedTransition(f, corpusPreparationEntries, {additionalPath});
+  const release = f.classifyCandidate(pr, {productionSource: pr.base, targets: f.record.targets});
+  expect(release.status, release.stderr).toBe(0);
+  expect(release.outputs).toContain(`mode=${mode}\n`);
+  expect(f.run('classify', 'baseline.json')).toBe(mode);
+});
+
+it('keeps ordinary PR CI full for corpus preparation maintenance', () => {
+  const f = repo();
+  const pr = f.mergeCandidate(f.git('rev-parse', 'HEAD'), corpusPreparationEntries.map(([path]) => path), 'preparation changes');
+  expect(classifyOrdinaryCi(f.root, pr)).toEqual({
+    mode: 'full', data: true, serving: true, reason: 'corpus-delivery-or-unclassified-path',
+  });
+});
+
+it.each([
+  {changedBefore: 'scripts/export-for-d1.ts'},
+  {changedAfter: 'scripts/export-for-d1.ts'},
+  {changedAfter: 'test/unit/scripts/d1SeedManifest.test.ts'},
+  {executable: 'scripts/export-for-d1.ts'},
+  {omitted: 'scripts/sqlite-corpus-markers.ts'},
+])('keeps a corpus preparation transition mismatch on the corpus route (%j)', change => {
+  const f = repo();
+  const pr = reviewedTransition(f, corpusPreparationEntries, change);
+  const release = f.classifyCandidate(pr, {productionSource: pr.base, targets: f.record.targets});
+  expect(release.status, release.stderr).toBe(0);
+  expect(release.outputs).toContain('mode=corpus\n');
+});
+
+it('keeps a partial corpus preparation test change on the corpus route', () => {
+  const f = repo();
+  const pr = f.mergeCandidate(f.git('rev-parse', 'HEAD'), 'test/unit/scripts/d1SeedManifest.test.ts', 'test changes');
+  const release = f.classifyCandidate(pr, {productionSource: pr.base, targets: f.record.targets});
+  expect(release.status, release.stderr).toBe(0);
+  expect(release.outputs).toContain('mode=corpus\n');
+});
+
+it.each(['preview', 'production'] as const)('keeps a %s binding change on the corpus route with exact corpus preparation maintenance', role => {
+  const f = repo();
+  const changed = structuredClone(f.record);
+  changed.targets[role].databaseId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const pr = reviewedTransition(f, corpusPreparationEntries, {
+    additionalPath: 'release/serving.json',
+    additionalContents: JSON.stringify(changed),
+  });
   const release = f.classifyCandidate(pr, {productionSource: pr.base, targets: f.record.targets});
   expect(release.status, release.stderr).toBe(0);
   expect(release.outputs).toContain('mode=corpus\n');

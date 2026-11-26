@@ -11,9 +11,50 @@ import { basename, dirname, join } from 'node:path';
 
 export interface PublicationOperations {
   rename(source: string, destination: string): void;
+  remove?: typeof rmSync;
 }
 
 const defaultOperations: PublicationOperations = { rename: renameSync };
+
+function finishPublication(
+  transactionRoot: string,
+  remove: typeof rmSync,
+  install: () => void,
+  rollback: () => void = () => {},
+): void {
+  try {
+    install();
+  } catch (publicationError) {
+    try {
+      rollback();
+    } catch (rollbackError) {
+      throw new AggregateError(
+        [publicationError, rollbackError],
+        `Publication failed (${String(publicationError)}). Recovery required at ${transactionRoot}: ${String(rollbackError)}`,
+        { cause: publicationError },
+      );
+    }
+    try {
+      remove(transactionRoot, { recursive: true, force: true });
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [publicationError, cleanupError],
+        `Publication rolled back after ${String(publicationError)}, but cleanup failed at ${transactionRoot}: ${String(cleanupError)}`,
+        { cause: publicationError },
+      );
+    }
+    throw publicationError;
+  }
+
+  try {
+    remove(transactionRoot, { recursive: true, force: true });
+  } catch (cleanupError) {
+    throw new Error(
+      `Publication committed, but cleanup failed at ${transactionRoot}: ${String(cleanupError)}`,
+      { cause: cleanupError },
+    );
+  }
+}
 
 function assertRelativeFile(path: string): void {
   if (!/^[A-Za-z0-9._/-]+$/.test(path)
@@ -43,10 +84,11 @@ export function publishFilesAtomically(
 
   const transactionRoot = mkdtempSync(join(dirname(targetRoot), `.${basename(targetRoot)}-transaction-`));
   const backupRoot = join(transactionRoot, 'backup');
-  mkdirSync(backupRoot);
+  const remove = operations.remove ?? rmSync;
   const backedUp: string[] = [];
   const published: string[] = [];
-  try {
+  finishPublication(transactionRoot, remove, () => {
+    mkdirSync(backupRoot);
     for (const path of relativePaths) {
       const target = join(targetRoot, path);
       if (!existsSync(target)) continue;
@@ -60,17 +102,33 @@ export function publishFilesAtomically(
       operations.rename(join(stagedRoot, path), target);
       published.push(path);
     }
-  } catch (error) {
-    for (const path of published.reverse()) rmSync(join(targetRoot, path), { force: true });
-    for (const path of backedUp.reverse()) {
+  }, () => {
+    const failures: Error[] = [];
+    const blockedPaths = new Set<string>();
+    for (const path of published.reverse()) {
       const target = join(targetRoot, path);
-      mkdirSync(dirname(target), { recursive: true });
-      operations.rename(join(backupRoot, path), target);
+      try {
+        remove(target, { force: true });
+      } catch (error) {
+        blockedPaths.add(path);
+        const recovery = backedUp.includes(path) ? ` (original at ${join(backupRoot, path)})` : '';
+        failures.push(new Error(`Remove installed file ${target}${recovery}: ${String(error)}`, { cause: error }));
+      }
     }
-    throw error;
-  } finally {
-    rmSync(transactionRoot, { recursive: true, force: true });
-  }
+    for (const path of backedUp.reverse()) {
+      if (blockedPaths.has(path)) continue;
+      const target = join(targetRoot, path);
+      const backup = join(backupRoot, path);
+      try {
+        operations.rename(backup, target);
+      } catch (error) {
+        failures.push(new Error(`Restore ${backup} to ${target}: ${String(error)}`, { cause: error }));
+      }
+    }
+    if (failures.length > 0) {
+      throw new AggregateError(failures, failures.map(error => error.message).join('\n'));
+    }
+  });
 }
 
 export function publishDirectoryAtomically(
@@ -88,29 +146,33 @@ export function publishDirectoryAtomically(
   const transactionRoot = mkdtempSync(join(dirname(targetDirectory), `.${basename(targetDirectory)}-transaction-`));
   const backup = join(transactionRoot, 'previous');
   let backedUp = false;
-  try {
+  finishPublication(transactionRoot, operations.remove ?? rmSync, () => {
     if (existsSync(targetDirectory)) {
       operations.rename(targetDirectory, backup);
       backedUp = true;
     }
     operations.rename(stagedDirectory, targetDirectory);
-  } catch (error) {
-    if (existsSync(targetDirectory)) rmSync(targetDirectory, { recursive: true, force: true });
-    if (backedUp) operations.rename(backup, targetDirectory);
-    throw error;
-  } finally {
-    rmSync(transactionRoot, { recursive: true, force: true });
-  }
+  }, () => {
+    if (!backedUp) return;
+    try {
+      operations.rename(backup, targetDirectory);
+    } catch (error) {
+      throw new Error(`Restore ${backup} to ${targetDirectory}: ${String(error)}`, { cause: error });
+    }
+  });
 }
 
-export function writeFileAtomically(path: string, content: string | Buffer): void {
+export function writeFileAtomically(
+  path: string,
+  content: string | Buffer,
+  operations: PublicationOperations & { write?: typeof writeFileSync } = defaultOperations,
+): void {
   mkdirSync(dirname(path), { recursive: true });
   const transactionRoot = mkdtempSync(join(dirname(path), `.${basename(path)}-write-`));
   const staged = join(transactionRoot, basename(path));
-  try {
-    writeFileSync(staged, content);
-    renameSync(staged, path);
-  } finally {
-    rmSync(transactionRoot, { recursive: true, force: true });
-  }
+  const write = operations.write ?? writeFileSync;
+  finishPublication(transactionRoot, operations.remove ?? rmSync, () => {
+    write(staged, content);
+    operations.rename(staged, path);
+  });
 }

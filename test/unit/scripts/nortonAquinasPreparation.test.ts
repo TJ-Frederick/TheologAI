@@ -1,6 +1,8 @@
-import {readFileSync} from 'node:fs';
+import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import Database from 'better-sqlite3';
-import {it,expect} from 'vitest';
+import {it,expect,vi} from 'vitest';
 import {optimizePreorderTrigger} from '../../../scripts/norton-aquinas-preparation.js';
 it('preserves the terminal graph predicate on fifteen adversarial graph and ordering controls', () => {
     const source = new Database(':memory:');
@@ -52,7 +54,8 @@ it('retains the separately reserved discovery reads in the same preparation role
 });
 
 import {createHash} from 'node:crypto';
-import {checkPreparationBaseline,type PreparationSession} from '../../../scripts/norton-aquinas-preparation.js';
+import {applyPreparation,checkPreparationBaseline,type JournalEntry,type PreparationPlan,type PreparationSession} from '../../../scripts/norton-aquinas-preparation.js';
+import {canonicalJson} from '../../../scripts/audit-historical-core-preview.js';
 import {comparableSchema,PROVIDER_CATALOG} from '../../../scripts/corpus-source-proof.js';
 function baselineCheckFixture(fault=''){
  const db=new Database(':memory:');db.exec("CREATE TABLE fixture(\n-- imported line comment\nnote TEXT DEFAULT '-- literal', [-- name] TEXT, marker TEXT /* preserve -- block */); CREATE TABLE theologai_metadata(key TEXT,value TEXT); CREATE TABLE historical_corpus_seal(id TEXT);");
@@ -75,3 +78,91 @@ it('keeps provider definitions exact even for a line-comment-only change',async(
 it('still rejects changed ledger timestamps after the application schema check',async()=>{const f=baselineCheckFixture('ledger');try{await expect(f.run()).rejects.toThrow('original baseline ledger timestamps changed');expect(f.queries).toHaveLength(2);}finally{f.db.close();}});
 
 it.each(['identity','seal'])('still refuses baseline %s drift after schema acceptance',async fault=>{const f=baselineCheckFixture(fault);try{await expect(f.run()).rejects.toThrow('baseline identity/seal changed');expect(f.queries).toHaveLength(fault==='identity'?3:4);}finally{f.db.close();}});
+
+async function withPreparationPlan(run: (plan: PreparationPlan, source: Database.Database) => Promise<void>) {
+    const root = mkdtempSync(join(tmpdir(), 'theologai-preparation-plan-'));
+    const path = join(root, 'source.db');
+    const source = new Database(path);
+    try {
+        source.exec('CREATE TABLE fixture (value INTEGER)');
+        const body: Omit<PreparationPlan, 'sha256'> = {
+            schemaVersion: 'norton-aquinas-preparation.v1',
+            target: TARGETS.production,
+            baselineSha256: 'a'.repeat(64),
+            baselineWitnessSha256: 'b'.repeat(64),
+            sourceSha256: createHash('sha256').update(readFileSync(path)).digest('hex'),
+            operations: [1, 2].map(value => ({
+                phase: 'fixture', sql: `INSERT INTO fixture VALUES (${value})`, readCeiling: 2, writeCeiling: 1,
+            })),
+            readbacks: [],
+        };
+        await run({ ...body, sha256: createHash('sha256').update(canonicalJson(body)).digest('hex') }, source);
+    } finally {
+        source.close();
+        rmSync(root, { recursive: true, force: true });
+    }
+}
+
+it('executes a fresh plan in order and refuses definitive or corrupt nonempty journals', async () => {
+    await withPreparationPlan(async (plan, source) => {
+        const execute = vi.fn(async (_sql: string) => ({ rows: [], rowsRead: 1, rowsWritten: 1 }));
+        const first = session({ execute });
+        await expect(applyPreparation(plan, first.s, source)).resolves.toEqual({
+            planSha256: plan.sha256,
+            readbacksSha256: createHash('sha256').update('[]').digest('hex'),
+            rowsRead: 2,
+            rowsWritten: 2,
+        });
+        expect(execute.mock.calls).toEqual(plan.operations.map(({ sql }) => [sql]));
+        expect(first.entries.map(({ state, index }) => [state, index])).toEqual([
+            ['intent', 0], ['complete', 0], ['intent', 1], ['complete', 1],
+        ]);
+
+        const replay = session();
+        await expect(applyPreparation(plan, replay.s, source, first.entries))
+            .rejects.toThrow('recovery requires a separately reviewed operation');
+        const corrupt: JournalEntry[] = [first.entries[0], { ...first.entries[1], sqlSha256: '0'.repeat(64) }];
+        await expect(applyPreparation(plan, replay.s, source, corrupt)).rejects.toThrow('unknown or mismatched journal');
+        expect(replay.calls()).toBe(0);
+        expect(replay.entries).toEqual([]);
+    });
+});
+
+it('keeps the verified operation sequence when an operation is appended during dispatch', async () => {
+    await withPreparationPlan(async (plan, source) => {
+        const originalSql = plan.operations.map(({ sql }) => [sql]);
+        const originalDigest = plan.sha256;
+        const execute = vi.fn(async (sql: string) => {
+            if (sql === originalSql[0][0]) {
+                await Promise.resolve();
+                plan.operations.push({ ...plan.operations[0], sql: 'INSERT INTO fixture VALUES (3)' });
+            }
+            return { rows: [], rowsRead: 1, rowsWritten: 1 };
+        });
+        const fixture = session({ execute });
+
+        await expect(applyPreparation(plan, fixture.s, source)).resolves.toMatchObject({
+            planSha256: originalDigest,
+            rowsRead: 2,
+            rowsWritten: 2,
+        });
+        expect(plan.operations).toHaveLength(3);
+        expect(execute.mock.calls).toEqual(originalSql);
+    });
+});
+
+it('stops after a lost acknowledgement and refuses to replay the unmatched intent', async () => {
+    await withPreparationPlan(async (plan, source) => {
+        const execute = vi.fn(async (_sql: string) => { throw Error('lost acknowledgement'); });
+        const first = session({ execute });
+        await expect(applyPreparation(plan, first.s, source)).rejects.toThrow('lost acknowledgement');
+        expect(first.entries).toEqual([expect.objectContaining({ state: 'intent', index: 0 })]);
+        await expect(applyPreparation(plan, first.s, source)).rejects.toThrow('halted');
+        expect(execute.mock.calls).toEqual([[plan.operations[0].sql]]);
+
+        const replay = session();
+        await expect(applyPreparation(plan, replay.s, source, first.entries)).rejects.toThrow('unmatched intent');
+        expect(replay.calls()).toBe(0);
+        expect(replay.entries).toEqual([]);
+    });
+});

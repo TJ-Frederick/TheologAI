@@ -60,21 +60,34 @@ const reviewedNodeE2eChanges = [
   ['scripts/test-node-stdio-e2e.ts', 'b824299c4ff760091df61f3773cdb29a1f642b82', '0dd9542494d7c405264c9cebb67204405b06f6e5'],
   ['test/unit/scripts/nodeE2eFixture.test.ts', null, '4b4957ce01ef2784fda529dafef4a833bb631efa'],
 ];
+// PR #216 reproduced the Worker, SQLite database and seed export byte for byte.
+// Keep these preparation changes on the no-deployment path only in this exact form.
+const reviewedCorpusPreparationChanges = [
+  ['scripts/atomic-publication.ts', '2dd1781bad7806b62c3aa7f9a86b8c02f1ac94da', '9c1f6f82084f0edca35bd717a02a4849e984652c'],
+  ['scripts/export-for-d1.ts', '7ee672c6e568795e6237e7a8ea372f28ee6c9aa1', '9444efe472cf3f183ad77af9e4274724920a8501'],
+  ['scripts/norton-aquinas-preparation.ts', '5297bdd3cd7c7142c739f78b81eaba5c24c7d875', 'd2bfd0eae7073524e7d0f799cd17884c73586a5a'],
+  ['scripts/sqlite-corpus-markers.ts', null, 'f0df49dd3da1f21a5f6dd4af012966f1eb3dbe29'],
+  ['scripts/verify-database.ts', 'c3a0b142f1688e5c496f900286b27bc416387c9c', '0d6b30e3a09bb3329e7dc865b77441a3054fe83a'],
+  ['test/unit/scripts/d1SeedManifest.test.ts', '69f68ffbb516d38003e23d209eead23412af050e', '41f07a28192fc07542c35e49546f4939880ecaf1'],
+  ['test/unit/scripts/languageBuildInfrastructure.test.ts', '6eef2b680c449967eb221c270e25cc4841b4f2ec', '5c4b1e0190a70bb463760cd6885a9e4e853747cc'],
+  ['test/unit/scripts/nortonAquinasPreparation.test.ts', '2126b796ed3ad721c447315c1c0e9c2de6c684e6', 'f076d97107ef6c9d4ce735bb4633beee5f62e2ed'],
+  ['test/unit/scripts/transform12FtsCorruption.test.ts', '07578fcbc2aeec852ffe134e5ced84c2a96d70cd', 'caf6c822ef0ca6c01b512fbc262f640e42a295b6'],
+];
 const reviewedNodeE2ePaths = new Set(reviewedNodeE2eChanges.map(([path]) => path));
+const reviewedCorpusPreparationPaths = new Set(reviewedCorpusPreparationChanges.map(([path]) => path));
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
 const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
 function requireValue(value, message) {
   if (!value) throw new Error('Release refused: ' + message);
 }
 
-function isReviewedNodeE2eChange(root, base, changes) {
-  const matching = changes.filter(change => change.paths.some(path => reviewedNodeE2ePaths.has(path)));
-  if (matching.length !== reviewedNodeE2eChanges.length || matching.some(change => !['A', 'M'].includes(change.status))) {
+function isReviewedTransition(root, base, matching, entries) {
+  if (matching.length !== entries.length || matching.some(change => !['A', 'M'].includes(change.status))) {
     return false;
   }
-  const expected = reviewedNodeE2eChanges.map(([path, before, after]) =>
+  const expected = entries.map(([path, before, after]) =>
     `:${before ? '100644' : '000000'} 100644 ${before ?? '0'.repeat(40)} ${after} ${before ? 'M' : 'A'}\0${path}\0`).join('');
-  const actual = git(root, ['diff', '--raw', '--no-abbrev', '--no-renames', '-z', base, 'HEAD', '--', ...reviewedNodeE2ePaths]);
+  const actual = git(root, ['diff', '--raw', '--no-abbrev', '--no-renames', '-z', base, 'HEAD', '--', ...entries.map(([path]) => path)]);
   return actual === expected;
 }
 
@@ -114,9 +127,17 @@ export function classifyRelease(root = process.cwd(), baselineFile) {
   // The CI classifier already has an explicit list of runtime-only and documentation changes.
   // Anything outside it, including builders and their dependencies, needs data validation.
   // Release automation can change independently of the Worker and corpus.
-  const reviewedNodeE2e = isReviewedNodeE2eChange(root, baseline.productionSource, paths);
-  const substantive = paths.filter(change => !change.paths.every(path =>
-    releaseOperations.has(path) || (reviewedNodeE2e && reviewedNodeE2ePaths.has(path))));
+  const nodeE2e = paths.filter(change => change.paths.some(path => reviewedNodeE2ePaths.has(path)));
+  const corpusPreparation = paths.filter(change => change.paths.some(path => reviewedCorpusPreparationPaths.has(path)));
+  const reviewedNodeE2e = isReviewedTransition(root, baseline.productionSource, nodeE2e, reviewedNodeE2eChanges);
+  const reviewedCorpusPreparation = isReviewedTransition(root, baseline.productionSource, corpusPreparation, reviewedCorpusPreparationChanges);
+  if (corpusPreparation.length && !reviewedCorpusPreparation) return 'corpus';
+  const maintenance = new Set([
+    ...(reviewedNodeE2e ? nodeE2e : []),
+    ...(reviewedCorpusPreparation ? corpusPreparation : []),
+  ]);
+  const substantive = paths.filter(change => !maintenance.has(change) &&
+    !change.paths.every(path => releaseOperations.has(path)));
   if (!substantive.length) return 'docs';
   const diff = substantive.map(change => [change.status, ...change.paths].join('\0') + '\0').join('');
   const {mode} = classifyCiChanges(diff);
