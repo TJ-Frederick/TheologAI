@@ -191,7 +191,14 @@ it.each([
   expect(release.status, release.stderr).toBe(0);
   expect(release.outputs).toContain(`mode=${mode}\n`);
   expect(f.run('classify', 'baseline.json')).toBe(mode);
-  expect(classifyOrdinaryCi(f.root, pr)).toMatchObject({mode: 'full', data: true, serving: true});
+});
+
+it('keeps ordinary PR CI full for corpus preparation maintenance', () => {
+  const f = repo();
+  const pr = f.mergeCandidate(f.git('rev-parse', 'HEAD'), corpusPreparationEntries.map(([path]) => path), 'preparation changes');
+  expect(classifyOrdinaryCi(f.root, pr)).toEqual({
+    mode: 'full', data: true, serving: true, reason: 'corpus-delivery-or-unclassified-path',
+  });
 });
 
 it.each([
