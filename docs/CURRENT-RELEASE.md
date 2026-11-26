@@ -3,12 +3,36 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. The latest November 26 verification established the
-original-language study v3 application release on the Norton and Thomas Aquinas
-corpus and the observed preview control. Earlier releases and custody records
-below preserve dated historical evidence.
+identity authority. The latest November 26 verification established the shared
+runtime cursor codec release on the Norton and Thomas Aquinas corpus and the
+observed preview control. Earlier releases and custody records below preserve
+dated historical evidence.
 
 ## Latest verified production release — November 26, 2026
+
+[PR #217](https://github.com/TJ-Frederick/TheologAI/pull/217) shares UTF-8
+base64url encoding across hierarchy, Strong’s occurrence, and UBS parallel
+group cursors. Each retains its existing token format and validation rules.
+
+Production source `7ad05214ac9d384b127220d947e89a862361acc0` matches tree
+`f0237be51eac892530ea5fa82d8797029179c8f3`, accepted by
+[protected preview run 45837487221](https://github.com/TJ-Frederick/TheologAI/actions/runs/45837487221).
+[Protected production run 45841904181](https://github.com/TJ-Frederick/TheologAI/actions/runs/45841904181),
+attempt 1, promoted that bundle on the existing schema-0010 production D1.
+Preview and production each passed **8/8** checks across both MCP protocol
+versions. Final routing matched the accepted Worker and D1, and the preview
+control stayed stable throughout production promotion.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — verified serving assignment | `cc7d0dbe-7469-42c9-af89-1d6e3e3795ec` | `0771e5b4-be08-434f-99d8-4c520f26055d` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control at production verification | `cdf14c81-d0f2-4684-829d-01b27b162833` | `872feda9-c01f-4493-8ee9-6d13c34a0eb1` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The protected run retained its matched predecessor and acceptance receipt.
+The receipt SHA-256 is
+`4524ba0d845bb6fd7dd92e6c34b1294ea29d6087b95b6d8e55e96d5772d904dd`.
+
+## Historical application release — November 26, 2026
 
 [PR #214](https://github.com/TJ-Frederick/TheologAI/pull/214) made schema v3
 the public `original_language_study` contract. Omitted `depth` selects
