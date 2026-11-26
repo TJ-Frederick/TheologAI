@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client, StreamableHTTPClientTransport, SdkError, SdkErrorCode } from '@modelcontextprotocol/client';
 import { versionNegotiationFor } from './audit-dual-era-mcp-preview.js';
-import { assertSuccess, assertSafeError, assertInputError, corruptCursor } from './audit-original-language-v2-preview.js';
+import { assertLanguageReleaseSuccess, assertLanguageReleaseError, type LanguageReleaseFixture } from './original-language-study-release.js';
 import { captureMcpTransportSnapshot, assertMcpTransportContract, fingerprintMcpTransportSnapshot } from '../test/helpers/mcpTransportContract.js';
 import { escapeFrozenEditionSectionContentForMarkdown } from '../src/kernel/editionProvenanceFoundation.js';
 import {createHash} from 'node:crypto';
@@ -206,7 +206,7 @@ export async function auditCorpusRelease(options: {
     const databaseSha256=sha(readFileSync(options.databasePath)),manifestSha256=sha(readFileSync(join(root,'data/data-manifest.json')));
     const core = JSON.parse(readFileSync(join(root, 'test/fixtures/historical-core-preview-audit.json'), 'utf8'));
     const spine = JSON.parse(readFileSync(join(root, 'test/fixtures/historical-spine-preview-audit.json'), 'utf8'));
-    const language = JSON.parse(readFileSync(join(root, 'test/fixtures/original-language-v2-preview-audit.json'), 'utf8'));
+    const language = JSON.parse(readFileSync(join(root, 'test/fixtures/original-language-study-v3-release.json'), 'utf8')) as LanguageReleaseFixture;
     const db = new Database(options.databasePath, { readonly: true, fileMustExist: true });
     const norton = (db.prepare("SELECT d.document_id,d.section_key FROM historical_section_identities d WHERE d.document_id LIKE '%norton%' OR d.document_id='calvin-institutes-of-the-christian-religion' ORDER BY source_ordinal LIMIT 1").get() as any);
     const aquinas = (db.prepare('SELECT public_slug,hierarchy_id FROM historical_hierarchy_publications').get() as any);
@@ -439,17 +439,14 @@ export async function auditCorpusRelease(options: {
                                 const cursor = cursorHistory.get(c.cursorFrom);
                                 if (!cursor)
                                     throw new AuditFault('assertion','language_cursor_missing');
-                                args.cursor = c.cursorMutation ? corruptCursor(cursor) : cursor;
+                                args.cursor = cursor;
                             }
                             const value = await probe('language:' + c.id, () => client.callTool({ name: 'original_language_study', arguments: args }), c.mode !== 'success');
-                            const raw = { ...value, text: (value.content ?? []).filter((x: any) => x.type === 'text').map((x: any) => x.text) };
                             try{
                                 if (c.mode === 'success')
-                                    assertSuccess(c.id, raw as any, language, cursorHistory, priorCandidates);
-                                else if (c.mode === 'safe-error')
-                                    assertSafeError(c.id, raw as any, args.cursor);
+                                    assertLanguageReleaseSuccess(c, value, language, cursorHistory, priorCandidates);
                                 else
-                                    assertInputError(raw as any);
+                                    assertLanguageReleaseError(c, value, args.cursor);
                             }catch{throw new AuditFault('assertion',c.mode==='success'?'language_success_contract':c.mode==='safe-error'?'language_safe_error_contract':'language_input_error_contract');}
                         }
                     }

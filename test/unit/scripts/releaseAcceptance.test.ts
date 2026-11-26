@@ -15,6 +15,14 @@ const options = {
 
 const knownTools = ['bible_lookup', 'bible_verse_morphology', 'primary_source_search']
   .map(name => ({ name, inputSchema: { type: 'object' } }));
+const depths = ['beginner', 'intermediate', 'technical'];
+const languageStudy = (version: string) => ({
+  name: 'original_language_study',
+  inputSchema: { type: 'object', properties: { depth: { enum: depths } } },
+  outputSchema: { type: 'object', oneOf: depths.map(depth => ({
+    properties: { schemaVersion: { const: version }, depth: { const: depth } },
+  })) },
+});
 const kempisUri = 'theologai://documents/kempis-imitation-of-christ#section-001';
 const discovery = {
   protocolVersion: '2026-07-28',
@@ -24,7 +32,7 @@ const discovery = {
   _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'theologai-bible-server', version: 'test' } },
 };
 
-function endpoint(fault?: 'discover' | 'wrong-passage' | 'wrong-citation' | 'large-response') {
+function endpoint(fault?: 'discover' | 'wrong-passage' | 'wrong-citation' | 'large-response' | 'stale-language-study') {
   const calls: string[] = [];
   const fetchImpl = vi.fn<typeof fetch>(async (_input, init) => {
     const request = JSON.parse(String(init?.body));
@@ -37,7 +45,7 @@ function endpoint(fault?: 'discover' | 'wrong-passage' | 'wrong-citation' | 'lar
     const results = {
       initialize: { ...discovery, protocolVersion: '2025-11-25', serverInfo: discovery._meta['io.modelcontextprotocol/serverInfo'] },
       'server/discover': discovery,
-      'tools/list': { tools: knownTools },
+      'tools/list': { tools: [...knownTools, languageStudy(fault === 'stale-language-study' ? '2' : '3')] },
       'tools/call': {
         content: [],
         structuredContent: params?.name === 'primary_source_search'
@@ -87,6 +95,7 @@ describe('shared release acceptance', () => {
     ['wrong-passage', 'local-passage', 'passage_mismatch'],
     ['wrong-citation', 'search:kempis-imitation-of-christ', 'search_citation_mismatch'],
     ['large-response', 'tools-list', 'response_size'],
+    ['stale-language-study', 'tools-list', 'language_study_contract'],
   ] as const)('refuses %s without entering the second protocol era', async (fault, probeId, category) => {
     const { fetchImpl, calls } = endpoint(fault);
     const receipt = await runReleaseAcceptance({ ...options, fetch: fetchImpl, search: true });
