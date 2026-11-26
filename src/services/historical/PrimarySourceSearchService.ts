@@ -1,5 +1,5 @@
 import { ValidationError } from '../../kernel/errors.js';
-import type { CcelPrimarySourceSearchPort, LocalPrimarySourceSearchPort } from './PrimarySourceSearchPorts.js';
+import type { CcelPrimarySourceSearchPort, LocalPrimarySourceSearchPort, PrimarySourceSearchProviderPort } from './PrimarySourceSearchPorts.js';
 import type { PrimarySourceContractConfig } from '../../kernel/featureFlags.js';
 import type { CcelUpstreamCoordinator } from './CcelUpstreamCoordinator.js';
 import {
@@ -38,12 +38,13 @@ export class PrimarySourceSearchService {
 
   async search(input: unknown): Promise<PrimarySourceSearchPlanResult> {
     const queries = validatePlan(input, this.options.contractVersion);
+    const local = this.local.forPlan?.() ?? this.local;
     let queryResults: PrimarySourcePlanQueryResult[];
     let aggregateTruncated: boolean;
     if (this.options.contractVersion === '8') {
-      ({ queryResults, aggregateTruncated } = await this.executeV8Plan(queries));
+      ({ queryResults, aggregateTruncated } = await this.executeV8Plan(queries, local));
     } else {
-      queryResults = await Promise.all(queries.map(query => this.executeQuery(query)));
+      queryResults = await Promise.all(queries.map(query => this.executeQuery(query, local)));
       aggregateTruncated = enforceAggregateHitBudget(queryResults);
     }
     const providerResults = queryResults.flatMap(query => query.providers);
@@ -87,8 +88,9 @@ export class PrimarySourceSearchService {
 
   private async executeV8Plan(
     queries: NormalizedPlanQuery[],
+    local: PrimarySourceSearchProviderPort,
   ): Promise<{ queryResults: PrimarySourcePlanQueryResult[]; aggregateTruncated: boolean }> {
-    const localResults = await Promise.all(queries.map(query => this.executeProvider(query, 'local')));
+    const localResults = await Promise.all(queries.map(query => this.executeProvider(query, 'local', local)));
     const localBudget = enforceProviderHitBudget(localResults, MAX_TOTAL_HITS);
     const queryResults = queries.map((query, index) => {
       const local = localResults[index]!;
@@ -102,7 +104,7 @@ export class PrimarySourceSearchService {
     });
     await Promise.all(queryResults.map(async (queryResult, index) => {
       if (queryResult.expansionDecision?.triggered) {
-        queryResult.providers.push(await this.executeProvider(queries[index]!, 'ccel'));
+        queryResult.providers.push(await this.executeProvider(queries[index]!, 'ccel', local));
       }
     }));
     const externalResults = queryResults.flatMap(query => query.providers.filter(provider => provider.provider === 'ccel_live'));
@@ -113,13 +115,17 @@ export class PrimarySourceSearchService {
     };
   }
 
-  private async executeQuery(query: NormalizedPlanQuery): Promise<PrimarySourcePlanQueryResult> {
+  private async executeQuery(query: NormalizedPlanQuery, local: PrimarySourceSearchProviderPort): Promise<PrimarySourcePlanQueryResult> {
     const providers: PrimarySourcePlanProviderResult[] = [];
-    for (const provider of query.providers) providers.push(await this.executeProvider(query, provider));
+    for (const provider of query.providers) providers.push(await this.executeProvider(query, provider, local));
     return { id: query.id, normalizedMode: query.match, normalizedSelection: query.selection, providers };
   }
 
-  private async executeProvider(query: NormalizedPlanQuery, provider: PrimarySourceRequestedProvider): Promise<PrimarySourcePlanProviderResult> {
+  private async executeProvider(
+    query: NormalizedPlanQuery,
+    provider: PrimarySourceRequestedProvider,
+    local: PrimarySourceSearchProviderPort,
+  ): Promise<PrimarySourcePlanProviderResult> {
     const localProviderQuery = {
       text: query.text,
       match: query.match,
@@ -156,7 +162,7 @@ export class PrimarySourceSearchService {
     } else {
       try {
         result = provider === 'local'
-          ? await this.local.search({ ...localProviderQuery, selection: query.selection })
+          ? await local.search({ ...localProviderQuery, selection: query.selection })
           : await this.ccel.search(externalProviderQuery, this.coordinator!);
       } catch {
         result = {
