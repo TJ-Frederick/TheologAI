@@ -10,6 +10,30 @@ historical evidence.
 
 ## Latest verified production release — November 25, 2026
 
+[PR #209](https://github.com/TJ-Frederick/TheologAI/pull/209) reuses the bundled
+legacy parallel-passage index within each Worker isolate. Repositories and
+request bindings remain scoped to each request.
+
+Production source `91eed01dbc71b620fae6906190ac1a65087a1c94` matches tree
+`72c1a71ff62d1858c3d572a335a1e8e0b988716f`, accepted by
+[protected preview run 45738915030](https://github.com/TJ-Frederick/TheologAI/actions/runs/45738915030).
+[Protected production run 45753029561](https://github.com/TJ-Frederick/TheologAI/actions/runs/45753029561),
+attempt 1, promoted that bundle on the existing schema-0010 production D1.
+Preview and production each passed **8/8** checks across both MCP protocol
+versions. Final routing matched the accepted Worker and D1, and the preview
+control stayed stable throughout production promotion.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — verified serving assignment | `40226983-9fa3-4806-a102-41388dd8e9c5` | `e8f0152b-9672-4ece-9206-57d7c9ce8d9f` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control at production verification | `d55562e1-9c93-4968-8667-15c5bc032a92` | `aa06ae69-7410-4924-bd8d-3f3022178b36` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The protected run retained its matched predecessor and acceptance receipt.
+The receipt SHA-256 is
+`fe213686ea89d4d2cc488d0d0c3e05ef912e3f100944c1f8ad81eeb0808785e1`.
+
+## Historical application release — November 25, 2026
+
 [PR #208](https://github.com/TJ-Frederick/TheologAI/pull/208) shares one
 successful historical catalog read across each primary-source search plan while
 preserving per-query failure handling. It includes the provider coverage
