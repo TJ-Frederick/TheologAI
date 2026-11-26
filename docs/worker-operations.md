@@ -652,7 +652,8 @@ or limiter change is currently approved.
 
 `wrangler.toml` supplies the checked-in Wrangler template. Keep the browser
 origin allowlist, maximum request size, and request-lifecycle logging settings
-declared there for both roles. The protected workflows use
+declared there for both roles. Avoid dashboard-only plaintext variables for
+these settings. The protected workflows use
 `worker-release-artifact.mjs render` to generate the upload configuration and
 take the intended `THEOLOGAI_DB` name and UUID for that role from
 [`release/serving.json`](../release/serving.json). Use the [current release
