@@ -45,7 +45,7 @@ historical-spine audits passed; production remained unchanged. This
 post-release evidence update is documentation-only and is not itself a new
 runtime claim.
 
-## Current product boundary
+## Historical starting product boundary
 
 TheologAI exposes eleven tools and six guided prompts across local stdio/HTTP
 and hosted Worker transports. It provides eight Bible translations, six
@@ -65,9 +65,11 @@ The following boundaries remain deliberate:
 
 ## Phase 3B sequencing
 
-Status: **3B.0 complete (C1 + C2); 3B.1 complete in PR #151 after protected
-preview and production proof; 3B.2 is next**. This plan does not authorize any
-additional deployment, binding change, cleanup, or other operational mutation.
+3B.0 and 3B.1 are complete. The November releases shipped the local Norton and
+Aquinas corpus and the 3B.3 original-language study v3 cutover. Live CCEL
+discovery remains deferred under the 3B.2 provider gate. See the
+[roadmap closeout](ROADMAP.md#simplification-pass-closeout) for the November
+simplification work and follow-ups.
 
 ### 3B.0 — Rebaseline and simplify
 
@@ -177,6 +179,9 @@ has a defined scholarly purpose.
 
 ### 3B.3 — Original-language experience
 
+The public v3 cutover shipped in [PR #214](https://github.com/TJ-Frederick/TheologAI/pull/214).
+The earlier PR #154 is retained as superseded review history.
+
 Preserve the existing evidence boundary while making one tool useful at
 multiple levels:
 
@@ -214,7 +219,7 @@ Worker/D1 target, and records only sanitized hashes. C2 reconciled the
 successful dated rehearsal and current release identity in the permitted
 Markdown authority documents.
 
-The active production release is PR #151 source
+The 3B.1 production release at this milestone used PR #151 source
 `50fcc5ea1d460a7869d5c0b5bf29aa26a37cbfc5`, tree
 `e73599eb50cd4a6beb6d756a587118407fc548e2`, deployed as Cloudflare
 `e44c5732-7203-4ac8-87db-f50cbd6761f0`, Worker

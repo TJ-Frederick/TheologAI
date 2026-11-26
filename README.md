@@ -78,9 +78,10 @@ rollback unit in that dated release record; it is not current today: deployment
 history, not the immediate rollback claim.
 
 The successor delivery program is tracked in
-[Phase 3B](docs/PHASE-3B-PLAN.md). The 3B.1 dual-era implementation is locally
-release-ready and awaits its separately authorized protected preview proof;
-it makes no claim about the currently deployed runtime.
+[Phase 3B](docs/PHASE-3B-PLAN.md). Dual-era MCP support and the original-language
+study v3 cutover have completed protected preview and production verification.
+See the [roadmap](docs/ROADMAP.md#simplification-pass-closeout) for the completed
+simplification work and deferred follow-ups.
 
 The historical PR #96 `original_language_study` schema-v2 audit passed 11/11
 cases.
