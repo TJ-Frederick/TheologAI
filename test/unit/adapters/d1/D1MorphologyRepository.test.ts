@@ -180,5 +180,32 @@ describe('D1MorphologyRepository', () => {
       expect(first.next_after).toEqual({ book_order: 19, chapter: 3, verse: 0, position: 2 });
       await expect(repo.getTokenOccurrences('H9998', first.next_after, 2)).resolves.toEqual({ occurrences: [rows[2]] });
     });
+
+    it('verifies that an occurrence cursor names an exact corpus coordinate', async () => {
+      const db = createMockD1([{
+        sql: 'SELECT 1 AS present FROM morphology',
+        first: { present: 1 },
+      }]);
+      const repo = new D1MorphologyRepository(db as any);
+
+      await expect(repo.hasTokenOccurrenceAt('G25', {
+        book_order: 43,
+        chapter: 3,
+        verse: 16,
+        position: 1,
+      })).resolves.toBe(true);
+      expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith('G0025', 43, 3, 16, 1);
+
+      const missing = createMockD1([{
+        sql: 'SELECT 1 AS present FROM morphology',
+        first: undefined,
+      }]);
+      await expect(new D1MorphologyRepository(missing as any).hasTokenOccurrenceAt('G25', {
+        book_order: 43,
+        chapter: 3,
+        verse: 16,
+        position: 2,
+      })).resolves.toBe(false);
+    });
   });
 });

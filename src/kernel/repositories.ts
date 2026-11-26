@@ -152,6 +152,11 @@ export interface IMorphologyRepository {
     after?: CanonicalOccurrencePosition,
     limit?: number,
   ): RepositoryResult<TokenOccurrencePage>;
+  /** Checks whether an exact Strong’s token occurs at the seek coordinate. */
+  hasTokenOccurrenceAt?(
+    strongsNumber: string,
+    boundary: CanonicalOccurrencePosition,
+  ): RepositoryResult<boolean>;
 }
 
 // ── Historical document types & interface ──

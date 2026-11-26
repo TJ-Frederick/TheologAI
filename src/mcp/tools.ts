@@ -6,6 +6,7 @@ import {
 } from '@modelcontextprotocol/server';
 import type { ToolHandler } from '../kernel/types.js';
 import { internalError } from './errors.js';
+import { MCP_INPUT_LIMIT_MESSAGE } from './inputLimits.js';
 import { formatValidationError, inputValidatorFor, type SchemaValidator, validatorFor } from './validation.js';
 
 export function registerToolHandlers(
@@ -43,10 +44,13 @@ export function registerToolHandlers(
     const toolArguments = args ?? {};
     const validation = validate?.(toolArguments);
     if (!validation?.valid) {
+      const explanation = validation?.errorMessage === MCP_INPUT_LIMIT_MESSAGE
+        ? undefined
+        : tool.explainInvalidInput?.(toolArguments);
       return server.projectCallToolResult({
         content: [{
           type: 'text',
-          text: `Invalid arguments for ${name}: ${formatValidationError(validation?.errorMessage)}`,
+          text: `Invalid arguments for ${name}: ${explanation ?? formatValidationError(validation?.errorMessage)}`,
         }],
         isError: true,
       }, tool.outputSchema);

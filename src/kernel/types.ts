@@ -18,6 +18,8 @@ export interface ToolHandler {
   description: string;
   inputSchema: Tool['inputSchema'] & { properties?: Record<string, any> };
   outputSchema?: Tool['outputSchema'] & { properties?: Record<string, any> };
+  /** Optional tool-specific guidance when arguments fail the advertised input schema. */
+  explainInvalidInput?: (params: Record<string, unknown>) => string | undefined;
   /** Optional cross-field validation that JSON Schema cannot fully express. */
   validateStructuredOutput?: (value: Record<string, unknown>) => boolean;
   annotations?: Tool['annotations'];
@@ -374,6 +376,16 @@ export interface CorpusUsageResult {
   nextOccurrenceCursor?: string;
   cautions: string[];
 }
+
+/** Narrow technical occurrence projection used by original_language_study v3. */
+export type CorpusOccurrencePageResult = Pick<
+  CorpusUsageResult,
+  'exactMorphologyKey' | 'corpusIdentity' | 'attested' | 'totals' | 'cautions'
+> & {
+  publicStrongs: string;
+  occurrences: NonNullable<CorpusUsageResult['occurrences']>;
+  nextOccurrenceCursor?: string;
+};
 
 export interface StrongsResult {
   strongs_number: string;

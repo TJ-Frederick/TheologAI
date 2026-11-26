@@ -12,6 +12,9 @@ export interface RecommendedToolCall {
 }
 
 const TRANSLATIONS = new Set(['ESV', 'NET', 'KJV', 'WEB', 'BSB', 'ASV', 'YLT', 'DBY']);
+const PROMPT_DEPTHS = ['beginner', 'intermediate', 'technical'] as const;
+export type PromptDepth = typeof PROMPT_DEPTHS[number];
+const DEPTH_ARGUMENT_DESCRIPTION = 'Workflow depth: beginner, intermediate, or technical. An explicit depth wins. When mapping natural-language wording, use beginner for simple/beginner requests, technical for raw-evidence/technical requests, and intermediate otherwise. Default: intermediate.';
 const CCEL_DATE_CAPABILITY_NOTICE = 'Expanded discovery does not provide reviewed composition-date filtering; any returned broader hit is not composition-date evidence.';
 const CCEL_DATED_FALLBACK_NOTICE = 'Expanded discovery deliberately omits the requested catalog composition-year bounds; any returned broader hit cannot establish membership in that requested range.';
 
@@ -43,6 +46,33 @@ function containingChapterReference(value: string): string {
   }
 }
 
+export function resolvePromptDepth(args: Record<string, string> | undefined): PromptDepth {
+  const requested = args?.depth;
+  return requested && (PROMPT_DEPTHS as readonly string[]).includes(requested)
+    ? requested as PromptDepth
+    : 'intermediate';
+}
+
+function depthWorkflowGuidance(depth: PromptDepth): string {
+  if (depth === 'beginner') {
+    return 'After reading the evidence and English context, explain one likely nuance in plain English. Label it explicitly as prompt-produced interpretation supported by the cited evidence, state reasonable alternatives when ambiguity remains, and say what the evidence cannot prove. The deterministic tool does not select contextual meaning.';
+  }
+  if (depth === 'technical') {
+    return 'Keep raw source identity, morphology, provenance, semantic candidates, ambiguity, and bounded corpus occurrences visible and source-separated. Do not turn frequency or a source candidate into a contextual verdict. The deterministic tool does not select contextual meaning.';
+  }
+  return 'Explain the lemma, source form, transliteration, morphology, source-attributed lexical range, and local context. Keep that lexical range separate from English translation comparison, and label contextual conclusions as interpretation rather than deterministic tool output.';
+}
+
+function lexicalOverviewDepthGuidance(depth: PromptDepth): string {
+  if (depth === 'beginner') {
+    return 'Present compact candidate identities and source-attributed lexical cues in plain English. Without one verse, do not produce a likely contextual nuance or choose a meaning.';
+  }
+  if (depth === 'technical') {
+    return 'Keep raw source identities, provenance, lexical cues, exact surface variants, and bounded occurrence evidence visible and source-separated. Frequency does not establish contextual meaning.';
+  }
+  return 'Explain candidate lemmas, source forms, transliterations, and source-attributed lexical range while clearly withholding any verse-specific conclusion.';
+}
+
 /**
  * Machine-checkable calls used by prompt prose. Keeping these structured lets
  * tests prove that guided workflows remain executable as tool schemas evolve.
@@ -56,9 +86,18 @@ export function recommendedToolCallsForPrompt(
     case 'word-study': {
       const word = args?.word?.trim() ?? '';
       const reference = args?.reference?.trim();
+      const depth = resolvePromptDepth(args);
       const strongsIdentity = parseStrongsIdentity(word);
       const lexical = strongsIdentity
-        ? [{ tool: 'original_language_lookup', arguments: { strongs_number: strongsIdentity.publicId, include_extended: true, detail_level: 'detailed', usage_level: 'overview' } }]
+        ? [{
+          tool: 'original_language_lookup',
+          arguments: {
+            strongs_number: strongsIdentity.publicId,
+            include_extended: true,
+            detail_level: 'detailed',
+            usage_level: depth === 'technical' && !reference ? 'technical' : 'overview',
+          },
+        }]
         : [{ tool: 'original_language_lookup', arguments: { query: word, limit: 10 } }];
       return reference
         ? [
@@ -185,6 +224,7 @@ export function registerPromptHandlers(
           { name: 'word', description: 'The English word, Greek/Hebrew term, or Strong\'s number (e.g. "love", "agape", "G26")', required: true },
           { name: 'testament', description: 'Focus on OT (Hebrew) or NT (Greek). Default: auto-detect.', required: false },
           { name: 'reference', description: 'One verse providing context for the word. Without it, the workflow is a lexical overview, not a claim about meaning in a verse.', required: false },
+          { name: 'depth', description: DEPTH_ARGUMENT_DESCRIPTION, required: false },
         ],
       },
       {
@@ -193,6 +233,7 @@ export function registerPromptHandlers(
         arguments: [
           { name: 'reference', description: 'Bible reference (e.g. "John 3:16", "Romans 8:28-30")', required: true },
           { name: 'translation', description: 'Primary translation. Default: ESV.', required: false },
+          { name: 'depth', description: DEPTH_ARGUMENT_DESCRIPTION, required: false },
         ],
       },
       {
@@ -201,6 +242,7 @@ export function registerPromptHandlers(
         arguments: [
           { name: 'reference', description: 'Bible reference (e.g. "Philippians 2:6-8")', required: true },
           { name: 'translations', description: 'Comma-separated list of translations. Default: ESV,KJV,NET,BSB.', required: false },
+          { name: 'depth', description: DEPTH_ARGUMENT_DESCRIPTION, required: false },
         ],
       },
       {
@@ -273,52 +315,60 @@ export function registerPromptHandlers(
       case 'word-study': {
         const word = args?.word ?? '';
         const reference = args?.reference?.trim();
+        const depth = resolvePromptDepth(args);
+        const depthGuidance = depthWorkflowGuidance(depth);
+        const lexicalUsageLevel = depth === 'technical' && !reference ? 'technical' : 'overview';
         const exactStrongs = parseStrongsIdentity(word) !== undefined;
         const testament = args?.testament;
         const testamentHint = testament
           ? ` Focus on the ${testament.toUpperCase() === 'OT' ? 'Hebrew (Old Testament)' : 'Greek (New Testament)'}.`
           : '';
         text = reference
-          ? `Conduct a context-first word study on "${word}" in ${reference}.${testamentHint}
+          ? `Conduct a context-first word study on "${word}" in ${reference} at **${depth}** depth.${testamentHint}
 
 1. **Read the context** — ${callText(calls[0])}; compare ${callText(calls[1])}.
-2. **Resolve the verse token** — ${callText(calls[2])}. Prefer structured \`words[]\`: preserve the selected word's raw \`morphologyCode\`, nullable \`text\`, \`lemma\`, and \`morphologyExpansion\`, plus \`provenanceIds\` and \`lemmaProvenanceIds\`; use Markdown only as fallback. An empty \`lemmaProvenanceIds\` means no lemma is present to attribute. Identify the source form, lemma, Strong's identifier, or exact local gloss corresponding to the user's term. Then call \`original_language_study\` with ${reference}, that verse-local target, and \`detail: "summary"\`. Its v2 structured output keeps the complete prior study under \`study\`; if \`study.status\` is \`needs_disambiguation\`, select a candidate only from sentence context and call it again with that source position; do not guess. Request \`detail: "detailed"\` only when candidate detail could materially help. Treat returned semantic candidates as source evidence, not contextual adjudication. When another candidate page materially helps, pass \`semanticEvidence.resultWindow.continuation.cursor\` unchanged with the same reference, target, position, and detail; never inspect, decode, or rewrite it.
-3. **Consult lexical and corpus evidence** — ${callText(calls[3])}.${exactStrongs ? '' : ' This first call is discovery only. After it resolves the relevant Strong\'s identity, make a subsequent exact `original_language_lookup` call with that returned `strongs_number`, `include_extended: true`, `detail_level: "detailed"`, and `usage_level: "overview"`; do not invent or hard-code an identifier.'} Keep OpenScriptures lexicon claims, STEPBible lexicon metadata, and counted \`corpusUsage\` source-separated. For Hebrew, the Online-Bible-derived TBESH Meaning field is withheld: retain the disclosed identity, form, morphology, lemma, and brief gloss, but do not reconstruct or infer the missing definition. Present corpus frequency only after the verse-local meaning and never use it to select the sense.
-4. **Synthesize in this order** — Begin with **Meaning here, in plain English**, then explain why it fits the verse, the word identity, and grammar. Put broader lexical evidence after the contextual explanation.
+2. **Resolve the verse token** — ${callText(calls[2])}. Prefer structured \`words[]\`: preserve the selected word's raw \`morphologyCode\`, nullable \`text\`, \`lemma\`, and \`morphologyExpansion\`, plus \`provenanceIds\` and \`lemmaProvenanceIds\`; use Markdown only as fallback. An empty \`lemmaProvenanceIds\` means no lemma is present to attribute. Identify the source form, lemma, Strong's identifier, or exact local gloss corresponding to the user's term. Then call \`original_language_study\` with ${reference}, that verse-local target, and \`depth: "${depth}"\`. If \`study.status\` is \`needs_disambiguation\`, select a candidate only from sentence context and call it again with that source position; do not guess. Treat returned semantic candidates as source evidence, not contextual adjudication. When another evidence page materially helps, pass the returned \`semanticEvidence.resultWindow.continuation.cursor\` or, at technical depth only, \`corpusOccurrences.resultWindow.continuation.cursor\` unchanged as \`cursor\` with the same reference, target, position, and depth; never inspect, decode, or rewrite it.
+3. **Consult lexical and corpus evidence** — ${callText(calls[3])}.${exactStrongs ? '' : ` This first call is discovery only. After it resolves the relevant Strong's identity, make a subsequent exact \`original_language_lookup\` call with that returned \`strongs_number\`, \`include_extended: true\`, \`detail_level: "detailed"\`, and \`usage_level: "${lexicalUsageLevel}"\`; do not invent or hard-code an identifier.`} Keep OpenScriptures lexicon claims, STEPBible lexicon metadata, and counted \`corpusUsage\` source-separated. For Hebrew, the Online-Bible-derived TBESH Meaning field is withheld: retain the disclosed identity, form, morphology, lemma, and brief gloss, but do not reconstruct or infer the missing definition. Present corpus frequency only after the verse-local meaning and never use it to select the sense.
+4. **Synthesize for ${depth} depth** — ${depthGuidance} Keep source-attributed \`lexicalRange\` separate from the English renderings retrieved in step 1; \`englishTranslationComparison\` and \`contextualInterpretation\` remain guided-prompt responsibilities.
 5. **Apply safeguards** — Context controls sense. A gloss is not a definition; a Strong's number is an identifier; morphology constrains but does not settle meaning; roots and etymology do not prove present meaning; never import every possible sense into one occurrence. Do not infer Aramaic from an H identifier.`
-          : `Provide a lexical overview of "${word}".${testamentHint}
+          : `Provide a **${depth}**-depth lexical overview of "${word}".${testamentHint}
 
-1. **Identify candidate terms** — ${callText(calls[0])}. ${exactStrongs ? 'This is already an exact Strong\'s lookup.' : 'Treat this as discovery. After resolving the relevant candidate from the returned entries, make a subsequent exact `original_language_lookup` call with that returned `strongs_number`, `include_extended: true`, `detail_level: "detailed"`, and `usage_level: "overview"`; do not invent or hard-code an identifier.'} Prefer structured \`mode\`, \`entries\`, \`detailLevel\`, optional \`corpusUsage\`, and \`provenanceIds\`, with Markdown as fallback.
-2. **Label the scope honestly** — There is no verse context, so do not claim a contextual meaning. Invite a passage-specific study.
-3. **Apply safeguards** — Do not treat one English gloss as exhausting the term's semantic range. The Online-Bible-derived TBESH Hebrew Meaning field is withheld; do not reconstruct it or present a brief gloss as its replacement. Counted morphology tokens are distinct from lexicon occurrence metadata. Frequency, a gloss, Strong's number, morphology, root, or etymology does not establish meaning in a verse, and do not import every possible sense into every occurrence.`;
+1. **Identify candidate terms** — ${callText(calls[0])}. ${exactStrongs ? 'This is already an exact Strong\'s lookup.' : `Treat this as discovery. After resolving the relevant candidate from the returned entries, make a subsequent exact \`original_language_lookup\` call with that returned \`strongs_number\`, \`include_extended: true\`, \`detail_level: "detailed"\`, and \`usage_level: "${lexicalUsageLevel}"\`; do not invent or hard-code an identifier.`} Prefer structured \`mode\`, \`entries\`, \`detailLevel\`, optional \`corpusUsage\`, and \`provenanceIds\`, with Markdown as fallback.
+2. **Label the scope honestly** — There is no verse context, so do not claim a contextual meaning or a likely nuance in one occurrence. Invite a passage-specific study.
+3. **Match the selected depth** — ${lexicalOverviewDepthGuidance(depth)}
+4. **Apply safeguards** — Do not treat one English gloss as exhausting the term's semantic range. The Online-Bible-derived TBESH Hebrew Meaning field is withheld; do not reconstruct it or present a brief gloss as its replacement. Counted morphology tokens are distinct from lexicon occurrence metadata. Frequency, a gloss, Strong's number, morphology, root, or etymology does not establish meaning in a verse, and do not import every possible sense into every occurrence.`;
         break;
       }
       case 'passage-exegesis': {
         const reference = args?.reference ?? '';
+        const depth = resolvePromptDepth(args);
+        const depthGuidance = depthWorkflowGuidance(depth);
         const morphologyCall = calls.find(call => call.tool === 'bible_verse_morphology');
         const crossReferenceCall = calls.find(call => call.tool === 'bible_cross_references');
-        text = `Perform a systematic exegesis of ${reference}.
+        text = `Perform a systematic exegesis of ${reference} at **${depth}** depth.
 
 1. **Read the text** — ${callText(calls[0])}; compare with ${callText(calls[1])}. Prefer structured \`passages[]\` and retain each translation's \`provenanceIds\`; distinguish an unavailable translation in \`failures[]\` from a translation whose text is absent.
 2. **Trace the passage before selecting terms** — Explain literary and discourse flow first. ${morphologyCall ? `For this single verse, ${callText(morphologyCall)}. Prefer structured \`words[]\`, retain raw \`morphologyCode\` beside nullable \`morphologyExpansion\`, and preserve both morphology and lemma provenance links; use Markdown only as fallback.` : 'This is a range: select at most three key individual verses and call `bible_verse_morphology` separately for each; never pass the range to a single-verse tool.'}
-3. **Study only consequential terms** — For a term affecting a real translation or interpretive question, call \`original_language_study\` with one exact verse, the verse-local target, and \`detail: "summary"\`. Read the complete prior result from v2 \`study\`; resolve \`study.status: "needs_disambiguation"\` by source position rather than guessing. Request \`detail: "detailed"\` only when candidate detail could materially help. Treat semantic candidates as source evidence rather than contextual adjudication. If another candidate page materially helps, pass \`semanticEvidence.resultWindow.continuation.cursor\` unchanged with the same reference, target, position, and detail; never inspect, decode, or rewrite it.
+3. **Study only consequential terms** — For a term affecting a real translation or interpretive question, call \`original_language_study\` with one exact verse, the verse-local target, and \`depth: "${depth}"\`. Resolve \`study.status: "needs_disambiguation"\` by source position rather than guessing. Treat semantic candidates as source evidence rather than contextual adjudication. If another evidence page materially helps, pass the returned \`semanticEvidence.resultWindow.continuation.cursor\` or, at technical depth only, \`corpusOccurrences.resultWindow.continuation.cursor\` unchanged as \`cursor\` with the same reference, target, position, and depth; never inspect, decode, or rewrite it.
 4. **Explore connections without conflating sources** — ${callText(calls.find(call => call.tool === 'parallel_passages')!)} for returned UBS source-attested group metadata without silently fanning out to translation providers. Browse structured group metadata only. Preserve every returned group's member order, source order, and provenance; because the source labels directionality unspecified, do not infer quotation, dependence, synoptic direction, or a thematic relationship. Continue only when \`sourceAttestedResultWindow.additionalMatchStatus\` is \`additional_match_observed\`, it supplies \`nextCursor\`, and one more page could materially help. Pass that \`nextCursor\` unchanged as \`groupCursor\` while preserving exactly the same \`reference\`, \`corpora\`, and \`maxGroups\`; omit \`includeText\`, translation, alignment, legacy, and OpenBible controls. Never inspect, decode, or rewrite the cursor. Stop at a terminal window, once the evidence is sufficient, or after two continuation calls (at most three pages / 15 groups); if that cap ends a potentially useful survey, disclose that it was bounded. From the browsed metadata, select at most two materially relevant groups in returned source order. Preserve each selected group and every member intact; do not dedupe or flatten the groups. Only when comparison text materially helps, construct a separate text-enrichment queue by traversing the selected groups and their members in returned source order. Dedupe only that queue by \`normalizedReference\`, keeping its first occurrence. Use direct \`bible_lookup\` only for the first 12 unique queue references; label every later unique queue reference \`budget_omitted\` before lookup. Record lookup failures and budget omissions; never backfill with later references. Never combine \`groupCursor\` with \`includeText\`. ${crossReferenceCall ? `${callText(crossReferenceCall)} separately for broader OpenBible.info discovery.` : 'This is not one exact verse: select at most three consequential individual verses and call `bible_cross_references` separately for each; never pass a chapter or range.'} Prefer the cross-reference call's structured \`requestedReference\`, \`resolvedReference\`, \`query\`, \`ranking\`, \`semantics\`, \`references\`, \`resultWindow\`, and \`provenance\`; preserve returned positions and raw source-vote order. Treat those community-ranked links only as discovery leads and candidates for contextual investigation, not UBS-attested parallels or evidence that one passage quotes another. The dataset supplies no relationship classification or directionality. Retain its separate attribution.
 5. **Consult commentaries and historical theology** — Use \`commentary_lookup\` and \`classic_text_lookup\`; note agreement and divergence. For classic-text discovery, treat snippets only as leads, select the most relevant exact \`resource_link\`, and use \`resources/read\` before quotation, attribution, or comparison. A structured \`no_results\` status means only that this bounded local collection returned no match; it is not evidence of historical silence. Prefer structured commentary \`coverage\`, \`commentary\`, \`retrieval\`, and \`provenance\`, with Markdown as fallback. Treat \`exact_verse\` only as the returned provider identity evidence states; treat \`chapter_aggregate\` only as chapter-level evidence and never infer a section span. Keep the commentary work's rights/provenance distinct from cached-or-live HelloAO delivery; per-result cache status is not exposed. The recommended Matthew Henry and John Gill calls use the containing chapter because their current source metadata cannot safely support these scalar requests. Exact-verse commentary coverage varies by provider; if any scalar call has no exact match, retry with its containing chapter or another commentator. Keep chapter responses labeled as chapter-level evidence rather than attributing them to one verse.
-6. **Synthesize distinctly** — Separate observation, lexical evidence, interpretation, theological synthesis, and application. Context controls sense; never derive contextual meaning from a gloss, Strong's identifier, morphology, root, etymology, frequency, or every possible lexicon sense.`;
+6. **Synthesize distinctly at ${depth} depth** — ${depthGuidance} Separate observation, lexical evidence, interpretation, theological synthesis, and application. Keep source-attributed \`lexicalRange\` separate from English translation comparison. Context controls sense; never derive contextual meaning from a gloss, Strong's identifier, morphology, root, etymology, frequency, or every possible lexicon sense.`;
         break;
       }
       case 'compare-translations': {
         const reference = args?.reference ?? '';
+        const depth = resolvePromptDepth(args);
+        const depthGuidance = depthWorkflowGuidance(depth);
         const lookupCalls = calls.filter(call => call.tool === 'bible_lookup').map(call => `- ${callText(call)}`).join('\n');
         const morphologyCall = calls.find(call => call.tool === 'bible_verse_morphology');
-        text = `Compare ${reference} across multiple Bible translations.
+        text = `Compare ${reference} across multiple Bible translations at **${depth}** depth.
 
 1. **Retrieve each translation**
 ${lookupCalls}
 Use structured \`passages[]\` when available, compare by its \`translation\`, report every \`failures[]\` item, and keep each citation/provenance link attached to the relevant translation. Fall back to the Markdown text when structured fields are unavailable.
 2. **Examine the original language** — ${morphologyCall ? `${callText(morphologyCall)}. Prefer structured \`words[]\`, compare raw \`morphologyCode\` with nullable \`morphologyExpansion\`, and retain \`provenanceIds\` and \`lemmaProvenanceIds\`; use Markdown only as fallback.` : 'This is not one exact verse. Select at most three consequential individual verses and call `bible_verse_morphology` separately for each; never pass the range or chapter to the single-verse tool.'}
-3. **Investigate divergences** — Make exact \`original_language_lookup\` calls for the relevant Strong's numbers. Request \`usage_level: "overview"\` only when distribution materially helps, keep it after verse-local analysis, and never infer contextual meaning from frequency.
-4. **Summarize** — Compare literal/dynamic choices and any theologically significant differences.`;
+3. **Investigate only consequential divergences** — After morphology resolves the exact verse-local token, call \`original_language_study\` with that one exact verse, target, optional source position, and \`depth: "${depth}"\`. Resolve ambiguity by returned source position rather than guessing. Make exact \`original_language_lookup\` calls only when additional source-attributed lexical evidence materially helps. Treat \`lexicalRange\` as language evidence and keep it separate from the English renderings retrieved in step 1; the deterministic study tool's \`englishTranslationComparison\` and \`contextualInterpretation\` remain not performed. At technical depth only, bounded \`corpusOccurrences\` may be reported as raw distribution evidence, never as a contextual verdict.
+4. **Summarize for ${depth} depth** — ${depthGuidance} Compare literal/dynamic choices and any theologically significant differences without implying that lexical range mechanically determines an English rendering.`;
         break;
       }
       case 'confession-study': {

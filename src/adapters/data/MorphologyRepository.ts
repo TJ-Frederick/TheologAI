@@ -52,6 +52,7 @@ export class MorphologyRepository implements IMorphologyRepository {
   private stmtFormUsageLimited: Database.Statement;
   private stmtTokenOccurrences: Database.Statement;
   private stmtTokenOccurrencesAfter: Database.Statement;
+  private stmtTokenOccurrenceAt: Database.Statement;
 
   constructor(db?: Database.Database) {
     this.db = db ?? getDatabase();
@@ -101,6 +102,11 @@ export class MorphologyRepository implements IMorphologyRepository {
       `SELECT ${tokenColumns} FROM morphology
        WHERE strongs_number = ? AND (book_order, chapter, verse, position) > (?, ?, ?, ?)
        ORDER BY book_order, chapter, verse, position LIMIT ?`
+    );
+    this.stmtTokenOccurrenceAt = this.db.prepare(
+      `SELECT 1 AS present FROM morphology
+       WHERE strongs_number = ? AND book_order = ? AND chapter = ? AND verse = ? AND position = ?
+       LIMIT 1`
     );
   }
 
@@ -187,5 +193,22 @@ export class MorphologyRepository implements IMorphologyRepository {
       )
       : this.stmtTokenOccurrences.all(identity.morphologyKey, limit + 1)) as TokenOccurrence[];
     return tokenOccurrencePage(rows, limit);
+  }
+
+  hasTokenOccurrenceAt(
+    strongsNumber: string,
+    boundary: CanonicalOccurrencePosition,
+  ): boolean {
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return false;
+    assertOccurrencePosition(boundary);
+    const row = this.stmtTokenOccurrenceAt.get(
+      identity.morphologyKey,
+      boundary.book_order,
+      boundary.chapter,
+      boundary.verse,
+      boundary.position,
+    ) as { present: number } | undefined;
+    return row?.present === 1;
   }
 }

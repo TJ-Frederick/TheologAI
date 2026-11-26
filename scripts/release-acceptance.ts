@@ -152,6 +152,20 @@ async function applicationSmoke(options: AcceptanceOptions, endpoint: URL) {
       for (const expected of ['bible_lookup', PASSAGE_TOOL, 'primary_source_search']) {
         if (!tools.some(tool => tool.name === expected)) throw new SmokeFault('tool_missing');
       }
+      const study = tools.find(tool => tool.name === 'original_language_study');
+      const studyInputs = record(study?.inputSchema.properties);
+      const depths = ['beginner', 'intermediate', 'technical'];
+      const outputs = records(record(study?.outputSchema)?.oneOf);
+      if (!studyInputs || study?.inputSchema.additionalProperties !== false
+          || JSON.stringify([...(study.inputSchema.required ?? [])].sort()) !== '["reference","target"]'
+          || record(studyInputs.reference)?.type !== 'string' || record(studyInputs.target)?.type !== 'string'
+          || Object.hasOwn(studyInputs, 'detail')
+          || JSON.stringify(record(studyInputs.depth)?.enum) !== JSON.stringify(depths)
+          || outputs.length !== depths.length
+          || !depths.every(depth => outputs.some(output => {
+            const fields = record(output.properties);
+            return record(fields?.schemaVersion)?.const === '3' && record(fields?.depth)?.const === depth;
+          }))) throw new SmokeFault('language_study_contract');
       checks.push({ era, probeId, passed: true });
       probeId = 'local-passage';
       const result = await client.callTool({ name: PASSAGE_TOOL, arguments: { reference: PASSAGE } });

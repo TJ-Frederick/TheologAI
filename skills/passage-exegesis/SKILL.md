@@ -15,6 +15,9 @@ Use this workflow when the user asks for:
 
 ### Step 1: Establish the Text
 
+- Choose one workflow depth: `beginner`, `intermediate`, or `technical`. An
+  explicit depth wins. Otherwise map simple/beginner wording to `beginner`, raw
+  evidence/technical wording to `technical`, and use `intermediate` by default.
 - Call `bible_lookup` with the reference in the user's preferred translation (default: ESV)
 - Also retrieve KJV for a second perspective
 - If NET is available, retrieve it too for the translator notes
@@ -25,7 +28,13 @@ Use this workflow when the user asks for:
 - Trace the passage's literary and discourse flow before selecting terms.
 - For a range, select at most three key individual verses. Never pass a range to `bible_verse_morphology` or `original_language_study`.
 - Study only terms affecting an actual translation or interpretive question.
-- Call `original_language_study` with one verse and the verse-local target. Resolve returned ambiguity by source position, not guesswork.
+- Call `original_language_study` with one verse, the verse-local target, and the
+  selected `depth` (including explicit `intermediate` when omitted). Resolve
+  returned ambiguity by source position, not guesswork.
+- Treat semantic candidates as source evidence, not contextual adjudication.
+  When another page materially helps, pass its cursor unchanged with the same
+  verse, target, position, and depth. Only `technical` depth returns bounded
+  corpus occurrences.
 - Request `usage_level: "overview"` from an exact `original_language_lookup`
   only after the verse-local analysis and only when global distribution is
   consequential. Overview is totals plus complete books only. Do not request
@@ -74,6 +83,24 @@ Present findings as:
 5. **Interpretation**: What the passage meant in its original context
 6. **Theological Connections**: Links to systematic theology and historical confessions
 7. **Application**: Practical implications (if appropriate)
+
+Match the selected depth:
+
+- `beginner`: after reading the passage and evidence, explain a likely nuance in
+  plain English and label it as prompt-produced interpretation supported by the
+  cited evidence. State reasonable alternatives and what the evidence cannot
+  prove. The deterministic tool does not choose contextual meaning.
+- `intermediate`: present lemma, source form, transliteration, morphology,
+  source-attributed lexical range, English translation comparison, and local
+  context without conflating those evidence layers.
+- `technical`: preserve raw source identity, provenance, morphology, semantic
+  candidates, ambiguity, and bounded occurrence evidence; frequency and source
+  candidates are not contextual verdicts.
+
+Keep `lexicalRange` separate from English renderings fetched through
+`bible_lookup`. The tool's `englishTranslationComparison` and
+`contextualInterpretation` fields remain not performed because synthesis is the
+guided prompt's responsibility.
 
 ## Important Notes
 

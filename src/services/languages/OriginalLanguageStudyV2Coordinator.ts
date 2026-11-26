@@ -43,7 +43,7 @@ const WITHHELD_EVIDENCE = Object.freeze([
 ] as const);
 
 /**
- * Active v2 coordinator. Eligible Hebrew calls execute one aggregate
+ * Internal semantic evidence coordinator. Eligible Hebrew calls execute one aggregate
  * repository operation; neither source identity nor alignment proof is
  * caller-controlled.
  */
@@ -53,10 +53,19 @@ export class OriginalLanguageStudyV2Coordinator {
     private readonly evidenceRepository: IUbsSemanticEvidenceBundleRepository,
   ) {}
 
-  async study(input: unknown): Promise<OriginalLanguageStudyV2ApplicationResult> {
+  async study(
+    input: unknown,
+    beforePagedEvidence?: (context: OriginalLanguageStudyV2BeforePagedEvidenceContext) => void,
+  ): Promise<OriginalLanguageStudyV2ApplicationResult> {
     const request = snapshotRequest(input);
     const authoritative = snapshotAuthoritativeContext(await this.contextProvider.resolve(request));
     const canonicalReference = validateV1ResultAgainstRequest(authoritative.v1Result, request);
+    beforePagedEvidence?.(Object.freeze({
+      request,
+      v1Result: authoritative.v1Result,
+      semanticArtifactIdentity: authoritative.semanticArtifactIdentity,
+      canonicalReference: Object.freeze({ ...canonicalReference }),
+    }));
     const semanticEvidence = await this.semanticEvidence(request, authoritative, canonicalReference);
     return Object.freeze({ request, v1Result: authoritative.v1Result, semanticEvidence });
   }
@@ -116,6 +125,13 @@ export class OriginalLanguageStudyV2Coordinator {
     return buildHebrewEvidence(bundle, request.detail, identity.publicStrongs,
       authoritative.serverVerifiedAlignment, binding);
   }
+}
+
+export interface OriginalLanguageStudyV2BeforePagedEvidenceContext {
+  request: Readonly<OriginalLanguageStudyV2ResolvedRequest>;
+  v1Result: OriginalLanguageStudyDomainResult;
+  semanticArtifactIdentity: string | undefined;
+  canonicalReference: Readonly<CanonicalOriginalLanguageStudyReference>;
 }
 
 function buildHebrewEvidence(

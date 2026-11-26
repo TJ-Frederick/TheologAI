@@ -3,7 +3,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { originalLanguageStudyV2InputSchema } from '../../../src/mcp/schemas/originalLanguageStudyV2.js';
+import { originalLanguageStudyV3InputSchema } from '../../../src/mcp/schemas/originalLanguageStudyV3.js';
 import {
   ORIGINAL_LANGUAGE_STUDY_V2_SEMANTIC_ARTIFACT_IDENTITY,
 } from '../../../src/services/languages/OriginalLanguageStudyV2ContextProvider.js';
@@ -11,35 +11,45 @@ import {
 const repoPath = fileURLToPath(new URL('../../../', import.meta.url));
 const activatedModules = [
   'src/kernel/originalLanguageStudyV2Contract.ts',
-  'src/mcp/schemas/originalLanguageStudyV2.ts',
+  'src/kernel/originalLanguageStudyV3Contract.ts',
+  'src/mcp/schemas/originalLanguageStudyV3.ts',
+  'src/presenters/originalLanguageStudyEvidenceTrust.ts',
+  'src/presenters/originalLanguageStudyV3Structured.ts',
+  'src/presenters/originalLanguageStudyV3Presentation.ts',
+  'src/formatters/originalLanguageStudyV3Formatter.ts',
+  'src/services/languages/OriginalLanguageStudyV2Coordinator.ts',
+  'src/services/languages/OriginalLanguageStudyV2ContextProvider.ts',
+  'src/services/languages/OriginalLanguageStudyV3Coordinator.ts',
+] as const;
+const retiredV2PresentationModules = [
   'src/presenters/originalLanguageStudyV2Structured.ts',
   'src/presenters/originalLanguageStudyV2Presentation.ts',
   'src/formatters/originalLanguageStudyV2Formatter.ts',
-  'src/services/languages/OriginalLanguageStudyV2Coordinator.ts',
-  'src/services/languages/OriginalLanguageStudyV2ContextProvider.ts',
 ] as const;
 const runtimeEntrypoints = [
   'src/index.ts',
   'src/worker.ts',
 ] as const;
 
-describe('activated original_language_study v2 runtime seam', () => {
-  it('is reachable from both production runtimes', () => {
+describe('original_language_study v3 runtime seam', () => {
+  it('reaches the v3 presentation and shared evidence checks from both runtimes', () => {
     for (const entrypoint of runtimeEntrypoints) {
       const reachable = reachableModules(entrypoint);
       expect(activatedModules.filter(path => !reachable.has(path)), entrypoint).toEqual([]);
+      expect(retiredV2PresentationModules.filter(path => reachable.has(path)), entrypoint).toEqual([]);
     }
   });
 
-  it('registers the same public tool with the closed v2 input boundary and no caller-controlled semantic authority', () => {
+  it('registers the same public tool with a closed v3 input boundary', () => {
     const registry = read('src/tools/toolRegistry.ts');
     const nodeRoot = read('src/tools/v2/index.ts');
     const workerRoot = read('src/tools/worker/index.ts');
     expect(registry).toContain('originalLanguageStudyCoordinator');
     expect(nodeRoot).toContain('new UbsSemanticEvidenceBundleRepository(db)');
     expect(workerRoot).toContain('new D1UbsSemanticEvidenceBundleRepository(db)');
-    expect(JSON.stringify(originalLanguageStudyV2InputSchema))
-      .not.toMatch(/artifactIdentity|sourceIdentity|serverVerifiedAlignment|verifierVersion/);
+    expect(originalLanguageStudyV3InputSchema.additionalProperties).toBe(false);
+    expect(Object.keys(originalLanguageStudyV3InputSchema.properties).sort())
+      .toEqual(['cursor', 'depth', 'position', 'reference', 'target']);
   });
 
   it('keeps the pinned artifact identity and aggregate repository seam runtime-small and storage configuration-free', () => {
