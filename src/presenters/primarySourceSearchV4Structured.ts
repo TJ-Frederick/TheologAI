@@ -1,5 +1,6 @@
 import { buildLocalDocumentResourceUri } from '../kernel/documentResource.js';
 import { CLASSIC_TEXT_LIMITS } from '../kernel/classicTextContract.js';
+import { projectPrimarySourceCoverage, type ServerObservedCoverage } from '../services/historical/primarySourceCoverage.js';
 import {
   CCEL_COMPOSITION_DATE_NOTICE,
   EXTERNAL_EDITION_READINESS,
@@ -125,11 +126,6 @@ export interface PresentedPrimarySourceSearchV4 extends Record<string, unknown> 
   };
   evidencePolicy: typeof PRIMARY_SOURCE_V4_EVIDENCE_POLICY;
 }
-
-type ServerObservedCoverage = {
-  searched: Array<{ queryId: string; provider: 'local' | 'ccel_live'; status: PrimarySourceProviderStatus; returnedHitCount: number }>;
-  notSearched: Array<{ queryId: string; provider: 'local' | 'ccel_live'; status: PrimarySourceProviderStatus }>;
-};
 
 type ProviderDraft = Omit<PresentedProvider, 'hitCount' | 'resultWindow' | 'hits'> & {
   sourceAdditional: PresentedProvider['resultWindow']['additionalMatchStatus'];
@@ -383,8 +379,10 @@ function buildEnvelope(
     }),
   }));
   const providers = queries.flatMap(query => query.providers);
-  const local = providers.filter(provider => provider.provider === 'local');
-  const ccel = providers.filter(provider => provider.provider === 'ccel_live');
+  const { providerCoverage, serverObserved } = projectPrimarySourceCoverage(queries);
+  if (structuralOmission && providerCoverage.localStatus !== undefined) {
+    providerCoverage.localStatus = 'interface_changed';
+  }
   const statuses = providers.map(provider => provider.status);
   const hasUsable = providers.some(provider => provider.hits.length > 0 || COMPLETE.has(provider.status));
   const recomputed = sourcePlanStatus === 'partial'
@@ -403,17 +401,12 @@ function buildEnvelope(
     responseWindow: { unit: 'utf8_bytes', maximum: PRIMARY_SOURCE_V4_MAX_BYTES, truncated },
     queries,
     coverage: {
-      localAttempted: local.some(provider => provider.searched),
-      ...(local.length ? { localStatus: structuralOmission ? 'interface_changed' as const : aggregateStatus(local) } : {}),
-      localHitCount: local.reduce((sum, provider) => sum + provider.hits.length, 0),
-      ccelAttempted: ccel.some(provider => provider.searched),
-      ...(ccel.length ? { ccelStatus: aggregateStatus(ccel) } : {}),
-      ccelHitCount: ccel.reduce((sum, provider) => sum + provider.hits.length, 0),
+      ...providerCoverage,
       notices: uniqueBounded([
         ...providers.flatMap(provider => provider.notices),
         ...(structuralOmission ? ['One or more provider groups exceeded the public contract and were omitted.'] : []),
       ], 8, 240),
-      serverObserved: presentServerObserved(queries),
+      serverObserved,
     },
     evidencePolicy: PRIMARY_SOURCE_V5_EVIDENCE_POLICY,
   };
@@ -548,33 +541,6 @@ function presentScope(scope: PrimarySourceSearchPlanResult['queries'][number]['p
     eligibleDocuments,
     eligibleDocumentsTruncated: scope.eligibleDocumentsTruncated || scope.eligibleDocuments.length > eligibleDocuments.length,
   };
-}
-
-function presentServerObserved(
-  queries: Array<{ id: string; providers: PresentedProvider[] }>,
-): ServerObservedCoverage {
-  const searched: ServerObservedCoverage['searched'] = [];
-  const notSearched: ServerObservedCoverage['notSearched'] = [];
-  for (const query of queries) {
-    for (const provider of query.providers) {
-      if (provider.searched) {
-        searched.push({
-          queryId: query.id,
-          provider: provider.provider,
-          status: provider.status,
-          returnedHitCount: provider.hitCount,
-        });
-      } else {
-        notSearched.push({ queryId: query.id, provider: provider.provider, status: provider.status });
-      }
-    }
-  }
-  return { searched, notSearched };
-}
-
-function aggregateStatus(providers: PresentedProvider[]): PrimarySourceProviderStatus {
-  const priority: PrimarySourceProviderStatus[] = ['unavailable', 'rate_limited', 'interface_changed', 'disabled', 'unsupported_filter', 'catalog_miss', 'ok', 'no_results'];
-  return priority.find(status => providers.some(provider => provider.status === status)) ?? 'unavailable';
 }
 
 function boundedText(value: string, maximum: number): string {
