@@ -1,3 +1,4 @@
+import { immutableValidatorSchema } from '../validation.js';
 import type { Tool } from '@modelcontextprotocol/server';
 import type {
   CanonicalCommentator,
@@ -159,7 +160,7 @@ const commentatorVariants = COMMENTARY_CATALOG.map(entry => ({
 const commentatorNames = COMMENTARY_CATALOG.map(entry => entry.canonicalName);
 const workProvenanceIds = COMMENTARY_CATALOG.map(entry => entry.workProvenance.id);
 
-export const commentaryOutputSchema = {
+export const commentaryOutputSchema = immutableValidatorSchema({
   type: 'object',
   properties: {
     schemaVersion: { type: 'string', const: '1' },
@@ -229,4 +230,4 @@ export const commentaryOutputSchema = {
   ],
   additionalProperties: false,
   allOf: [{ oneOf: commentatorVariants }],
-} as NonNullable<Tool['outputSchema']>;
+} as NonNullable<Tool['outputSchema']>);

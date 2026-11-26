@@ -43,18 +43,40 @@ export const jsonSchemaValidator = {
   },
 };
 const validatorCache = new Map<string, SchemaValidator<Record<string, unknown>>>();
+// A null entry marks an immutable snapshot whose validator has yet to be looked up.
+const immutableValidatorCache = new WeakMap<Record<string, unknown>, SchemaValidator<Record<string, unknown>> | null>();
+
+/** Own a deeply frozen copy of a built-in schema without freezing shared inputs. */
+export function immutableValidatorSchema<T extends Record<string, unknown>>(schema: T): T {
+  const snapshot = structuredClone(schema);
+  freezeSchemaTree(snapshot);
+  immutableValidatorCache.set(snapshot, null);
+  return snapshot;
+}
+
+function freezeSchemaTree(value: object): void {
+  if (Object.isFrozen(value)) return;
+  Object.freeze(value);
+  for (const child of Object.values(value)) {
+    if (typeof child === 'object' && child !== null) freezeSchemaTree(child);
+  }
+}
 
 export function validatorFor(
   schema: Record<string, unknown>,
 ): SchemaValidator<Record<string, unknown>> {
-  const serializedSchema = JSON.stringify(schema);
-  const cached = validatorCache.get(serializedSchema);
-  if (cached) return cached;
+  const byIdentity = immutableValidatorCache.get(schema);
+  if (byIdentity) return byIdentity;
 
-  const validator = jsonSchemaValidator.getValidator<Record<string, unknown>>(
-    JSON.parse(serializedSchema) as JsonSchemaType,
-  );
-  validatorCache.set(serializedSchema, validator);
+  const serializedSchema = JSON.stringify(schema);
+  let validator = validatorCache.get(serializedSchema);
+  if (!validator) {
+    validator = jsonSchemaValidator.getValidator<Record<string, unknown>>(
+      JSON.parse(serializedSchema) as JsonSchemaType,
+    );
+    validatorCache.set(serializedSchema, validator);
+  }
+  if (byIdentity === null) immutableValidatorCache.set(schema, validator);
   return validator;
 }
 

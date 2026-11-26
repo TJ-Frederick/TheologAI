@@ -1,3 +1,4 @@
+import { immutableValidatorSchema } from '../validation.js';
 import type { Tool } from '@modelcontextprotocol/server';
 import {
   RECIPIENT_ADDRESS,
@@ -453,7 +454,7 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export const verifyDonationOutputSchema = {
+export const verifyDonationOutputSchema = immutableValidatorSchema({
   type: 'object',
   properties: {
     schemaVersion: { type: 'string', const: '1' },
@@ -527,4 +528,4 @@ export const verifyDonationOutputSchema = {
     { oneOf: explorerCoverageVariants },
     ...transferEvidenceCorrelations,
   ],
-} as NonNullable<Tool['outputSchema']>;
+} as NonNullable<Tool['outputSchema']>);
