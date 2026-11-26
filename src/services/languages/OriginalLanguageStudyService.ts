@@ -5,8 +5,6 @@ import { parseStrongsIdentity } from '../../kernel/strongs.js';
 import { NotFoundError, ValidationError } from '../../kernel/errors.js';
 import { StrongsService } from './StrongsService.js';
 
-export type StudyStatus = 'complete' | 'partial' | 'needs_disambiguation';
-
 export interface StudyToken {
   position: number;
   text: string;
@@ -16,13 +14,17 @@ export interface StudyToken {
   gloss: string | null;
 }
 
-export interface OriginalLanguageStudyDomainResult {
-  status: StudyStatus;
+interface StudyContext {
   reference: string;
   language: 'Greek' | 'Hebrew';
   target: string;
-  selectedToken?: StudyToken;
-  candidates?: StudyToken[];
+  warnings: string[];
+}
+
+interface SelectedStudyResult extends StudyContext {
+  status: 'complete' | 'partial';
+  selectedToken: StudyToken;
+  candidates?: never;
   identity?: {
     publicStrongs: string;
     morphologyKey: string;
@@ -35,8 +37,20 @@ export interface OriginalLanguageStudyDomainResult {
   grammar?: { code: string; expansion?: string; certainty: 'expanded' | 'unknown' };
   dictionary?: EnhancedStrongsResult;
   stepBible?: NonNullable<EnhancedStrongsResult['extended']>;
-  warnings: string[];
 }
+
+interface AmbiguousStudyResult extends StudyContext {
+  status: 'needs_disambiguation';
+  candidates: StudyToken[];
+  selectedToken?: never;
+  identity?: never;
+  grammar?: never;
+  dictionary?: never;
+  stepBible?: never;
+}
+
+export type OriginalLanguageStudyDomainResult = SelectedStudyResult | AmbiguousStudyResult;
+export type StudyStatus = OriginalLanguageStudyDomainResult['status'];
 
 export class OriginalLanguageStudyService {
   private strongs: StrongsService;
@@ -84,7 +98,7 @@ export class OriginalLanguageStudyService {
     }
 
     const word = positioned[0];
-    const result: OriginalLanguageStudyDomainResult = {
+    const result: SelectedStudyResult = {
       ...base,
       status: 'complete',
       selectedToken: toStudyToken(word),
