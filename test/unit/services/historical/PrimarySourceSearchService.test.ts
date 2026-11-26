@@ -449,6 +449,37 @@ describe('PrimarySourceSearchService', () => {
     expect(result.queries[0].providers.map(item => item.status)).toEqual(['no_results', 'unavailable']);
   });
 
+  it('projects coverage in query and provider order, including a caught local failure', async () => {
+    const local = { search: vi.fn()
+      .mockResolvedValueOnce(providerResult('local', 'no_results', 0))
+      .mockRejectedValueOnce(new Error('provider failure'))
+      .mockResolvedValueOnce(providerResult('local', 'ok', 2)) };
+    const ccel = { search: vi.fn().mockResolvedValue(providerResult('ccel_live')) };
+    const result = await new PrimarySourceSearchService(local, ccel, live, coordinator).search(plan([
+      v7Query({ id: 'empty', searchDepth: 'expanded' }),
+      v7Query({ id: 'failed' }),
+      v7Query({ id: 'found' }),
+    ]));
+
+    expect(result.planStatus).toBe('partial');
+    expect(result.coverage).toEqual({
+      localAttempted: true, localStatus: 'unavailable', localHitCount: 2,
+      ccelAttempted: true, ccelStatus: 'ok', ccelHitCount: 1,
+      notices: [CCEL_COMPOSITION_DATE_NOTICE, 'Local primary-source search is temporarily unavailable.'],
+      serverObserved: {
+        searched: [
+          { queryId: 'empty', provider: 'local', status: 'no_results', returnedHitCount: 0 },
+          { queryId: 'empty', provider: 'ccel_live', status: 'ok', returnedHitCount: 1 },
+          { queryId: 'found', provider: 'local', status: 'ok', returnedHitCount: 2 },
+        ],
+        notSearched: [{ queryId: 'failed', provider: 'local', status: 'unavailable' }],
+      },
+    });
+    expect(Object.keys(result.coverage)).toEqual([
+      'localAttempted', 'localStatus', 'localHitCount', 'ccelAttempted', 'ccelStatus', 'ccelHitCount', 'notices', 'serverObserved',
+    ]);
+  });
+
   it('caps aggregate hits at 32 without merging provider ranks', async () => {
     const local = { search: vi.fn().mockResolvedValue(providerResult('local', 'ok', 8)) };
     const ccel = { search: vi.fn().mockResolvedValue(providerResult('ccel_live', 'ok', 8)) };

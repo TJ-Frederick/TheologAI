@@ -223,7 +223,7 @@ describe('published project contract', () => {
     expect(`${developerGuide}\n${confessionSkill}`).not.toMatch(/18 historical documents/i);
   });
 
-  it('documents current transport, disabled discovery and inactive corpus boundaries', async () => {
+  it('documents transport, disabled discovery and the release authority', async () => {
     const [readme, workerConfig, coordinatorGuide, roadmap, operations] = await Promise.all([
       readProjectProse('README.md'),
       readProjectFile('wrangler.toml'),
@@ -238,9 +238,8 @@ describe('published project contract', () => {
     expect(readme).toMatch(/Both deployed environments do \*\*not\*\* currently fetch CCEL search\s+results or document bodies/);
     expect(readme).toContain('Production v6/local-only is deployed');
     expect(readme).toContain('preview runs the audited v7/discovery-only contract with CCEL execution disabled');
-    expect(readme).toContain('current release snapshot records the active 35-work assignment');
-    expect(readme).toContain('local Norton/Aquinas release candidate');
-    expect(readme).toContain('wired into local runtime and MCP surfaces');
+    expect(readme).toContain('[current release snapshot](docs/CURRENT-RELEASE.md) for the deployed assignments');
+    expect(readme).not.toMatch(/active 35-work assignment|Norton and Aquinas assets remain inactive/);
     expect(readme).toContain('before adapter');
     expect(readme).toContain('Durable Object lookup/RPC, or fetch');
     expect(readme).toContain('reconnect');
@@ -258,7 +257,8 @@ describe('published project contract', () => {
     expect(workerConfig.slice(previewStart)).toContain('THEOLOGAI_ENABLE_CCEL_LIVE_SEARCH = "false"');
     expect(workerConfig.slice(previewStart)).toContain('THEOLOGAI_ENABLE_CCEL_COORDINATOR = "false"');
     expect(operations).toContain('[current release snapshot](CURRENT-RELEASE.md)');
-    expect(operations).toContain('CCEL execution remains disabled and Aquinas remains inactive');
+    expect(operations).toContain('## Historical PR #122 live baseline');
+    expect(operations).not.toContain("today's [current release snapshot](CURRENT-RELEASE.md)");
   });
 
   it('keeps current CCEL rollout status aligned across operator documents', async () => {

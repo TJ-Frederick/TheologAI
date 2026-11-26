@@ -1,4 +1,4 @@
-import type { DocumentInfo, IHistoricalDocumentRepository } from '../../kernel/repositories.js';
+import type { DocumentInfo, IHistoricalDocumentRepository, RepositoryResult } from '../../kernel/repositories.js';
 import { buildLocalDocumentResourceUri } from '../../kernel/documentResource.js';
 import {
   LOCAL_PRIMARY_SOURCE_ATTRIBUTION,
@@ -8,19 +8,40 @@ import {
   type PrimarySourceSearchQuery,
 } from './primarySourceTypes.js';
 import { formatLocalDocumentSectionResourceWithIdentity } from '../../formatters/historicalFormatter.js';
-import type { LocalPrimarySourceSearchPort } from './PrimarySourceSearchPorts.js';
+import type { LocalPrimarySourceSearchPort, PrimarySourceSearchProviderPort } from './PrimarySourceSearchPorts.js';
 
 export class LocalPrimarySourceSearchProvider implements LocalPrimarySourceSearchPort {
   constructor(private readonly repository: IHistoricalDocumentRepository) {}
 
-  async search(input: PrimarySourceSearchQuery): Promise<PrimarySourceProviderResult> {
+  search(input: PrimarySourceSearchQuery): Promise<PrimarySourceProviderResult> {
+    return this.searchWithCatalog(input, () => this.repository.listDocuments());
+  }
+
+  forPlan(): PrimarySourceSearchProviderPort {
+    let catalog: Promise<DocumentInfo[]> | undefined;
+    const readCatalog = async () => this.repository.listDocuments();
+    const listDocuments = () => {
+      if (catalog) {
+        // On failure, each follower still gets its own original catalog attempt.
+        return catalog.catch(readCatalog);
+      }
+      catalog = readCatalog();
+      return catalog;
+    };
+    return { search: input => this.searchWithCatalog(input, listDocuments) };
+  }
+
+  private async searchWithCatalog(
+    input: PrimarySourceSearchQuery,
+    listDocuments: () => RepositoryResult<DocumentInfo[]>,
+  ): Promise<PrimarySourceProviderResult> {
     const page = input.page ?? 1;
     const limit = input.limit ?? 5;
     const selection = input.selection ?? 'relevance';
     if (page !== 1) {
       return result('unsupported_filter', page, false, [], ['The local historical index does not support pagination; page was not silently ignored.']);
     }
-    const documents = await this.repository.listDocuments();
+    const documents = await listDocuments();
     const selected = selectCatalogScope(documents, input);
     if (selected.scope.eligibleDocumentCount === 0) {
       return result('catalog_miss', page, false, [], selected.notices, selected.scope);

@@ -10,7 +10,9 @@ export interface PrimarySourceSearchProviderPort<TContext extends unknown[] = []
 }
 
 /** Application-owned local primary-source search boundary. */
-export type LocalPrimarySourceSearchPort = PrimarySourceSearchProviderPort;
+export interface LocalPrimarySourceSearchPort extends PrimarySourceSearchProviderPort {
+  forPlan?(): PrimarySourceSearchProviderPort;
+}
 
 /** Application-owned dormant/live CCEL search boundary. */
 export type CcelPrimarySourceSearchPort = PrimarySourceSearchProviderPort<[CcelUpstreamCoordinator]>;

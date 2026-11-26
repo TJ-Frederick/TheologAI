@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { IHistoricalDocumentRepository } from '../../../../src/kernel/repositories.js';
 import type { LocalPrimarySourceSearchHit } from '../../../../src/services/historical/primarySourceTypes.js';
 import { LocalPrimarySourceSearchProvider } from '../../../../src/services/historical/LocalPrimarySourceSearchProvider.js';
+import { PrimarySourceSearchService } from '../../../../src/services/historical/PrimarySourceSearchService.js';
 import { formatLocalDocumentSectionResourceWithIdentity } from '../../../../src/formatters/historicalFormatter.js';
+import { DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG } from '../../../../src/kernel/featureFlags.js';
 
 function repository(overrides: Partial<IHistoricalDocumentRepository> = {}): IHistoricalDocumentRepository {
   const catalog = {
@@ -27,6 +29,77 @@ function repository(overrides: Partial<IHistoricalDocumentRepository> = {}): IHi
 }
 
 describe('LocalPrimarySourceSearchProvider', () => {
+  const localQuery = (id: string, filters: { work?: string; page?: number } = {}) =>
+    ({ id, text: 'grace', providers: ['local'], ...filters });
+
+  it('shares one catalog for the plan while preserving scopes, order and fresh reads for another call', async () => {
+    const catalog = await repository().listDocuments();
+    const listDocuments = vi.fn().mockResolvedValueOnce(catalog).mockResolvedValueOnce([]);
+    const repo = repository({ listDocuments });
+    const ccel = { search: vi.fn() };
+    const service = new PrimarySourceSearchService(new LocalPrimarySourceSearchProvider(repo), ccel, DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG);
+    const unsupported = await service.search({ queries: [localQuery('page', { page: 2 })] });
+    expect(unsupported.queries[0]?.providers[0]?.status).toBe('unsupported_filter');
+    expect(listDocuments).not.toHaveBeenCalled();
+
+    const result = await service.search({ queries: [localQuery('all'), localQuery('found', { work: 'Institutes' }), localQuery('missing', { work: 'Unknown' }), localQuery('page', { page: 2 })] });
+    expect(listDocuments).toHaveBeenCalledTimes(1);
+    expect(repo.searchPrimarySources).toHaveBeenCalledTimes(2);
+    expect(result.queries.map(query => [query.id, query.providers[0]?.status])).toEqual([
+      ['all', 'ok'], ['found', 'ok'], ['missing', 'catalog_miss'], ['page', 'unsupported_filter'],
+    ]);
+    expect(result.queries[1]?.providers[0]?.scope?.eligibleDocumentCount).toBe(1);
+
+    const next = await service.search({ queries: [localQuery('fresh')] });
+    expect(listDocuments).toHaveBeenCalledTimes(2);
+    expect(next.queries[0]?.providers[0]?.status).toBe('catalog_miss');
+    expect(ccel.search).not.toHaveBeenCalled();
+  });
+
+  it.each(['synchronous', 'asynchronous'] as const)('preserves per-query recovery after a %s catalog failure', async failure => {
+    const catalog = await repository().listDocuments();
+    let rejectFirst!: (error: Error) => void;
+    const firstRead = new Promise<Awaited<ReturnType<IHistoricalDocumentRepository['listDocuments']>>>((_, reject) => {
+      rejectFirst = reject;
+    });
+    const firstError = new Error('first read failed');
+    const listDocuments = vi.fn().mockImplementationOnce(() => {
+      if (failure === 'synchronous') throw firstError;
+      return firstRead;
+    })
+      .mockResolvedValueOnce(catalog).mockRejectedValueOnce(new Error('third read failed'));
+    const repo = repository({ listDocuments });
+    const service = new PrimarySourceSearchService(new LocalPrimarySourceSearchProvider(repo), { search: vi.fn() }, DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG);
+    const resultPromise = service.search({ queries: [localQuery('first'), localQuery('second'), localQuery('third')] });
+    expect(listDocuments).toHaveBeenCalledTimes(1);
+    if (failure === 'asynchronous') rejectFirst(firstError);
+
+    const result = await resultPromise;
+    expect(listDocuments).toHaveBeenCalledTimes(3);
+    expect(repo.searchPrimarySources).toHaveBeenCalledTimes(1);
+    expect(result.planStatus).toBe('partial');
+    expect(result.queries.map(query => [query.id, query.providers[0]?.status, query.providers[0]?.searched])).toEqual([
+      ['first', 'unavailable', false], ['second', 'ok', true], ['third', 'unavailable', false],
+    ]);
+  });
+
+  it('keeps overlapping plans on the same service isolated', async () => {
+    const catalog = await repository().listDocuments();
+    let resolveFirst!: (value: typeof catalog) => void;
+    const firstRead = new Promise<typeof catalog>(resolve => { resolveFirst = resolve; });
+    const listDocuments = vi.fn().mockReturnValueOnce(firstRead).mockResolvedValueOnce([]);
+    const repo = repository({ listDocuments });
+    const service = new PrimarySourceSearchService(new LocalPrimarySourceSearchProvider(repo), { search: vi.fn() }, DEFAULT_PRIMARY_SOURCE_CONTRACT_CONFIG);
+
+    const first = service.search({ queries: [localQuery('first-one'), localQuery('first-two')] });
+    const second = await service.search({ queries: [localQuery('second-one'), localQuery('second-two')] });
+    expect(listDocuments).toHaveBeenCalledTimes(2);
+    expect(second.queries.map(query => query.providers[0]?.status)).toEqual(['catalog_miss', 'catalog_miss']);
+
+    resolveFirst(catalog);
+    expect((await first).queries.map(query => query.providers[0]?.status)).toEqual(['ok', 'ok']);
+  });
+
   it('returns bounded snippet-only factual metadata and an exact locator', async () => {
     const repo = repository();
     const result = await new LocalPrimarySourceSearchProvider(repo).search({ text: 'grace', work: 'INSTITUTES', limit: 3 });
