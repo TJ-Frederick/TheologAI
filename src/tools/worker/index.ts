@@ -40,6 +40,7 @@ import { StrongsService } from '../../services/languages/StrongsService.js';
 import { MorphologyService } from '../../services/languages/MorphologyService.js';
 import { OriginalLanguageStudyService } from '../../services/languages/OriginalLanguageStudyService.js';
 import { OriginalLanguageStudyV2Coordinator } from '../../services/languages/OriginalLanguageStudyV2Coordinator.js';
+import { OriginalLanguageStudyV3Coordinator } from '../../services/languages/OriginalLanguageStudyV3Coordinator.js';
 import { OriginalLanguageStudyV2ContextProvider } from '../../services/languages/OriginalLanguageStudyV2ContextProvider.js';
 import { SourceAttestedParallelService } from '../../services/bible/SourceAttestedParallelService.js';
 
@@ -159,10 +160,11 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const strongsService = new StrongsService(strongsRepo, morphRepo);
   const morphService = new MorphologyService(morphRepo);
   const originalLanguageStudyService = new OriginalLanguageStudyService(morphRepo, strongsRepo);
-  const originalLanguageStudyCoordinator = new OriginalLanguageStudyV2Coordinator(
+  const evidenceCoordinator = new OriginalLanguageStudyV2Coordinator(
     new OriginalLanguageStudyV2ContextProvider(originalLanguageStudyService),
     ubsSemanticEvidenceBundleRepo,
   );
+  const originalLanguageStudyCoordinator = new OriginalLanguageStudyV3Coordinator(evidenceCoordinator, strongsService);
 
   // Module-scope services (cached across requests)
   const donationService = getDonationService(env);

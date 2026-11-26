@@ -15,7 +15,7 @@ describe('MorphologyRepository', () => {
   it('prepares all reusable morphology queries', () => {
     const db = new FakeSqliteDatabase();
     new MorphologyRepository(db.asDatabase());
-    expect(db.prepare).toHaveBeenCalledTimes(12);
+    expect(db.prepare).toHaveBeenCalledTimes(13);
     expect(db.statement('COUNT(DISTINCT').sql).toContain('GROUP BY book');
   });
 
@@ -137,5 +137,36 @@ describe('MorphologyRepository', () => {
     expect(first.occurrences).toHaveLength(2);
     expect(first.next_after).toEqual({ book_order: 19, chapter: 3, verse: 0, position: 2 });
     expect(repo.getTokenOccurrences('H9998', first.next_after, 2)).toEqual({ occurrences: [rows[2]] });
+  });
+
+  it('verifies that an occurrence cursor names an exact corpus coordinate', () => {
+    const db = new FakeSqliteDatabase([{
+      match: 'SELECT 1 AS present FROM morphology',
+      get: (...args: unknown[]) => args.join(':') === 'G0025:43:3:16:1'
+        ? { present: 1 }
+        : args.join(':') === 'G0025:43:3:16:2'
+          ? undefined
+          : { present: 1 },
+    }]);
+    const repo = new MorphologyRepository(db.asDatabase());
+
+    expect(repo.hasTokenOccurrenceAt('G25', {
+      book_order: 43,
+      chapter: 3,
+      verse: 16,
+      position: 1,
+    })).toBe(true);
+    expect(repo.hasTokenOccurrenceAt('G25', {
+      book_order: 43,
+      chapter: 3,
+      verse: 16,
+      position: 2,
+    })).toBe(false);
+    expect(repo.hasTokenOccurrenceAt('G25', {
+      book_order: 43,
+      chapter: 3,
+      verse: 16,
+      position: 3,
+    })).toBe(true);
   });
 });

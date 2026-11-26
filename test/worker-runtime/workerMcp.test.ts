@@ -595,7 +595,8 @@ describe('Worker MCP endpoint in workerd', () => {
     expect(textContent(study.message)).toContain('TBESH Meaning field is withheld');
     expect(study.message.result).toMatchObject({
       structuredContent: {
-        schemaVersion: '2',
+        schemaVersion: '3',
+        depth: 'intermediate',
         study: {
           status: 'partial',
           lexiconEvidence: [{
@@ -621,6 +622,76 @@ describe('Worker MCP endpoint in workerd', () => {
         },
       },
     });
+  });
+
+  it('serves the v3 study depths and advances an indexed occurrence cursor over local D1', async () => {
+    const db = env.THEOLOGAI_DB;
+    await db.batch([
+      db.prepare(`
+        WITH RECURSIVE verses(number) AS (
+          VALUES (2) UNION ALL SELECT number + 1 FROM verses WHERE number < 22
+        )
+        INSERT INTO morphology (
+          book, chapter, verse, position, word_text, lemma, strongs_number, morph_code, gloss, book_order
+        ) SELECT 'Genesis', 1, number, 99, 'וַ', '/וַ', 'H9001', 'H:C', '&', 1 FROM verses
+      `),
+      db.prepare(`
+        INSERT INTO strongs_usage_stats (strongs_key, token_count, verse_count, book_count, form_count)
+        VALUES ('H9001', 22, 22, 1, 1)
+      `),
+    ]);
+    try {
+      const request = { reference: 'Genesis 1:1', target: 'H9001', position: 1 };
+      const study = (options: Record<string, unknown> = {}) => rpc('tools/call', {
+        name: 'original_language_study', arguments: { ...request, ...options },
+      }, 90);
+      const implicit = (await study()).message.result?.structuredContent;
+      expect(implicit).toMatchObject({ schemaVersion: '3', depth: 'intermediate' });
+      const modern = await modernRpc('tools/call', {
+        name: 'original_language_study', arguments: request,
+      }, 91, 'original_language_study');
+      expect(modern.message.result?.structuredContent).toEqual(implicit);
+      expect((await study({ depth: 'intermediate' })).message.result?.structuredContent).toEqual(implicit);
+      expect((await study({ depth: 'beginner' })).message.result?.structuredContent)
+        .toMatchObject({ schemaVersion: '3', depth: 'beginner' });
+      expect(implicit).not.toHaveProperty('corpusOccurrences');
+
+      const first = (await study({ depth: 'technical' })).message.result?.structuredContent;
+      expect(first).toMatchObject({
+        schemaVersion: '3', depth: 'technical',
+        corpusOccurrences: {
+          status: 'available', exactMorphologyKey: 'H9001', totals: { tokenCount: 22 },
+          resultWindow: { returnedCount: 20, maximumReturned: 20, hasMore: true },
+        },
+      });
+      const corpus = (first as { corpusOccurrences: {
+        occurrences: Array<{ verse: number }>;
+        resultWindow: { continuation: { cursor: string } };
+      } }).corpusOccurrences;
+      expect(corpus.occurrences.map(row => row.verse)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+      const { cursor } = corpus.resultWindow.continuation;
+      const second = (await study({ depth: 'technical', cursor })).message.result?.structuredContent;
+      expect(second).toMatchObject({
+        corpusOccurrences: {
+          totals: { tokenCount: 22 }, occurrences: [{ verse: 21 }, { verse: 22 }],
+          resultWindow: { returnedCount: 2, maximumReturned: 20, hasMore: false },
+        },
+      });
+      expect((await study({ cursor })).message.result).toMatchObject({ isError: true });
+      for (const staleArguments of [{ cursor: 'olsv2c1_7b7d' }, { detail: 'detailed', cursor: 'olsv2c1_7b7d' }]) {
+        const stale = await study(staleArguments);
+        expect(stale.message.result).toMatchObject({ isError: true });
+        expect(textContent(stale.message)).toContain('Restart without a cursor or detail');
+      }
+      const legacy = await study({ detail: 'summary' });
+      expect(legacy.message.result).toMatchObject({ isError: true });
+      expect(textContent(legacy.message)).toContain('Use depth');
+    } finally {
+      await db.batch([
+        db.prepare("DELETE FROM morphology WHERE strongs_number = 'H9001' AND position = 99"),
+        db.prepare("DELETE FROM strongs_usage_stats WHERE strongs_key = 'H9001'"),
+      ]);
+    }
   });
 
   it.each(['John 3:16', 'Genesis 1:1'])('returns the same expanded %s tool output from one local D1 query', async reference => {

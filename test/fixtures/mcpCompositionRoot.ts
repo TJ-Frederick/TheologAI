@@ -27,6 +27,7 @@ import { MorphologyService } from '../../src/services/languages/MorphologyServic
 import { StrongsService } from '../../src/services/languages/StrongsService.js';
 import { OriginalLanguageStudyService } from '../../src/services/languages/OriginalLanguageStudyService.js';
 import { OriginalLanguageStudyV2Coordinator } from '../../src/services/languages/OriginalLanguageStudyV2Coordinator.js';
+import { OriginalLanguageStudyV3Coordinator } from '../../src/services/languages/OriginalLanguageStudyV3Coordinator.js';
 import { OriginalLanguageStudyV2ContextProvider } from '../../src/services/languages/OriginalLanguageStudyV2ContextProvider.js';
 import { createToolRegistry } from '../../src/tools/toolRegistry.js';
 import { bindPrimarySourceSearch } from '../../src/tools/v2/primarySourceSearch.js';
@@ -187,10 +188,11 @@ export function createDeterministicMcpFixture(): DeterministicMcpFixture {
       throw new Error('The deterministic semantic repository must not be reached without an eligible Hebrew token.');
     },
   };
-  const originalLanguageStudyCoordinator = new OriginalLanguageStudyV2Coordinator(
+  const evidenceCoordinator = new OriginalLanguageStudyV2Coordinator(
     new OriginalLanguageStudyV2ContextProvider(originalLanguageStudyService),
     ubsSemanticEvidenceBundleRepository,
   );
+  const originalLanguageStudyCoordinator = new OriginalLanguageStudyV3Coordinator(evidenceCoordinator, strongsService);
   const donationService = new DonationService(onChainVerifier);
   const primarySourceSearch = bindPrimarySourceSearch(primarySourceSearchService, primarySourceContract);
 
