@@ -70,15 +70,15 @@ const STATIC_RESOURCE_ORDER = [
 export const EXPECTED_MCP_CONTRACT_FINGERPRINTS: Record<'6' | '7', McpContractFingerprints> = {
   "6": {
     "capabilities": "",
-    "tools": "e0c5bf45288a0a01f5f611036b9ce9e56df037d0c5c0d580c581f1f2af2290a7",
-    "prompts": "a4b74048b785049c539bcc4868102e6143d4053a79e9da6cf0b41cc2fbf0fc60",
+    "tools": "717cf69f4033ba747b4b5b3107c2af327f78cd9e40a47093f56f535662e29e19",
+    "prompts": "1c47b7b40e158558f1892bef336e87c8ad9f5681faaeca02b0d6d35b1770143b",
     "resourceTemplates": "00f1610e183225227f78b36e6fb04fd72244e5dd042cb7205778703bf0d4accc",
     "staticResources": "1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b"
   },
   "7": {
     "capabilities": "",
-    "tools": "f37f40b7fb8b8abc9cbdbf9e75495b13830c20f23d3029642a886a24f0b6b140",
-    "prompts": "a18ccf15c9a9bc3fd588aebe5ac8a5dc5cf9dec9ef67013c1494b5d2239b7a0f",
+    "tools": "fc3facc1196c30187048122ba4b1cf49d2399d4ec13808e73351803504be1199",
+    "prompts": "5cdaaed864d234e0ac04fd66c7cb1bb44d3d7bb8ee601abcc4726e62c4406d63",
     "resourceTemplates": "00f1610e183225227f78b36e6fb04fd72244e5dd042cb7205778703bf0d4accc",
     "staticResources": "1a07ddfb5b7954de0f37d1bec03c0886e6235f63ef5611a557a8cde4424e201b"
   }

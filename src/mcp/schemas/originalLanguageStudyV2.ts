@@ -65,21 +65,21 @@ const candidateIdentityRequired = [
   'sourceId', 'sourceRole', 'entryId', 'senseId', 'sourceAttestedReferenceCount', 'referenceEvidenceIds',
 ] as const;
 
-const summaryCandidate = {
+export const originalLanguageStudySummaryCandidateSchema = {
   type: 'object',
   properties: { ...candidateIdentityProperties, detailStatus: { const: 'summary' } },
   required: [...candidateIdentityRequired, 'detailStatus'],
   additionalProperties: false,
 } as const;
 
-const omittedCandidate = {
+export const originalLanguageStudyOmittedCandidateSchema = {
   type: 'object',
   properties: { ...candidateIdentityProperties, detailStatus: { const: 'omitted_response_byte_budget' } },
   required: [...candidateIdentityRequired, 'detailStatus'],
   additionalProperties: false,
 } as const;
 
-const detailedCandidate = {
+export const originalLanguageStudyDetailedCandidateSchema = {
   type: 'object',
   properties: {
     ...candidateIdentityProperties,
@@ -158,7 +158,7 @@ const detailedCandidate = {
   additionalProperties: false,
 } as const;
 
-const identity = {
+export const originalLanguageStudySemanticIdentitySchema = {
   type: 'object',
   properties: {
     publicStrongs: { type: 'string', pattern: '^H(?:[1-9][0-9]{0,3})$' },
@@ -194,7 +194,7 @@ function provenanceSource(
   } as const;
 }
 
-const provenance = {
+export const originalLanguageStudySemanticProvenanceSchema = {
   type: 'object',
   properties: {
     artifactIdentity: { type: 'string', pattern: '^[0-9a-f]{64}$' },
@@ -243,7 +243,7 @@ const alignmentArtifactSource = {
   additionalProperties: false,
 } as const;
 
-const alignment = {
+export const originalLanguageStudySemanticAlignmentSchema = {
   type: 'object',
   properties: {
     status: { const: 'verified_token_alignment' },
@@ -289,14 +289,21 @@ const alignment = {
 
 const repositoryCommon = {
   language: { const: 'Hebrew' }, plainLanguage: { type: 'string', minLength: 1, maxLength: 2_000 },
-  identity, normalizedReference: { type: 'string', minLength: 1, maxLength: 100 },
-  resultWindow, provenance, withheldEvidence,
+  identity: originalLanguageStudySemanticIdentitySchema, normalizedReference: { type: 'string', minLength: 1, maxLength: 100 },
+  resultWindow, provenance: originalLanguageStudySemanticProvenanceSchema, withheldEvidence,
 } as const;
 const repositoryRequired = [
   'language', 'status', 'plainLanguage', 'identity', 'normalizedReference', 'resultWindow', 'provenance', 'withheldEvidence',
 ] as const;
 
-function semanticEvidenceSchema(candidate: typeof summaryCandidate | { readonly oneOf: readonly [typeof detailedCandidate, typeof omittedCandidate] }) {
+function semanticEvidenceSchema(
+  candidate: typeof originalLanguageStudySummaryCandidateSchema | {
+    readonly oneOf: readonly [
+      typeof originalLanguageStudyDetailedCandidateSchema,
+      typeof originalLanguageStudyOmittedCandidateSchema,
+    ];
+  },
+) {
   return {
     oneOf: [
       {
@@ -330,7 +337,7 @@ function semanticEvidenceSchema(candidate: typeof summaryCandidate | { readonly 
       {
         type: 'object', properties: {
           ...repositoryCommon, status: { const: 'reference_aligned_source_candidate' },
-          candidates: { type: 'array', minItems: 1, maxItems: 1, items: candidate }, alignmentEvidence: alignment,
+          candidates: { type: 'array', minItems: 1, maxItems: 1, items: candidate }, alignmentEvidence: originalLanguageStudySemanticAlignmentSchema,
         }, required: [...repositoryRequired, 'candidates', 'alignmentEvidence'], additionalProperties: false,
       },
     ],
@@ -339,7 +346,7 @@ function semanticEvidenceSchema(candidate: typeof summaryCandidate | { readonly 
 
 function rootSchema(detail: 'summary' | 'detailed') {
   const candidate = detail === 'summary'
-    ? summaryCandidate : { oneOf: [detailedCandidate, omittedCandidate] } as const;
+    ? originalLanguageStudySummaryCandidateSchema : { oneOf: [originalLanguageStudyDetailedCandidateSchema, originalLanguageStudyOmittedCandidateSchema] } as const;
   return {
     type: 'object',
     properties: {

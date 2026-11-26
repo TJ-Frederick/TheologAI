@@ -136,6 +136,29 @@ describe.each(SERVER_FACTORIES)('$name protocol contract', ({ create, logging })
           words: { maxItems: 200 },
         },
       });
+      const studyTool = listed.tools.find(tool => tool.name === 'original_language_study')!;
+      expect(studyTool.inputSchema).toMatchObject({
+        additionalProperties: false,
+        properties: {
+          depth: { enum: ['beginner', 'intermediate', 'technical'] },
+        },
+      });
+      expect(studyTool.inputSchema.properties).not.toHaveProperty('detail');
+      expect(studyTool.outputSchema?.oneOf).toMatchObject(
+        ['beginner', 'intermediate', 'technical'].map(depth => ({
+          properties: { schemaVersion: { const: '3' }, depth: { const: depth } },
+        })),
+      );
+      const studyRequest = { reference: 'John 1:1', target: 'G3056', position: 5 };
+      for (const legacyArgs of [{ cursor: 'olsv2c1_7b7d' }, { detail: 'detailed', cursor: 'olsv2c1_7b7d' }]) {
+        const stale = await client.callTool({
+          name: 'original_language_study', arguments: { ...studyRequest, ...legacyArgs },
+        });
+        expect(stale.isError).toBe(true);
+        expect(stale.content).toMatchObject([
+          { type: 'text', text: expect.stringContaining('Restart without a cursor or detail') },
+        ]);
+      }
       expect(listed.tools.find(tool => tool.name === 'primary_source_search')?.outputSchema).toMatchObject({
         properties: { schemaVersion: { const: '6' } },
       });

@@ -17,11 +17,19 @@ Use this workflow when the user asks about:
 
 - If the user asks what a word means in a verse, require one exact verse and read it with `bible_lookup` in the requested/default translation plus one comparison translation.
 - If no verse is supplied, label the result a lexical overview, not a contextual meaning, and invite a passage-specific study.
+- Choose one workflow depth: `beginner`, `intermediate`, or `technical`. An
+  explicit depth wins. Otherwise map simple/beginner wording to `beginner`, raw
+  evidence/technical wording to `technical`, and use `intermediate` by default.
 
 ### Step 2: Resolve the Verse Token
 
-- Call `original_language_study` with the exact verse and target.
+- Call `original_language_study` with the exact verse, target, and selected
+  `depth` (including explicit `intermediate` when the user omitted it).
 - If it returns `needs_disambiguation`, use sentence context to select a returned candidate and call again with that source `position`. Never guess.
+- Treat semantic candidates as source evidence, not contextual adjudication.
+  When another page materially helps, pass its returned cursor unchanged with
+  the same verse, target, position, and depth. Only `technical` depth returns
+  bounded corpus occurrences.
 
 ### Step 3: Consult Lexical Evidence
 
@@ -51,6 +59,22 @@ Present contextual findings in this order:
 3. **Word identity**: source form, lemma, transliteration, Strong's identifier
 4. **Grammar**: cautious explanation, then raw source code
 5. **Source-separated lexical evidence** and limitations
+
+Match the selected depth:
+
+- `beginner`: after reading the verse and evidence, explain one likely nuance in
+  plain English. Label it as prompt-produced interpretation supported by cited
+  evidence, name reasonable alternatives when ambiguity remains, and state what
+  the evidence cannot prove. The deterministic tool does not choose a meaning.
+- `intermediate`: explain lemma, source form, transliteration, morphology,
+  source-attributed lexical range, and local context.
+- `technical`: retain raw source identities, provenance, morphology, semantic
+  candidates, ambiguity, and bounded occurrence evidence without treating
+  frequency or a candidate as a contextual verdict.
+
+Keep the tool's source-attributed `lexicalRange` separate from the English
+translation comparison performed with `bible_lookup`. `englishTranslationComparison`
+and `contextualInterpretation` remain guided-prompt responsibilities.
 
 ## Important Notes
 

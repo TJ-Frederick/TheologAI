@@ -30,13 +30,13 @@ describe('Node composition root original-language-study v2 activation', () => {
     expect(tool?.inputSchema).toMatchObject({
       additionalProperties: false,
       properties: {
-        detail: { enum: ['summary', 'detailed'] },
-        cursor: { pattern: '^olsv2c1_(?:[0-9a-f]{2})+$' },
+        depth: { enum: ['beginner', 'intermediate', 'technical'] },
+        cursor: { maxLength: 12 * 1024 },
       },
     });
     expect(tool?.outputSchema).toMatchObject({
       oneOf: expect.arrayContaining([
-        expect.objectContaining({ properties: expect.objectContaining({ schemaVersion: { const: '2' } }) }),
+        expect.objectContaining({ properties: expect.objectContaining({ schemaVersion: { const: '3' } }) }),
       ]),
     });
   });

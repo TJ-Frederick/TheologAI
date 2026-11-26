@@ -153,4 +153,25 @@ export class D1MorphologyRepository implements IMorphologyRepository {
     const { results } = await statement.all<TokenOccurrence>();
     return tokenOccurrencePage(results, limit);
   }
+
+  async hasTokenOccurrenceAt(
+    strongsNumber: string,
+    boundary: CanonicalOccurrencePosition,
+  ): Promise<boolean> {
+    const identity = parseStrongsIdentity(strongsNumber);
+    if (!identity) return false;
+    assertOccurrencePosition(boundary);
+    const row = await this.db.prepare(
+      `SELECT 1 AS present FROM morphology
+       WHERE strongs_number = ? AND book_order = ? AND chapter = ? AND verse = ? AND position = ?
+       LIMIT 1`
+    ).bind(
+      identity.morphologyKey,
+      boundary.book_order,
+      boundary.chapter,
+      boundary.verse,
+      boundary.position,
+    ).first<{ present: number }>();
+    return row?.present === 1;
+  }
 }
