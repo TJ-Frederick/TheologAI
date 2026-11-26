@@ -2,113 +2,28 @@
 /** Deterministic process-boundary smoke test for the compiled Node HTTP server. */
 
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcessByStdio } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import type { Readable } from 'node:stream';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import {
   assertMcpTransportContract,
   captureMcpTransportSnapshot,
 } from '../test/helpers/mcpTransportContract.js';
+import {
+  COMPILED_SERVER,
+  SHUTDOWN_TIMEOUT_MS,
+  spawnNodeE2eProcess,
+  stopNodeE2eProcess,
+  withCleanup,
+  withIsolatedNodeE2eFixtures,
+  withNodeE2eFixture,
+  withTimeout,
+  type NodeE2eWorkspace,
+} from './node-e2e-fixture.js';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const TSX_CLI = join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs');
-const MAX_LOG_CHARS = 64 * 1024;
-const COMMAND_TIMEOUT_MS = 180_000;
 const STARTUP_TIMEOUT_MS = 15_000;
-const SHUTDOWN_TIMEOUT_MS = 5_000;
 const MCP_TIMEOUT_MS = 10_000;
 const TEST_ORIGIN = 'http://e2e.local';
-
-interface CapturedProcess {
-  child: ChildProcessByStdio<null, Readable, Readable>;
-  logs(): string;
-}
-
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-function appendBounded(current: string, chunk: Buffer | string): string {
-  const combined = current + chunk.toString();
-  return combined.length <= MAX_LOG_CHARS ? combined : combined.slice(-MAX_LOG_CHARS);
-}
-
-function sanitizedEnvironment(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  const entries = Object.entries(process.env).filter(([name]) =>
-    !/(API_KEY|TOKEN|SECRET|RPC_URL|PRIVATE_KEY)/i.test(name)
-  );
-  return { ...Object.fromEntries(entries), ...overrides };
-}
-
-function spawnCaptured(
-  command: string,
-  args: string[],
-  env = process.env,
-  cwd = ROOT,
-): CapturedProcess {
-  const child = spawn(command, args, {
-    cwd,
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let output = '';
-  child.stdout.on('data', chunk => { output = appendBounded(output, chunk); });
-  child.stderr.on('data', chunk => { output = appendBounded(output, chunk); });
-  return { child, logs: () => output };
-}
-
-async function waitForExit(child: ChildProcessByStdio<null, Readable, Readable>, timeoutMs: number): Promise<number | null> {
-  if (child.exitCode !== null) return child.exitCode;
-  return await new Promise<number | null>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error(`Process did not exit within ${timeoutMs}ms`));
-    }, timeoutMs);
-    const onExit = (code: number | null) => { cleanup(); resolve(code); };
-    const onError = (error: Error) => { cleanup(); reject(error); };
-    const cleanup = () => {
-      clearTimeout(timer);
-      child.off('exit', onExit);
-      child.off('error', onError);
-    };
-    child.once('exit', onExit);
-    child.once('error', onError);
-  });
-}
-
-async function runCommand(label: string, command: string, args: string[]): Promise<void> {
-  const processHandle = spawnCaptured(command, args, sanitizedEnvironment());
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    const exitCode = await Promise.race([
-      waitForExit(processHandle.child, COMMAND_TIMEOUT_MS),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} timed out`)), COMMAND_TIMEOUT_MS);
-      }),
-    ]);
-    assert.equal(exitCode, 0, `${label} failed with exit code ${exitCode}\n${processHandle.logs()}`);
-  } catch (error) {
-    if (processHandle.child.exitCode === null) processHandle.child.kill('SIGKILL');
-    throw error;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
 
 async function findAvailablePort(): Promise<number> {
   const server = createServer();
@@ -122,17 +37,21 @@ async function findAvailablePort(): Promise<number> {
   return address.port;
 }
 
-async function waitUntilReady(url: URL, server: CapturedProcess): Promise<void> {
+async function waitUntilReady(url: URL, server: ReturnType<typeof spawnNodeE2eProcess>): Promise<void> {
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    if (server.child.exitCode !== null) {
-      throw new Error(`Node HTTP server exited during startup (${server.child.exitCode})\n${server.logs()}`);
+    const { exitCode, signalCode } = server.child;
+    if (server.error() || exitCode !== null || signalCode !== null) {
+      throw new Error(`Node HTTP server exited during startup (${signalCode ?? exitCode})\n${server.logs()}`, {
+        cause: server.error(),
+      });
     }
     try {
       const response = await fetch(url, {
         headers: { Origin: TEST_ORIGIN },
         signal: AbortSignal.timeout(500),
       });
+      await response.body?.cancel();
       if (response.status === 405) return;
     } catch {
       // The listener may not be ready yet.
@@ -140,17 +59,6 @@ async function waitUntilReady(url: URL, server: CapturedProcess): Promise<void> 
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   throw new Error(`Node HTTP server did not become ready\n${server.logs()}`);
-}
-
-async function stopServer(server: CapturedProcess | undefined): Promise<void> {
-  if (!server || server.child.exitCode !== null) return;
-  server.child.kill('SIGTERM');
-  try {
-    await waitForExit(server.child, SHUTDOWN_TIMEOUT_MS);
-  } catch {
-    server.child.kill('SIGKILL');
-    await waitForExit(server.child, SHUTDOWN_TIMEOUT_MS);
-  }
 }
 
 function resultText(content: Array<{ type: string; text?: string }>): string {
@@ -179,50 +87,26 @@ function providerNeutralPrimarySourceArguments(inputSchema: object): Record<stri
   return { queries: [query] };
 }
 
-async function main(): Promise<void> {
-  const nodeMajor = Number(process.versions.node.split('.')[0]);
-  assert.equal(nodeMajor, 22, `Node HTTP E2E requires Node 22; received ${process.version}. Run with .nvmrc.`);
-
-  const workspace = await mkdtemp(join(tmpdir(), 'theologai-node-e2e-'));
-  const databasePath = join(workspace, 'theologai.db');
-  let server: CapturedProcess | undefined;
+export async function runNodeHttpE2e(workspace: NodeE2eWorkspace, serverEntry = COMPILED_SERVER): Promise<void> {
+  const port = await findAvailablePort();
+  const endpoint = new URL(`http://127.0.0.1:${port}/mcp`);
+  const server = spawnNodeE2eProcess(workspace, [serverEntry], {
+    HOST: '127.0.0.1',
+    PORT: String(port),
+    MCP_ALLOWED_ORIGINS: TEST_ORIGIN,
+    THEOLOGAI_DATABASE_PATH: workspace.databasePath,
+  });
   let client: Client | undefined;
+  let transport: StreamableHTTPClientTransport | undefined;
 
-  try {
-    await runCommand('database build', process.execPath, [
-      TSX_CLI,
-      join(ROOT, 'scripts', 'build-database.ts'),
-      '--output',
-      databasePath,
-    ]);
-    await runCommand('database verification', process.execPath, [
-      TSX_CLI,
-      join(ROOT, 'scripts', 'verify-database.ts'),
-      '--database',
-      databasePath,
-    ]);
-
-    const port = await findAvailablePort();
-    const endpoint = new URL(`http://127.0.0.1:${port}/mcp`);
-    server = spawnCaptured(
-      process.execPath,
-      [join(ROOT, 'dist', 'index.js')],
-      sanitizedEnvironment({
-        HOST: '127.0.0.1',
-        PORT: String(port),
-        MCP_ALLOWED_ORIGINS: TEST_ORIGIN,
-        THEOLOGAI_DATABASE_PATH: databasePath,
-      }),
-      // Keep dotenv/config from discovering the repository's developer .env.
-      workspace,
-    );
+  await withCleanup(async () => {
     await waitUntilReady(endpoint, server);
 
     client = new Client(
       { name: 'theologai-node-e2e', version: '1.0.0' },
       { capabilities: {} },
     );
-    const transport = new StreamableHTTPClientTransport(endpoint, {
+    transport = new StreamableHTTPClientTransport(endpoint, {
       requestInit: { headers: { Origin: TEST_ORIGIN } },
     });
     await withTimeout(client.connect(transport), MCP_TIMEOUT_MS, 'MCP initialize');
@@ -289,15 +173,16 @@ async function main(): Promise<void> {
 
     await withTimeout(client.close(), SHUTDOWN_TIMEOUT_MS, 'legacy MCP client close');
     client = undefined;
+    transport = undefined;
 
     client = new Client(
       { name: 'theologai-node-e2e-modern', version: '1.0.0' },
       { versionNegotiation: { mode: { pin: '2026-07-28' } } },
     );
-    const modernTransport = new StreamableHTTPClientTransport(endpoint, {
+    transport = new StreamableHTTPClientTransport(endpoint, {
       requestInit: { headers: { Origin: TEST_ORIGIN } },
     });
-    await withTimeout(client.connect(modernTransport), MCP_TIMEOUT_MS, 'modern MCP discovery');
+    await withTimeout(client.connect(transport), MCP_TIMEOUT_MS, 'modern MCP discovery');
     assert.equal(client.getProtocolEra(), 'modern');
     assert.equal(client.getNegotiatedProtocolVersion(), '2026-07-28');
     assert.deepEqual(client.getDiscoverResult(), expectModernDiscovery());
@@ -316,16 +201,16 @@ async function main(): Promise<void> {
     assert.equal((modernDonation.structuredContent as { kind?: string } | undefined)?.kind, 'donation_config');
 
     console.error('[node-http-e2e] Compiled Node HTTP MCP server passed legacy and modern process-boundary checks.');
-  } catch (error) {
-    if (server) console.error(server.logs());
-    throw error;
-  } finally {
-    if (client) {
-      await withTimeout(client.close(), SHUTDOWN_TIMEOUT_MS, 'MCP client close').catch(() => undefined);
+  }, async () => withCleanup(async () => {
+    if (transport) {
+      const close = client?.transport === transport ? client.close() : transport.close();
+      await withTimeout(close, SHUTDOWN_TIMEOUT_MS, 'MCP client close');
     }
-    await stopServer(server);
-    await rm(workspace, { recursive: true, force: true });
-  }
+  }, () => stopNodeE2eProcess(server))).catch(error => {
+    const logs = server.logs();
+    if (logs) console.error(logs);
+    throw error;
+  });
 }
 
 function expectModernDiscovery(): Record<string, unknown> {
@@ -344,7 +229,18 @@ function expectModernDiscovery(): Record<string, unknown> {
   };
 }
 
-main().catch(error => {
-  console.error('[node-http-e2e] Failed:', error);
-  process.exitCode = 1;
-});
+async function main(): Promise<void> {
+  if (process.argv[2] === '--with-stdio') {
+    const { runNodeStdioE2e } = await import('./test-node-stdio-e2e.js');
+    await withIsolatedNodeE2eFixtures(runNodeHttpE2e, runNodeStdioE2e);
+  } else {
+    await withNodeE2eFixture(runNodeHttpE2e);
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(error => {
+    console.error('[node-http-e2e] Failed:', error);
+    process.exitCode = 1;
+  });
+}
