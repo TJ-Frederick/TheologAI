@@ -2,6 +2,7 @@ import { ValidationError } from '../../kernel/errors.js';
 import type { CcelPrimarySourceSearchPort, LocalPrimarySourceSearchPort } from './PrimarySourceSearchPorts.js';
 import type { PrimarySourceContractConfig } from '../../kernel/featureFlags.js';
 import type { CcelUpstreamCoordinator } from './CcelUpstreamCoordinator.js';
+import { projectPrimarySourceCoverage } from './primarySourceCoverage.js';
 import {
   type PrimarySourcePlanProviderResult,
   type PrimarySourcePlanQueryResult,
@@ -56,31 +57,14 @@ export class PrimarySourceSearchService {
       ? 'unavailable'
       : 'partial';
 
-    const localResults = providerResults.filter(provider => provider.provider === 'local');
-    const ccelResults = providerResults.filter(provider => provider.provider === 'ccel_live');
-    const observed = queryResults.flatMap(query => query.providers.map(provider => ({
-      queryId: query.id,
-      provider: provider.provider,
-      status: provider.status,
-      returnedHitCount: provider.hitCount,
-      searched: provider.searched,
-    })));
+    const { providerCoverage, serverObserved } = projectPrimarySourceCoverage(queryResults);
     return {
       planStatus,
       queries: queryResults,
       coverage: {
-        localAttempted: localResults.some(result => result.searched),
-        ...(localResults.length ? { localStatus: aggregateStatus(localResults) } : {}),
-        localHitCount: localResults.reduce((total, result) => total + result.hitCount, 0),
-        ccelAttempted: ccelResults.some(result => result.searched),
-        ...(ccelResults.length ? { ccelStatus: aggregateStatus(ccelResults) } : {}),
-        ccelHitCount: ccelResults.reduce((total, result) => total + result.hitCount, 0),
+        ...providerCoverage,
         notices: [...new Set(providerResults.flatMap(result => result.notices))],
-        serverObserved: {
-          searched: observed.filter(provider => provider.searched).map(({ searched: _searched, ...provider }) => provider),
-          notSearched: observed.filter(provider => !provider.searched)
-            .map(({ searched: _searched, returnedHitCount: _returnedHitCount, ...provider }) => provider),
-        },
+        serverObserved,
       },
     };
   }
@@ -450,9 +434,4 @@ function enforceProviderHitBudget(
     remaining -= provider.hits.length;
   }
   return { remaining, truncated };
-}
-
-function aggregateStatus(results: PrimarySourcePlanProviderResult[]): PrimarySourceProviderStatus {
-  const priority: PrimarySourceProviderStatus[] = ['unavailable', 'rate_limited', 'interface_changed', 'disabled', 'unsupported_filter', 'catalog_miss', 'ok', 'no_results'];
-  return priority.find(status => results.some(result => result.status === status)) ?? 'unavailable';
 }

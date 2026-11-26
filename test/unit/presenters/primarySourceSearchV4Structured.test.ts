@@ -198,6 +198,15 @@ describe('primary-source v7 structured presentation', () => {
       expect(provider.resultWindow.returnedHitCount).toBe(provider.hits.length);
     }
     expect(presented.coverage.localHitCount).toBe(providers.reduce((sum, provider) => sum + provider.hits.length, 0));
+    expect(Object.keys(presented.coverage)).toEqual([
+      'localAttempted', 'localStatus', 'localHitCount', 'ccelAttempted', 'ccelHitCount', 'notices', 'serverObserved',
+    ]);
+    expect(presented.coverage.serverObserved.searched).toEqual(presented.queries.map(query => ({
+      queryId: query.id, provider: 'local', status: 'ok', returnedHitCount: query.providers[0]!.hits.length,
+    })));
+    expect(Object.keys(presented.coverage.serverObserved.searched[0]!)).toEqual([
+      'queryId', 'provider', 'status', 'returnedHitCount',
+    ]);
     expect(providers.some(provider => provider.resultWindow.additionalMatchStatus === 'additional_match_observed')).toBe(true);
     expect(providers.every(provider => provider.notices.length <= 4 && provider.notices.every(notice => Array.from(notice).length <= 240))).toBe(true);
     expect(presented.coverage.notices.length).toBeLessThanOrEqual(8);
