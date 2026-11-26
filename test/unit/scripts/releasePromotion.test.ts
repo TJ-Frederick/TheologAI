@@ -67,6 +67,84 @@ const exactMorphologyPaths = [
 ] as const;
 const exactCachePath = 'src/adapters/shared/HttpClient.ts';
 const narrowRuntimePaths = [...exactMorphologyPaths, exactCachePath];
+const nodeE2eEntries = [
+  ['package.json', '1a931cc4d60bd88d3968388bbfcb90fd08dc0ab6', '5471d433642480d3bbb02f78028d37489ff01e77'],
+  ['scripts/node-e2e-fixture.ts', null, 'c0555b9e5f378d6c3c3e0e2419cf17125ffe21f9'],
+  ['scripts/test-node-http-e2e.ts', '09fd645ca578c25a22d7e9eba38ce3a7684906ed', 'a6ac7eab37c659a8fdfd6bac9e041debc886e061'],
+  ['scripts/test-node-stdio-e2e.ts', 'b824299c4ff760091df61f3773cdb29a1f642b82', '0dd9542494d7c405264c9cebb67204405b06f6e5'],
+  ['test/unit/scripts/nodeE2eFixture.test.ts', null, '4b4957ce01ef2784fda529dafef4a833bb631efa'],
+] as const;
+
+function nodeE2eTransition(f: ReturnType<typeof repo>, additionalPath?: string, mutation?: 'package' | 'mode' | 'partial') {
+  // Classification uses commit tree entries. Supply those directly so this test
+  // works without the historical harness files or a full checkout's history.
+  const entry = (path: string, blob: string, mode = '100644') =>
+    f.git('update-index', '--add', '--info-only', '--cacheinfo', mode, blob, path);
+  const commitTree = (parent: string, ...additionalParents: string[]) => {
+    const tree = f.git('write-tree', '--missing-ok');
+    return f.git('commit-tree', tree, '-p', parent, ...additionalParents.flatMap(sha => ['-p', sha]), '-m', 'Node E2E fixture');
+  };
+  for (const [path, before] of nodeE2eEntries) if (before) entry(path, before);
+  const base = commitTree(f.git('rev-parse', 'HEAD'));
+  for (const [path, , after] of nodeE2eEntries) {
+    if (path === 'package.json' && mutation === 'package') {
+      f.write(path, '{"version":"9.9.9"}');
+      f.git('add', '--', path);
+    } else if (path !== 'scripts/node-e2e-fixture.ts' || mutation !== 'partial') {
+      entry(path, after, path === 'scripts/test-node-http-e2e.ts' && mutation === 'mode' ? '100755' : '100644');
+    }
+  }
+  if (additionalPath) {
+    f.write(additionalPath, 'additional change');
+    f.git('add', '--', additionalPath);
+  }
+  const head = commitTree(base);
+  const merge = commitTree(base, head);
+  f.git('update-ref', '--no-deref', 'HEAD', merge);
+  return {base, head, merge};
+}
+
+it.each([
+  [undefined, 'docs'],
+  ['src/formatters/bible.ts', 'application'],
+  ['data/manifest.json', 'corpus'],
+  ['scripts/another-build-script.ts', 'corpus'],
+] as const)('classifies the exact Node E2E transition plus %s as %s', (additionalPath, mode) => {
+  const f = repo();
+  const pr = nodeE2eTransition(f, additionalPath);
+  const baseline = {productionSource: pr.base, targets: f.record.targets};
+  const release = f.classifyCandidate(pr, baseline);
+  expect(release.status, release.stderr).toBe(0);
+  expect(release.outputs).toContain(`mode=${mode}\n`);
+  expect(f.run('classify', 'baseline.json')).toBe(mode);
+});
+
+it('keeps ordinary PR CI full for Node E2E maintenance', () => {
+  const f = repo();
+  const pr = f.mergeCandidate(f.git('rev-parse', 'HEAD'), nodeE2eEntries.map(([path]) => path), 'test harness changes');
+  expect(classifyOrdinaryCi(f.root, pr)).toEqual({
+    mode: 'full', data: true, serving: true, reason: 'corpus-delivery-or-unclassified-path',
+  });
+});
+
+it.each(['package', 'mode', 'partial'] as const)('keeps a %s mismatch in the Node E2E transition on the corpus route', mutation => {
+  const f = repo();
+  const pr = nodeE2eTransition(f, undefined, mutation);
+  const release = f.classifyCandidate(pr, {productionSource: pr.base, targets: f.record.targets});
+  expect(release.status, release.stderr).toBe(0);
+  expect(release.outputs).toContain('mode=corpus\n');
+});
+
+function classifyOrdinaryCi(root: string, pr: {merge: string; head: string}) {
+  const ci = spawnSync(process.execPath, [join(process.cwd(), 'scripts/classify-ci-changes.mjs')], {
+    cwd: root, encoding: 'utf8', env: {...process.env,
+      CI_EVENT_NAME: 'pull_request', CI_EXPECTED_HEAD: pr.merge, CI_PR_HEAD: pr.head, CI_FORCE_FULL: 'false',
+      GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: ''},
+  });
+  expect(ci.status, ci.stderr).toBe(0);
+  return JSON.parse(ci.stdout);
+}
+
 const morphologyPaths = [
   ...exactMorphologyPaths,
   'src/adapters/d1/D1MorphologyRepository.ts',
@@ -111,13 +189,7 @@ it.each([
   expect(release.status, release.stderr).toBe(0);
   expect(release.outputs).toContain('mode=application\n');
 
-  const ci = spawnSync(process.execPath, [join(process.cwd(), 'scripts/classify-ci-changes.mjs')], {
-    cwd: f.root, encoding: 'utf8', env: {...process.env,
-      CI_EVENT_NAME: 'pull_request', CI_EXPECTED_HEAD: pr.merge, CI_PR_HEAD: pr.head, CI_FORCE_FULL: 'false',
-      GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: ''},
-  });
-  expect(ci.status, ci.stderr).toBe(0);
-  expect(JSON.parse(ci.stdout)).toEqual({
+  expect(classifyOrdinaryCi(f.root, pr)).toEqual({
     mode: 'full', data: true, serving: true, reason: 'corpus-delivery-or-unclassified-path',
   });
 });

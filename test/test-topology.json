@@ -10,8 +10,8 @@
     "conformance": 1
   },
   "current": {
-    "totalTestTypeScript": 309,
-    "activeVitest": 227,
+    "totalTestTypeScript": 310,
+    "activeVitest": 228,
     "support": 27,
     "manual": 4,
     "legacyOrphan": 50,
@@ -173,6 +173,7 @@
       "test/unit/scripts/maculaSourceContract.test.ts",
       "test/unit/scripts/morphologyLemma.test.ts",
       "test/unit/scripts/morphologyUsageIdentity.test.ts",
+      "test/unit/scripts/nodeE2eFixture.test.ts",
       "test/unit/scripts/nortonAquinasCorruption.test.ts",
       "test/unit/scripts/nortonAquinasInventory.test.ts",
       "test/unit/scripts/nortonAquinasLive.test.ts",
