@@ -7,12 +7,7 @@ locally over stdio or Streamable HTTP and on Cloudflare Workers with D1.
 
 The checked-out local registry contains twelve tools, six guided prompts, eight
 English Bible translations, six commentary sources, 36 locally indexed
-historical works, Strong's dictionaries, and Greek/Hebrew morphology. The
-checked-out Transform 11 release adds ten reviewed editions to the former
-25-work baseline. The current release snapshot records the active 35-work
-assignment; the separately protected PR #108 D1 cutover is historical evidence.
-
-The local Norton/Aquinas release candidate adds 1,250 Norton source segments and a separate Aquinas hierarchy with 3,184 direct bodies / 3,185 nodes through Tertia Q90, excluding the Supplement. It is wired into local runtime and MCP surfaces; preview execution and production preparation/deployment require their separate gates.
+historical works, Strong's dictionaries, and Greek/Hebrew morphology.
 
 <!-- theologai-public-contract tools=12 structured=bible_cross_references,bible_lookup,bible_verse_morphology,classic_text_lookup,commentary_lookup,donation_config,historical_hierarchy_lookup,original_language_lookup,original_language_study,parallel_passages,primary_source_search,verify_donation -->
 
@@ -222,7 +217,7 @@ remains a historical acquisition-gate snapshot, not deployment evidence.
 Production v6/local-only and preview v7/discovery-only remain deployed with
 CCEL execution disabled before adapter, coordinator, or fetch.
 
-### Schema-0009 preview release state
+### Historical schema-0009 preview release
 
 The protected release targeted the prepared preview D1
 `theologai-preview-20260811-schema0009-a`
@@ -244,14 +239,14 @@ same-D1 predecessor. The detailed sanitized evidence is in
 [docs/PREVIEW-RELEASE-RECONCILIATION.md](docs/PREVIEW-RELEASE-RECONCILIATION.md).
 This post-release evidence commit postdates the deployed source and makes no new
 runtime claim.
-Production is separately bound to schema-`0009` D1
+The PR #122 production release separately bound schema-`0009` D1
 `theologai-production-20260811-schema0009-a`
-(`9bc79346-338b-439e-a2a5-424f4418eb21`) by the protected PR #122 release. The
-CCEL canary gate remains unrecorded and inert. The exact preparation identity,
+(`9bc79346-338b-439e-a2a5-424f4418eb21`). The CCEL canary gate was inert in this
+record. The exact preparation identity,
 seed evidence, and release boundary are recorded in
 [docs/D1-DATA-WORKFLOW.md](docs/D1-DATA-WORKFLOW.md).
 
-**Security release:** SEC-01–05 are resolved in production through PR #170 / run 41256928054. SEC-06 remains open and paused. See [findings and remaining risks](docs/SECURITY-REVIEW-2026-10-22.md) and [release evidence](docs/security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md). The eleven-tool / 35-work schema-0009 contract is preserved; the local corpus candidate is documented separately in [the release candidate](docs/NORTON-AQUINAS-RELEASE-CANDIDATE.md); deployment remains gated.
+**Security release.** SEC-01–05 were resolved through PR #170 / run 41256928054. SEC-06 remains open and paused. See [findings and remaining risks](docs/SECURITY-REVIEW-2026-10-22.md) and [release evidence](docs/security/SEC01-05-PRODUCTION-COMPLETE-2026-11-01.md).
 
 ## MCP capabilities
 
@@ -276,7 +271,7 @@ stderr or privacy-safe telemetry instead.
 | `bible_cross_references` | Query locally indexed OpenBible.info cross references with raw vote ranking, explicit discovery-only semantics, threshold-scoped result windows, and pinned snapshot provenance. |
 | `parallel_passages` | Return complete UBS source-attested parallel groups by default; legacy curated edges and OpenBible.info cross references require explicit selectors and remain separate. |
 | `commentary_lookup` | Retrieve Matthew Henry, JFB, Adam Clarke, John Gill, Keil-Delitzsch (OT), or Tyndale notes. |
-| `classic_text_lookup` | The checked-out candidate searches and browses 36 historical works with canonical source-first section keys; 19 reviewed source-pack editions use bounded sectioned delivery. Deployed assignments remain recorded in CURRENT-RELEASE. Exact sections are the only body route, and remote CCEL document bodies are not retrieved or republished. |
+| `classic_text_lookup` | Search and browse 36 historical works with canonical source-first section keys. Nineteen reviewed source-pack editions use bounded sectioned delivery. Retrieve body text through exact sections. |
 | `historical_hierarchy_lookup` | Browse Aquinas’s four authored Summa parts through Tertia Q90; exact nodes return direct text and the traditional Supplement is excluded. |
 | `primary_source_search` | Execute bounded primary-source query plans. Production v6/local-only is deployed; preview runs the audited v7/discovery-only contract with CCEL execution disabled before adapter, coordinator, or fetch. The Transform-9 preview corpus release does not change that CCEL policy. Local locators use canonical section keys plus source ordinals; snippets remain discovery-only and research workflows maintain explicit searched/read/deferred/not-searched coverage ledgers. |
 | `original_language_lookup` | Look up or search Strong's entries, with opt-in rights-reviewed STEPBible metadata, exact corrected-corpus usage, and bounded occurrence pages for exact identities. The Online-Bible-derived TBESH Hebrew `Meaning` field is withheld. |
@@ -442,24 +437,14 @@ transcription uncertainty.
 
 ### Historical documents and external discovery
 
-The checked-out candidate contains 36 flat works: 17 legacy works and 19 reviewed, normalized source-pack editions. Norton contributes 1,250 unchanged source segments. Aquinas is separate from the flat catalog: four authored parts through Tertia Q90, 3,184 direct bodies / 3,185 nodes, with the traditional Supplement excluded. Source manifests and authority locks remain the source of truth. These local changes do not establish a deployed corpus; see CURRENT-RELEASE and the separately gated Norton/Aquinas release candidate. The reviewed PR95 core-eight remains part of the deployed baselines and this local candidate. M4A's
-local/preview materialization and inactive-adapter statements are historical;
-PR #96 historically recorded a production D1 binding and bounded public
-`original_language_study` v2 audit. U3-T7 provides the in-memory semantic compiler,
-native-to-normalized coordinate bridge, and content-free compilation audit;
-M4A provides capacity and seed verification. The PR #96 audit does not
-independently establish the runtime status of later transforms.
-PR95's Transform9 core-eight remains included in the checked-out and deployed
-catalogs. Norton and Aquinas assets remain inactive. Transform 12 adds the
-generic Candidate-C storage lifecycle, seal, and dormant `sectioned_only`
-schema seam, but the canonical build, generated D1 seed, and readiness contract
-contain zero Norton rows. A separate disposable local-only command proves the
-1,250-row Norton authority in copied SQLite and isolated Workerd databases; it
-cannot write the canonical seed or use a remote binding. Cyril remains blocked
-with zero output pending reliable translator attribution.
+The local catalog contains 17 legacy works and 19 reviewed source-pack editions.
+Norton contributes 1,250 unchanged source segments. Aquinas uses a separate
+hierarchy of four authored parts through Tertia Q90, with 3,184 direct bodies and
+3,185 nodes. The traditional Supplement is excluded. The source manifests and
+authority locks define the corpus. See the [current release snapshot](docs/CURRENT-RELEASE.md)
+for the deployed assignments and the [Norton/Aquinas preparation record](docs/NORTON-AQUINAS-RELEASE-CANDIDATE.md)
+for the earlier local and preview evidence. Cyril remains blocked pending reliable translator attribution.
 
-Production v6/local-only and preview v7/discovery-only currently search and
-retrieve the 35-work Transform-11 collection.
 Both deployed environments do **not** currently fetch CCEL search results or document bodies.
 Preview's existing `classic_text_lookup` provides the Baltimore hard cut and
 canonical/legacy resolution without adding a tool. Its deployed v7

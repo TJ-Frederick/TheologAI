@@ -55,14 +55,14 @@ stable days, no active bindings, reconstruction/compatibility proof, and exact
 owner authorization. Review quarterly with the `2026-11-15` H1 reassessment;
 H1 artifact expiry is separate.
 
-Schema-`0009` is active; the two retained older cross-schema matched
-generations are PR #108 Transform-11 and PR #101 hierarchy.
+The August rollback rehearsal recorded schema `0009` as active, with PR #108
+Transform-11 and PR #101 hierarchy as the two older matched generations.
 
 ## Historical PR #122 live baseline
 
-The integrated checked-out normal build excludes the Transform-10 Aquinas
-hierarchy from all normal D1 corpora: it has no catalog, runtime, or MCP
-projection. In this dated record, production was PR #122 merge
+The normal build at PR #122 excluded the Transform-10 Aquinas hierarchy from
+the D1 corpus and omitted its catalog, runtime, and MCP projection. Production
+was PR #122 merge
 `86475ecf8288cb0ebcb6467c77c0fd0998a8f1c2` (tree
 `8150aa29e7e4a22141edbfc9ab568df933f9c9b3`). Protected workflow
 `31631924636` deployed `e62698f3-f6b0-4145-97bf-28abdeae0e3a`, serving Worker
@@ -70,9 +70,8 @@ projection. In this dated record, production was PR #122 merge
 bound to `theologai-production-20260811-schema0009-a`
 (`9bc79346-338b-439e-a2a5-424f4418eb21`). Readiness, authority, historical
 core, Transform-11 spine, original-language, edge stabilization, final Worker
-identity, preview-control, and environment-isolation checks passed. This is not
-a hierarchy/publication activation; CCEL execution remains disabled and
-Aquinas remains inactive.
+identity, preview-control, and environment-isolation checks passed. CCEL
+execution was disabled and Aquinas remained inactive at that cutover.
 
 For the schema-`0009` cutover, the exact captured PR #108 pair is the
 immediately preceding primary rollback unit: deployment
@@ -82,9 +81,9 @@ immediately preceding primary rollback unit: deployment
 (`53211f50-a893-4b4c-be1e-bc625a595dc7`). PR #101 is older retained rollback
 history, not the immediate rollback claim.
 
-### Schema-0009 release state
+### Historical schema-0009 release state
 
-The checked-in preview configuration targets schema-`0009` D1
+The PR #122 preview configuration targeted schema-`0009` D1
 `theologai-preview-20260811-schema0009-a`
 (`74f456e2-6951-4003-bb6f-91951342bf8f`). The protected preview workflow
 proved that binding and completed its audit. It captured production against its
@@ -92,10 +91,8 @@ checked-in D1 name/UUID and fresh inventory before preview mutation,
 immediately after deployment, and again after final preview audit. The
 separately prepared schema-`0009` candidate
 `theologai-production-20260811-schema0009-a`
-(`9bc79346-338b-439e-a2a5-424f4418eb21`) is the production D1 also recorded in
-today's [current release snapshot](CURRENT-RELEASE.md). PR #122's protected
-production binding observation is dated historical evidence, not current today;
-it proved the active binding, re-proved preview control after deployment and
+(`9bc79346-338b-439e-a2a5-424f4418eb21`) served production in that release. The
+protected PR #122 run proved the binding, re-proved preview control after deployment and
 audits, and emitted the final environment-isolation receipt.
 
 In the dated release record, PR #123 completed that protected preview release from
