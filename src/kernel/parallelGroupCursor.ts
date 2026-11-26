@@ -1,3 +1,4 @@
+import { decodeBase64Url, encodeBase64Url } from './utf8Base64Url.js';
 import type { SourceParallelReferenceSegment } from './sourceAttestedParallels.js';
 import { UBS_PARALLEL_PASSAGE_ARTIFACT_IDENTITY } from './ubsParallelSource.js';
 
@@ -146,19 +147,6 @@ function canonicalizeSegments(segments: readonly unknown[]): SourceParallelRefer
 
 function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
-}
-
-function encodeBase64Url(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
-}
-
-function decodeBase64Url(value: string): string {
-  const padded = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
-  const binary = atob(padded);
-  return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(binary, character => character.charCodeAt(0)));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
