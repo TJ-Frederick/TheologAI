@@ -43,10 +43,32 @@ const runtimeOnlyPaths = new Set([
   'test/fixtures/expandedMorphology.ts',
   'test/fixtures/mcpCompositionRoot.ts',
 ]);
+// PR #203 changes only the Node test harness and three npm test commands.
+// Recognize this exact transition so a future application release can include
+// the maintenance without granting a standing exception to package.json or scripts/.
+const reviewedNodeE2eChanges = [
+  ['package.json', '1a931cc4d60bd88d3968388bbfcb90fd08dc0ab6', '5471d433642480d3bbb02f78028d37489ff01e77'],
+  ['scripts/node-e2e-fixture.ts', null, 'c0555b9e5f378d6c3c3e0e2419cf17125ffe21f9'],
+  ['scripts/test-node-http-e2e.ts', '09fd645ca578c25a22d7e9eba38ce3a7684906ed', 'a6ac7eab37c659a8fdfd6bac9e041debc886e061'],
+  ['scripts/test-node-stdio-e2e.ts', 'b824299c4ff760091df61f3773cdb29a1f642b82', '0dd9542494d7c405264c9cebb67204405b06f6e5'],
+  ['test/unit/scripts/nodeE2eFixture.test.ts', null, '4b4957ce01ef2784fda529dafef4a833bb631efa'],
+];
+const reviewedNodeE2ePaths = new Set(reviewedNodeE2eChanges.map(([path]) => path));
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
 const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
 function requireValue(value, message) {
   if (!value) throw new Error('Release refused: ' + message);
+}
+
+function isReviewedNodeE2eChange(root, base, changes) {
+  const matching = changes.filter(change => change.paths.some(path => reviewedNodeE2ePaths.has(path)));
+  if (matching.length !== reviewedNodeE2eChanges.length || matching.some(change => !['A', 'M'].includes(change.status))) {
+    return false;
+  }
+  const expected = reviewedNodeE2eChanges.map(([path, before, after]) =>
+    `:${before ? '100644' : '000000'} 100644 ${before ?? '0'.repeat(40)} ${after} ${before ? 'M' : 'A'}\0${path}\0`).join('');
+  const actual = git(root, ['diff', '--raw', '--no-abbrev', '--no-renames', '-z', base, 'HEAD', '--', ...reviewedNodeE2ePaths]);
+  return actual === expected;
 }
 
 export function readReleaseConfiguration(root = process.cwd()) {
@@ -85,7 +107,9 @@ export function classifyRelease(root = process.cwd(), baselineFile) {
   // The CI classifier already has an explicit list of runtime-only and documentation changes.
   // Anything outside it, including builders and their dependencies, needs data validation.
   // Release automation can change independently of the Worker and corpus.
-  const substantive = paths.filter(change => !change.paths.every(path => releaseOperations.has(path)));
+  const reviewedNodeE2e = isReviewedNodeE2eChange(root, baseline.productionSource, paths);
+  const substantive = paths.filter(change => !change.paths.every(path =>
+    releaseOperations.has(path) || (reviewedNodeE2e && reviewedNodeE2ePaths.has(path))));
   if (!substantive.length) return 'docs';
   const diff = substantive.map(change => [change.status, ...change.paths].join('\0') + '\0').join('');
   const {mode} = classifyCiChanges(diff);

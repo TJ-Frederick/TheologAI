@@ -4,7 +4,7 @@ Use **PR Checks** for preview and **Deploy Production** to promote the accepted 
 
 | What changed | Before promotion | After promotion |
 | --- | --- | --- |
-| Documentation only | Ordinary CI | No deployment |
+| Documentation only or the exact reviewed Node E2E harness update in PR #203 | Ordinary CI, including full validation for the harness update | No deployment |
 | Application code, existing databases | Build once. Run the Worker locally, then on protected preview. In each MCP version, connect, list tools, read John 3:16 morphology and resolve a Kempis search citation. | Promote the same bundle. Verify the actual Worker and database, repeat eight checks and confirm final routing. |
 | Corpus, schema, database replacement or an unclassified change | Test the source data. Use an independently prepared candidate. Verify its contents, indexes and integrity. Run all 370 acceptance checks in local Workerd, then run the focused checks on protected preview. | Recheck the accepted preview, verify the production candidate under separate authority, switch traffic once, run the focused hosted checks and confirm both environments. |
 
