@@ -30,7 +30,7 @@ import { CcelSearchAdapter } from '../../adapters/commentary/CcelSearchAdapter.j
 // Services
 import { BibleService } from '../../services/bible/BibleService.js';
 import { CrossReferenceService } from '../../services/bible/CrossReferenceService.js';
-import { ParallelPassageService } from '../../services/bible/ParallelPassageService.js';
+import { createLegacyParallelLookup, ParallelPassageService } from '../../services/bible/ParallelPassageService.js';
 import { CommentaryService } from '../../services/commentary/CommentaryService.js';
 import { HistoricalDocumentService } from '../../services/historical/HistoricalDocumentService.js';
 import { HistoricalHierarchyService } from '../../services/historical/HistoricalHierarchyService.js';
@@ -86,6 +86,7 @@ const ccelSearchAdapter = new CcelSearchAdapter({
 });
 
 const commentaryService = new CommentaryService([helloaoCommentary]);
+let legacyParallelLookup: ReturnType<typeof createLegacyParallelLookup> | undefined;
 
 // ESV adapter + BibleService are lazy-initialized on first request
 // because EsvAdapter needs env.ESV_API_KEY which isn't available at module scope.
@@ -136,11 +137,13 @@ export function createWorkerCompositionRoot(env: Env): WorkerCompositionRoot {
   const crossRefService = new CrossReferenceService(crossRefRepo);
   const bibleService = getBibleService(env);
   const sourceAttestedParallelService = new SourceAttestedParallelService(sourceAttestedParallelRepo);
+  // Only the indexes over bundled data span requests. The service owns each request's repositories.
+  legacyParallelLookup ??= createLegacyParallelLookup(parallelPassagesData as Parameters<typeof createLegacyParallelLookup>[0]);
   const parallelService = new ParallelPassageService(
     crossRefRepo,
     bibleService,
     undefined, // no databasePath in Workers
-    parallelPassagesData as any, // preloaded from JSON module
+    legacyParallelLookup,
     sourceAttestedParallelService,
   );
   const historicalService = new HistoricalDocumentService(historicalRepo);

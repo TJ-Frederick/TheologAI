@@ -62,21 +62,25 @@ interface CuratedMember {
   parsed: BibleReference;
 }
 type TextService = Pick<BibleService, 'lookup'>;
+type LegacyParallelLookup = (
+  reference: string,
+  params: Pick<ParallelPassageLookupParams, 'mode' | 'maxParallels'>,
+) => ResearchLegacyParallel[];
 const TEXT_LOOKUP_CONCURRENCY = 4;
 
 export class ParallelPassageService {
-  private readonly groupsByReference = new Map<string, CuratedGroup[]>();
-  private readonly groupsByBookChapter = new Map<string, CuratedGroup[]>();
+  private readonly lookupLegacy: LegacyParallelLookup;
 
   constructor(
     private readonly crossRefs: ICrossReferenceRepository,
     private readonly bibleService?: TextService,
     databasePath?: string,
-    preloadedData?: RawParallelDatabase,
+    legacyData?: RawParallelDatabase | LegacyParallelLookup,
     private readonly sourceAttestedService?: Pick<SourceAttestedParallelService, 'lookup' | 'getProvenance'>,
   ) {
-    const raw = preloadedData ?? this.loadDatabase(databasePath);
-    this.indexDatabase(raw);
+    this.lookupLegacy = typeof legacyData === 'function'
+      ? legacyData
+      : createLegacyParallelLookup(legacyData ?? this.loadDatabase(databasePath));
   }
 
   async lookup(params: ParallelPassageLookupParams): Promise<ParallelPassageResearchResult> {
@@ -177,26 +181,6 @@ export class ParallelPassageService {
     };
   }
 
-  private lookupLegacy(primaryReference: string, params: ParallelPassageLookupParams): ResearchLegacyParallel[] {
-    const mode = params.mode ?? 'auto';
-    const maxParallels = normalizeMaxParallels(params.maxParallels);
-    const candidates = new Map<string, ResearchLegacyParallel>();
-    const primaryParsed = parseReference(primaryReference);
-    for (const group of this.findGroups(primaryReference, primaryParsed)) {
-      for (const member of group.members) {
-        if (rangesOverlap(primaryParsed, member.parsed) || candidates.has(member.reference)) continue;
-        const relationship = relationshipForEdge(group.relationship, primaryParsed, member.parsed);
-        if (!relationshipMatchesMode(relationship, mode)) continue;
-        candidates.set(member.reference, {
-          reference: member.reference, relationship, confidence: group.confidence, notes: group.notes,
-          textEnrichmentStatus: 'not_requested',
-          provenanceIds: [LEGACY_PARALLEL_PROVENANCE_ID],
-        });
-      }
-    }
-    return [...candidates.values()].slice(0, maxParallels);
-  }
-
   private async lookupOpenBible(reference: string, maxResults: number, warnings: string[]) {
     const result = await this.crossRefs.getCrossReferences(reference, { maxResults });
     return result.references.flatMap(xref => {
@@ -214,47 +198,6 @@ export class ParallelPassageService {
     const currentDirectory = dirname(fileURLToPath(import.meta.url));
     const path = databasePath ?? join(currentDirectory, '..', '..', 'data', 'parallel-passages.json');
     return JSON.parse(readFileSync(path, 'utf-8')) as RawParallelDatabase;
-  }
-
-  private indexDatabase(database: RawParallelDatabase): void {
-    for (const [rawPrimary, entry] of Object.entries(database.parallels)) {
-      if (!['synoptic', 'quotation', 'allusion', 'thematic'].includes(entry.relationship)) {
-        throw new Error(`Invalid parallel relationship for ${rawPrimary}`);
-      }
-      if (!Array.isArray(entry.parallels) || !Number.isFinite(entry.confidence)) {
-        throw new Error(`Invalid parallel entry for ${rawPrimary}`);
-      }
-      const uniqueMembers = [...new Set([rawPrimary, ...entry.parallels].map(normalizeReference))]
-        .map(reference => ({ reference, parsed: parseReference(reference) }));
-      const confidence = entry.confidence > 1 ? entry.confidence / 100 : entry.confidence;
-      if (confidence < 0 || confidence > 1) throw new Error(`Invalid parallel confidence for ${rawPrimary}`);
-      const group: CuratedGroup = {
-        relationship: entry.relationship,
-        confidence,
-        notes: entry.notes,
-        members: uniqueMembers,
-      };
-      for (const member of group.members) {
-        const groups = this.groupsByReference.get(member.reference) ?? [];
-        groups.push(group);
-        this.groupsByReference.set(member.reference, groups);
-
-        const scope = referenceScopeKey(member.parsed);
-        const scopedGroups = this.groupsByBookChapter.get(scope) ?? [];
-        scopedGroups.push(group);
-        this.groupsByBookChapter.set(scope, scopedGroups);
-      }
-    }
-  }
-
-  private findGroups(primaryReference: string, primaryParsed: BibleReference): CuratedGroup[] {
-    const groups = new Set(this.groupsByReference.get(primaryReference) ?? []);
-    for (const group of this.groupsByBookChapter.get(referenceScopeKey(primaryParsed)) ?? []) {
-      if (group.members.some(member => rangesOverlap(primaryParsed, member.parsed))) {
-        groups.add(group);
-      }
-    }
-    return [...groups];
   }
 
   private async attachTexts(
@@ -365,6 +308,67 @@ export class ParallelPassageService {
       completionStatus: failedReferences.length === 0 && omittedLookupCount === 0 ? 'complete' : 'incomplete',
     };
   }
+}
+
+/** Build the legacy indexes once. Only fresh result objects leave this closure. */
+export function createLegacyParallelLookup(database: RawParallelDatabase): LegacyParallelLookup {
+  const groupsByReference = new Map<string, CuratedGroup[]>();
+  const groupsByBookChapter = new Map<string, CuratedGroup[]>();
+  for (const [rawPrimary, entry] of Object.entries(database.parallels)) {
+    if (!['synoptic', 'quotation', 'allusion', 'thematic'].includes(entry.relationship)) {
+      throw new Error(`Invalid parallel relationship for ${rawPrimary}`);
+    }
+    if (!Array.isArray(entry.parallels) || !Number.isFinite(entry.confidence)) {
+      throw new Error(`Invalid parallel entry for ${rawPrimary}`);
+    }
+    const uniqueMembers = [...new Set([rawPrimary, ...entry.parallels].map(normalizeReference))]
+      .map(reference => ({ reference, parsed: parseReference(reference) }));
+    const confidence = entry.confidence > 1 ? entry.confidence / 100 : entry.confidence;
+    if (confidence < 0 || confidence > 1) throw new Error(`Invalid parallel confidence for ${rawPrimary}`);
+    const group: CuratedGroup = {
+      relationship: entry.relationship,
+      confidence,
+      notes: entry.notes,
+      members: uniqueMembers,
+    };
+    for (const member of group.members) {
+      const groups = groupsByReference.get(member.reference) ?? [];
+      groups.push(group);
+      groupsByReference.set(member.reference, groups);
+
+      const scope = referenceScopeKey(member.parsed);
+      const scopedGroups = groupsByBookChapter.get(scope) ?? [];
+      scopedGroups.push(group);
+      groupsByBookChapter.set(scope, scopedGroups);
+    }
+  }
+
+  return (primaryReference, params) => {
+    const mode = params.mode ?? 'auto';
+    const maxParallels = normalizeMaxParallels(params.maxParallels);
+    const primaryParsed = parseReference(primaryReference);
+    const groups = new Set(groupsByReference.get(primaryReference) ?? []);
+    for (const group of groupsByBookChapter.get(referenceScopeKey(primaryParsed)) ?? []) {
+      if (group.members.some(member => rangesOverlap(primaryParsed, member.parsed))) {
+        groups.add(group);
+      }
+    }
+
+    const candidates = new Map<string, ResearchLegacyParallel>();
+    for (const group of groups) {
+      for (const member of group.members) {
+        if (rangesOverlap(primaryParsed, member.parsed) || candidates.has(member.reference)) continue;
+        const relationship = relationshipForEdge(group.relationship, primaryParsed, member.parsed);
+        if (!relationshipMatchesMode(relationship, mode)) continue;
+        candidates.set(member.reference, {
+          reference: member.reference, relationship, confidence: group.confidence, notes: group.notes,
+          textEnrichmentStatus: 'not_requested',
+          provenanceIds: [LEGACY_PARALLEL_PROVENANCE_ID],
+        });
+      }
+    }
+    return [...candidates.values()].slice(0, maxParallels);
+  };
 }
 
 function notRequestedTextEnrichment(uniqueTargetCount: number): ParallelTextEnrichment {
