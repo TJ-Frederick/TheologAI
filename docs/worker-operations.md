@@ -571,8 +571,8 @@ are separate version domains.
 
 No rollback asset is claimed as known-good without a read-only inventory and
 compatibility check. Do not copy database IDs, credentials, API tokens, or
-provider-bearing secret RPC URLs into this runbook; `wrangler.toml` and the
-approved workflow are the configuration sources of truth.
+provider-bearing secret RPC URLs into this runbook. For any approved rollback,
+use the verified Worker and D1 pair.
 
 Choose rollback as a matched operational decision:
 
@@ -591,14 +591,11 @@ Choose rollback as a matched operational decision:
 5. **No destructive cleanup:** do not delete predecessor databases until a
    separately authorized retention window and rollback review are complete.
 
-The production Wrangler workflow targets the top-level configuration explicitly
-with `npx --no-install wrangler secret put ESV_API_KEY --env=` for secret upload
-and `command: deploy --env=` for deploy. The secret value is supplied through
-stdin from the masked job environment and is not part of the command text.
-This is intentional: the top-level configuration is production, while
-`preview` is the only named environment. The action's named
-`environment: production` input is not used because no `env.production` block
-exists and creating one would change the Worker/configuration model.
+Use the protected **PR Checks** workflow for preview and **Deploy Production**
+to promote the accepted bundle. The upload uses the rendered configuration for
+the approved role and preserves existing secret bindings. Follow the [current
+deployment procedure](ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md) for approvals,
+verification, and recovery.
 
 ## Anonymous MCP request limit
 
@@ -653,12 +650,14 @@ or limiter change is currently approved.
 
 ## Runtime configuration ownership
 
-`wrangler.toml` is the source of truth for non-secret runtime configuration.
-Production and preview explicitly declare the exact browser origin allowlist,
-maximum request size, and request-lifecycle logging state. Do not add these as
-dashboard-only plaintext variables: Wrangler removes undeclared variables on a
-later deploy unless `keep_vars` is enabled, and this project deliberately does
-not enable it.
+`wrangler.toml` supplies the checked-in Wrangler template. Keep the browser
+origin allowlist, maximum request size, and request-lifecycle logging settings
+declared there for both roles. Avoid dashboard-only plaintext variables for
+these settings. The protected workflows use
+`worker-release-artifact.mjs render` to generate the upload configuration and
+take the intended `THEOLOGAI_DB` name and UUID for that role from
+[`release/serving.json`](../release/serving.json). Use the [current release
+snapshot](CURRENT-RELEASE.md) for the latest verified Worker and D1 assignments.
 
 API keys and provider-bearing RPC URLs remain optional Worker secrets. The
 temporary exact `CF-Connecting-IP` plus `User-Agent` abusive-poller exception
