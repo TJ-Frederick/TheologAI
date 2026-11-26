@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatValidationError, validatePromptArguments, validatorFor } from '../../../src/mcp/validation.js';
+import { formatValidationError, immutableValidatorSchema, validatePromptArguments, validatorFor } from '../../../src/mcp/validation.js';
 import { createBibleLookupHandler } from '../../../src/tools/v2/bibleLookup.js';
 import { createClassicTextsHandler } from '../../../src/tools/v2/classicTexts.js';
 import { createCommentaryHandler } from '../../../src/tools/v2/commentary.js';
@@ -15,6 +15,42 @@ import { originalLanguageOutputSchema } from '../../../src/mcp/schemas/originalL
 const unused = {} as never;
 
 describe('Worker-safe JSON Schema validation', () => {
+  it('rebuilds validators after nested edits to a mutable schema with a frozen root', () => {
+    const schema = Object.freeze({
+      type: 'object',
+      properties: { value: { type: 'string' } },
+      required: ['value'],
+    });
+    const before = validatorFor(schema);
+    expect(before({ value: 42 }).valid).toBe(false);
+
+    schema.properties.value.type = 'number';
+    const after = validatorFor(schema);
+    expect(after).not.toBe(before);
+    expect(after({ value: 42 }).valid).toBe(true);
+    expect(before({ value: 42 }).valid).toBe(false);
+  });
+
+  it('reuses an owned immutable snapshot and compiles a replacement after a source edit', () => {
+    const source = {
+      type: 'object',
+      properties: { value: { enum: ['first'] } },
+      required: ['value'],
+    };
+    const snapshot = immutableValidatorSchema(source);
+    expect(Object.isFrozen(snapshot.properties.value.enum)).toBe(true);
+    expect(Object.isFrozen(snapshot.required)).toBe(true);
+    const first = validatorFor(snapshot);
+    expect(validatorFor(snapshot)).toBe(first);
+
+    source.properties.value.enum[0] = 'second';
+    const second = validatorFor(immutableValidatorSchema(source));
+    expect(second).not.toBe(first);
+    expect(first({ value: 'first' }).valid).toBe(true);
+    expect(first({ value: 'second' }).valid).toBe(false);
+    expect(second({ value: 'second' }).valid).toBe(true);
+  });
+
   it.each([
     ['reference', 316],
     ['translation', ['NET']],

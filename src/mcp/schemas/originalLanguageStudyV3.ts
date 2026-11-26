@@ -1,3 +1,4 @@
+import { immutableValidatorSchema } from '../validation.js';
 import type { Tool } from '@modelcontextprotocol/server';
 import { originalLanguageStudyOutputSchema } from './originalLanguageStudy.js';
 import {
@@ -286,7 +287,7 @@ function continuationSchema(operation: string) {
   } as const;
 }
 
-export const originalLanguageStudyV3OutputSchema = {
+export const originalLanguageStudyV3OutputSchema = immutableValidatorSchema({
   type: 'object',
   properties: {
     schemaVersion: {}, kind: {}, depth: {}, request: {}, study: {}, lexicalRange: {},
@@ -295,4 +296,4 @@ export const originalLanguageStudyV3OutputSchema = {
   },
   additionalProperties: false,
   oneOf: [rootSchema('beginner'), rootSchema('intermediate'), rootSchema('technical')],
-} as NonNullable<Tool['outputSchema']>;
+} as NonNullable<Tool['outputSchema']>);
