@@ -11,7 +11,7 @@ The successor program after PR #122 is defined in
 [Phase 3B](./PHASE-3B-PLAN.md); earlier uses of "Phase 3" below are historical
 names for already-shipped work.
 
-## Current delivery status — November 3, 2026
+## Delivery status — November 25, 2026
 
 - **Production reliability complete:** [PR #172](https://github.com/TJ-Frederick/TheologAI/pull/172), merged as `701ab6295f033105ec306f7878a85e294cba0f6d`, passed the separately approved production release. [Completion and accounting](ci-reliability/PRODUCTION-COMPLETE-2026-11-03.md) records the proof and live audits. [CURRENT-RELEASE](CURRENT-RELEASE.md) alone owns the dated assignment.
 - **Security complete within scope:** SEC-01–05 shipped through PR #170; SEC-06 remains open and paused. The section below preserves the remaining risks and approval boundaries.
@@ -20,7 +20,11 @@ names for already-shipped work.
 
 ## Next work
 
-- Resume the preserved Norton/Aquinas candidate in [its existing chat](codex://threads/01a179a9-6b6e-7973-92de-f7b13d617aad). Keep that candidate and its evidence separate from this documentation work; production promotion requires Tyler's approval. PR #154's language-depth candidate also remains preserved and unmerged.
+The application simplification releases through November 25 are recorded in
+[CURRENT-RELEASE](CURRENT-RELEASE.md). [PR #203](https://github.com/TJ-Frederick/TheologAI/pull/203)
+consolidated Node E2E fixture setup and merged without deployment.
+
+- Hold the four [corpus tooling drafts](https://github.com/TJ-Frederick/TheologAI/pull/202) for a future corpus release. The language-depth candidate in PR #154 remains separate.
 - Review restoration of the September Bible reliability, tool telemetry, research-query benchmark and architecture-maintenance work against current security fixes. Establish current scope and acceptance evidence before implementation; do not reuse PR #161's expired preview transaction as release authority.
 - Maintain the strict dependency audit and its existing dev-only exception/November 22 UTC expiry. SEC-06 remains paused; broader evidence reuse, remote batching and assurance choices remain deferred as recorded in [remaining audit scope](ci-reliability/REMAINING-AUDIT-SCOPE.md).
 - Keep live CCEL discovery gated, section-span commentary dependent on honest provider coverage, and further structured-output revisions subject to compatibility review. The historical planning record below preserves their detailed constraints; it does not schedule or authorize operations.
