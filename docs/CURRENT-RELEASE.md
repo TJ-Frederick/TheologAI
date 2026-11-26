@@ -10,6 +10,32 @@ historical evidence.
 
 ## Latest verified production release — November 25, 2026
 
+[PR #208](https://github.com/TJ-Frederick/TheologAI/pull/208) shares one
+successful historical catalog read across each primary-source search plan while
+preserving per-query failure handling. It includes the provider coverage
+projection from [#207](https://github.com/TJ-Frederick/TheologAI/pull/207) and
+the release-guidance update from [#206](https://github.com/TJ-Frederick/TheologAI/pull/206).
+
+Production source `e4d7dc9bca51074023c1c8046ea1b861dc835dd6` matches tree
+`906181bdd9e75d7fcf914ca6d2e18d746002ef4f`, accepted by
+[protected preview run 45731501588](https://github.com/TJ-Frederick/TheologAI/actions/runs/45731501588).
+[Protected production run 45736021208](https://github.com/TJ-Frederick/TheologAI/actions/runs/45736021208),
+attempt 1, promoted that bundle on the existing schema-0010 production D1.
+Preview and production each passed **8/8** checks across both MCP protocol
+versions. Final routing matched the accepted Worker and D1, and the preview
+control stayed stable throughout production promotion.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — verified serving assignment | `1ff1e2ae-bbcf-4a2b-b136-2d3f5e13250a` | `dcf07c1f-ea1f-4156-9d51-c850cf77b9d7` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control at production verification | `8731f91a-957e-419c-8c35-797594ecbf45` | `61fa95c2-8c29-4bc6-93dd-4c6498eebae1` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The protected run retained its matched predecessor and acceptance receipt.
+The receipt SHA-256 is
+`aa3b6bb3833dc4b755765978c9feb1c728c6965bc025cdd8641bac3e3a1b3a84`.
+
+## Historical application release — November 25, 2026
+
 [PR #199](https://github.com/TJ-Frederick/TheologAI/pull/199) combined the
 provider response-cache validation fix, the indexed expanded-morphology query
 from [#192](https://github.com/TJ-Frederick/TheologAI/pull/192), and the narrow
