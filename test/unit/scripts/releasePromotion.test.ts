@@ -66,7 +66,13 @@ const exactMorphologyPaths = [
   'test/fixtures/mcpCompositionRoot.ts',
 ] as const;
 const exactCachePath = 'src/adapters/shared/HttpClient.ts';
-const narrowRuntimePaths = [...exactMorphologyPaths, exactCachePath];
+const cursorCodecPaths = [
+  'src/kernel/historicalHierarchyDelivery.ts',
+  'src/kernel/morphologyUsageCursor.ts',
+  'src/kernel/parallelGroupCursor.ts',
+  'src/kernel/utf8Base64Url.ts',
+] as const;
+const narrowRuntimePaths = [...exactMorphologyPaths, exactCachePath, ...cursorCodecPaths];
 const languageDepthPaths = [
   'src/kernel/originalLanguageStudyV3Contract.ts',
   'src/kernel/repositories.ts',
@@ -289,6 +295,12 @@ const cachePaths = [
   'test/unit/adapters/commentary/HelloAoCommentaryAdapter.test.ts',
   'test/unit/adapters/shared/HttpClient.test.ts',
 ];
+
+it('keeps the corpus-reachable sectioned cursor module on the corpus route', () => {
+  const f = repo();
+  f.commit([...cursorCodecPaths, 'src/kernel/historicalSectionedDelivery.ts'], 'cursor changes');
+  expect(f.run('classify')).toBe('corpus');
+});
 
 it.each(narrowRuntimePaths)('classifies the exact runtime path %s on its own as application', path => {
   const f = repo();

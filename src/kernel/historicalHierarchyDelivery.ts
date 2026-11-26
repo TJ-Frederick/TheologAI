@@ -1,3 +1,4 @@
+import { decodeBase64Url, encodeBase64Url } from './utf8Base64Url.js';
 import type { HistoricalHierarchyCursor, HistoricalHierarchyPublication } from './repositories.js';
 import { isHistoricalHierarchyNodeKey } from './historicalHierarchyResource.js';
 
@@ -103,18 +104,6 @@ function assertPosition(value: HistoricalHierarchyCursor): void {
   if (!Number.isSafeInteger(value.siblingOrdinal) || value.siblingOrdinal < 1 || !isHistoricalHierarchyNodeKey(value.nodeKey)) {
     throw new HistoricalHierarchyCursorError();
   }
-}
-
-function encodeBase64Url(value: string): string {
-  let binary = '';
-  for (const byte of new TextEncoder().encode(value)) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
-}
-
-function decodeBase64Url(value: string): string {
-  const padded = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
-  const binary = atob(padded);
-  return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(binary, character => character.charCodeAt(0)));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

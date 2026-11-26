@@ -42,6 +42,10 @@ const runtimeOnlyPaths = new Set([
   'src/adapters/shared/primarySourceSearchSql.ts',
   'src/adapters/shared/morphologyExpansion.ts',
   'src/adapters/shared/HttpClient.ts',
+  'src/kernel/historicalHierarchyDelivery.ts',
+  'src/kernel/morphologyUsageCursor.ts',
+  'src/kernel/parallelGroupCursor.ts',
+  'src/kernel/utf8Base64Url.ts',
   'src/kernel/originalLanguageStudyV3Contract.ts',
   'src/kernel/repositories.ts',
   'src/kernel/types.ts', // Shared TypeScript declarations only.

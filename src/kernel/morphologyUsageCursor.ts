@@ -1,3 +1,4 @@
+import { decodeBase64Url, encodeBase64Url } from './utf8Base64Url.js';
 import type { CanonicalOccurrencePosition } from './repositories.js';
 
 /** Pinned SHA-256 of the scoped morphology-usage sources and result semantics. */
@@ -60,19 +61,6 @@ export function decodeMorphologyUsageCursor(
     throw new RangeError('occurrence_cursor is malformed');
   }
   return after as CanonicalOccurrencePosition;
-}
-
-function encodeBase64Url(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
-}
-
-function decodeBase64Url(value: string): string {
-  const padded = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
-  const binary = atob(padded);
-  return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(binary, character => character.charCodeAt(0)));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
