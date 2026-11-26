@@ -3,7 +3,7 @@ import { formatPrimarySourceSearchFallback } from '../../../src/formatters/prima
 import { presentPrimarySourceSearchV6 } from '../../../src/presenters/primarySourceSearchV4Structured.js';
 import type { PrimarySourceSearchPlanResult } from '../../../src/services/historical/primarySourceTypes.js';
 
-describe('formatPrimarySourceSearch', () => {
+describe('formatPrimarySourceSearchFallback', () => {
   const scope = {
     status: 'matched' as const, requested: {}, eligibleDocumentCount: 1,
     eligibleDocuments: [{ id: 'doc', title: 'Document', metadataStatus: 'reviewed' as const }],
