@@ -11,34 +11,48 @@ The successor program after PR #122 is defined in
 [Phase 3B](./PHASE-3B-PLAN.md); earlier uses of "Phase 3" below are historical
 names for already-shipped work.
 
-## Delivery status — November 25, 2026
+## Delivery status — November 26, 2026
 
 - **Production reliability complete:** [PR #172](https://github.com/TJ-Frederick/TheologAI/pull/172), merged as `701ab6295f033105ec306f7878a85e294cba0f6d`, passed the separately approved production release. [Completion and accounting](ci-reliability/PRODUCTION-COMPLETE-2026-11-03.md) records the proof and live audits. [CURRENT-RELEASE](CURRENT-RELEASE.md) alone owns the dated assignment.
 - **Security complete within scope:** SEC-01–05 shipped through PR #170; SEC-06 remains open and paused. The section below preserves the remaining risks and approval boundaries.
 - **Test maintenance merged:** [PR #174](https://github.com/TJ-Frederick/TheologAI/pull/174), merged as `4ef5d42e3a04c3b425586a4c39498a3ae8c05a6b`, strengthened retained coverage and retired obsolete draft tests. All five required checks passed; this test/docs change did not deploy. [Validation record](TEST-MAINTENANCE.md).
 - **September improvements are deferred, not a pending integrated release:** the corpus-preserving security reconciliation `527d33d596b6f8ee5dcacb2e76771f18b19f47da` restored the deployed September 1 application baseline and recorded newer work in [the deferred-path inventory](../release/deferred-main-paths.json). Earlier merge ancestry does not establish that those improvements remain implemented. See the [open-PR assessment](#open-pr-assessment).
 
+## Simplification pass closeout
+
+The November simplification pass is complete. The [release snapshot](CURRENT-RELEASE.md)
+records the verified application releases and their protected preview and
+production evidence.
+
+- Donation evidence validation, provider cache admission, and atomic publication recovery landed. [PR #187](https://github.com/TJ-Frederick/TheologAI/pull/187) · [PR #199](https://github.com/TJ-Frederick/TheologAI/pull/199) · [PR #216](https://github.com/TJ-Frederick/TheologAI/pull/216)
+- Query and setup reductions shipped for Strong’s fallback, catalog and morphology reads, historical search ranking, the Worker’s bundled legacy parallel index, and single-segment UBS lookahead. [PR #188](https://github.com/TJ-Frederick/TheologAI/pull/188) · [PR #195](https://github.com/TJ-Frederick/TheologAI/pull/195) · [PR #199](https://github.com/TJ-Frederick/TheologAI/pull/199) · [PR #208](https://github.com/TJ-Frederick/TheologAI/pull/208) · [PR #209](https://github.com/TJ-Frederick/TheologAI/pull/209) · [PR #218](https://github.com/TJ-Frederick/TheologAI/pull/218)
+- The public original-language study v3 cutover superseded the earlier draft. Three runtime cursor families now share encoding while retaining their own validation rules. Internal study results distinguish a selected token from disambiguation candidates. [PR #214](https://github.com/TJ-Frederick/TheologAI/pull/214) · [PR #217](https://github.com/TJ-Frederick/TheologAI/pull/217) · [PR #221](https://github.com/TJ-Frederick/TheologAI/pull/221)
+- Node HTTP and stdio E2E share a verified SQLite fixture. The reviewed corpus tooling batch validates and stages seed output and removes unreachable preparation-resume logic. Both tooling changes merged after full CI without a deployment or hosted D1 quota use. [PR #203](https://github.com/TJ-Frederick/TheologAI/pull/203) · [PR #216](https://github.com/TJ-Frederick/TheologAI/pull/216)
+- Preview and promotion use the accepted production baseline for release classification. Promotion verifies the exact preview-tested artifact and tree. The deployment procedure retains separate preview, production, and corpus authorization. [Deployment procedure](ci-reliability/SIMPLER-DEPLOYMENT-PLAN.md)
+- The final application release reuses validators for three immutable built-in schema snapshots. Regression tests confirm nested edits to mutable schemas still select a new validator. Local Workerd benchmarks measured 6–25% lower warm median request latency across the tested workloads. First-handshake medians on fresh local workers were approximately 0.5–1 ms higher in a small sample. [PR #223 and benchmark results](https://github.com/TJ-Frederick/TheologAI/pull/223)
+
 ## Next work
 
-The application simplification releases through November 25 are recorded in
-[CURRENT-RELEASE](CURRENT-RELEASE.md). [PR #203](https://github.com/TJ-Frederick/TheologAI/pull/203)
-consolidated Node E2E fixture setup and merged without deployment.
+Use existing production metrics when there is enough comparable traffic. Where
+the telemetry supports it, compare median and p95 latency and error rates before
+and after the validator rollout for the same MCP method and protocol version.
+The benchmark figures above describe local Workerd requests.
 
-- Hold the four [corpus tooling drafts](https://github.com/TJ-Frederick/TheologAI/pull/202) for a future corpus release. The language-depth candidate in PR #154 remains separate.
-- Review restoration of the September Bible reliability, tool telemetry, research-query benchmark and architecture-maintenance work against current security fixes. Establish current scope and acceptance evidence before implementation; do not reuse PR #161's expired preview transaction as release authority.
-- Maintain the strict dependency audit and its existing dev-only exception/November 22 UTC expiry. SEC-06 remains paused; broader evidence reuse, remote batching and assurance choices remain deferred as recorded in [remaining audit scope](ci-reliability/REMAINING-AUDIT-SCOPE.md).
-- Keep live CCEL discovery gated, section-span commentary dependent on honest provider coverage, and further structured-output revisions subject to compatibility review. The historical planning record below preserves their detailed constraints; it does not schedule or authorize operations.
+The hierarchy FTS rebuild experiment, retirement of historical tooling, and
+other conditional simplifications remain deferred. Revisit a slice when a
+measured bottleneck or concrete failure justifies it. September restoration,
+SEC-06, broader assurance changes, and live CCEL discovery also remain deferred
+under their existing scope and approval boundaries. [Remaining audit scope](ci-reliability/REMAINING-AUDIT-SCOPE.md)
 
 ## Open-PR assessment
 
-Assessment against main `4ef5d42e3a04c3b425586a4c39498a3ae8c05a6b`; dispositions require coordinating review. Neither PR is closed by this record.
+Historical assessment against main `4ef5d42e3a04c3b425586a4c39498a3ae8c05a6b`.
+The table preserves the proposed dispositions from that review.
 
 | PR | Evidence | Proposed disposition |
 | --- | --- | --- |
 | [#161 — September release candidate](https://github.com/TJ-Frederick/TheologAI/pull/161) | Its sole delta is `docs/SEPTEMBER-REVIEW-RELEASE.md`; head `88a87df4d872a2c95b4063a12b3ad141757b8d4f` records September preview proof and awaits production approval. Its base `09892c8d39aed34074312f46c0c724b4212e25ee` is an ancestor of current main, but reconciliation `527d33d` removed `src/mcp/toolExecutionObserver.ts`, `src/kernel/requestDeadline.ts`, the research benchmark and architecture guide. Current Bible service and primary-source query planner match the September 1 baseline. [Security backport review](SECURITY-BACKPORT-REVIEW.md) explains the baseline decision. | Close the obsolete release transaction after review, retaining its branch and preview history. Its improvement backlog remains deferred; it was not wholly superseded by a later release. Any restoration needs a fresh candidate and evidence. |
 | [#169 — agent guidance](https://github.com/TJ-Frederick/TheologAI/pull/169) | Head `89868155f3013ed7bd42a5f6c136a8c30a8bf6d3` adds nine working agreements missing from main. Its full instruction files also describe the newer twelve-tool/36-work candidate, whereas current main retains the security-backport contract. | Reconcile only the nine agreements into the current matching AGENTS/CLAUDE pair, preserving current security guidance and public-contract markers. After this replacement is reviewed and merged, close #169 as replaced; retain its branch. |
-
-Housekeeping task: documentation reconciliation and PR assessment are under review. Targeted documentation, instruction-pair and diff checks apply; merge is held for independent review and required CI. No deployment, PR closure or candidate modification is part of this patch.
 
 ## Security maintenance — resolved in production
 
@@ -899,9 +913,9 @@ Historical rollback records do not authorize a rollback.
   reconstruction, compatibility, and exact-owner gates. No cleanup is
   authorized. The 3B.1 dual-era MCP modernization is complete: protected
   preview run `33441596793` and production run `33443530427` passed against the
-  same tree, with no D1 binding, schema, or data mutation. Phase 3B.2 historical
-  research specification is next. This roadmap does not authorize any further
-  deployment.
+  same tree, with no D1 binding, schema, or data mutation. That milestone set
+  3B.2 historical research as the next work. See the [Phase 3B plan](PHASE-3B-PLAN.md)
+  for subsequent delivery and provider status.
 - Revisit the parked public-edge traffic issue: a Frankfurt/AWS client has
   generated sustained anonymous production invocations. The custom domain and
   ordinary-request PR #72 legacy-host redirect are already deployed. Any
