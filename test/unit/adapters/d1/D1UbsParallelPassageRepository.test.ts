@@ -65,6 +65,7 @@ describe('D1UbsParallelPassageRepository', () => {
     expect(results).toEqual({ groups: [group], additionalMatchObserved: false });
     expect(Object.isFrozen(results.groups[0].members[0].segments)).toBe(true);
     expect(await repository.getProvenance()).toEqual(UBS_PARALLEL_PASSAGE_PROVENANCE);
+    expect(db.prepare.mock.calls[0][0]).toContain('CROSS JOIN ubs_parallel_groups');
     expect(db.prepare.mock.calls[0][0]).toContain('LIMIT ?');
     expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(
       'ubs_paratext_parallel_passages', 0, 42, 6, 35, 35, 2,
@@ -79,6 +80,19 @@ describe('D1UbsParallelPassageRepository', () => {
       'ubs_paratext_parallel_passages', 87, 42, 6, 35, 35, 2,
     );
     expect(db.prepare).toHaveBeenCalledTimes(5);
+  });
+
+  it('keeps planner-selected join order for a cross-chapter lookahead', async () => {
+    const db = createMockD1([{ sql: 'SELECT DISTINCT g.group_id', all: { results: [] } }]);
+    await expect(new D1UbsParallelPassageRepository(db as any).findGroups('Matthew 5:47-48,6:1-2', 3, 25))
+      .resolves.toEqual({ groups: [], additionalMatchObserved: false });
+    const query = db.prepare.mock.calls[0][0];
+    expect(query).toContain('JOIN ubs_parallel_groups');
+    expect(query).not.toContain('CROSS JOIN');
+    expect(db.prepare.mock.results[0].value.bind).toHaveBeenCalledWith(
+      'ubs_paratext_parallel_passages', 25, 40, 5, 48, 47, 40, 6, 2, 1, 4,
+    );
+    expect(db.prepare).toHaveBeenCalledTimes(1);
   });
 
   it('uses one aggregate D1 query to validate the exact query-bound cumulative cursor boundary', async () => {

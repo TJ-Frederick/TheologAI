@@ -56,10 +56,13 @@ export class D1UbsParallelPassageRepository implements ISourceAttestedParallelRe
     if (parsed.segments.length > 8) throw new Error('reference exceeds the reviewed 8-segment query bound');
     const clauses = parsed.segments.map(() => '(s.book_number = ? AND s.chapter = ? AND s.start_verse <= ? AND s.end_verse >= ?)');
     const bindings = parsed.segments.flatMap(segment => [segment.bookNumber, segment.chapter, segment.endVerse, segment.startVerse]);
+    // For a single segment, start from its covering index even when D1 has no
+    // planner statistics. Multi-segment continuations can favor source order.
+    const groupJoin = parsed.segments.length === 1 ? 'CROSS JOIN' : 'JOIN';
     const { results: ids } = await this.db.prepare(
       `SELECT DISTINCT g.group_id, g.source_ordinal
          FROM ubs_parallel_segments s
-         JOIN ubs_parallel_groups g ON g.group_id = s.group_id
+         ${groupJoin} ubs_parallel_groups g ON g.group_id = s.group_id
         WHERE g.source_id = ? AND g.source_ordinal > ? AND (${clauses.join(' OR ')})
         ORDER BY g.source_ordinal, g.group_id
         LIMIT ?`,
