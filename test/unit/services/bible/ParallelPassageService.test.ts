@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BibleService } from '../../../../src/services/bible/BibleService.js';
 import type { ICrossReferenceRepository } from '../../../../src/kernel/repositories.js';
-import { ParallelPassageService as PublicParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
+import { createLegacyParallelLookup, ParallelPassageService as PublicParallelPassageService } from '../../../../src/services/bible/ParallelPassageService.js';
 import type { ParallelPassageLookupParams, ParallelPassageResearchResult } from '../../../../src/kernel/types.js';
 
 /** Exercise the retained legacy algorithm through its now-required selector. */
@@ -87,6 +87,54 @@ describe('ParallelPassageService', () => {
       'Luke 22:14-23',
     ]);
     expect(result.parallels.some(item => item.reference.startsWith('Matthew 26:'))).toBe(false);
+  });
+
+  it('reuses one legacy index for overlapping requests with independent bindings and results', async () => {
+    const data = fixture();
+    const readParallels = vi.fn(() => data.parallels);
+    const lookup = createLegacyParallelLookup({
+      description: data.description,
+      version: data.version,
+      get parallels() { return readParallels(); },
+    });
+    let markFirstStarted!: () => void;
+    const firstStarted = new Promise<void>(resolve => { markFirstStarted = resolve; });
+    let releaseFirst!: () => void;
+    const holdFirst = new Promise<void>(resolve => { releaseFirst = resolve; });
+    const firstRepo = repository();
+    vi.mocked(firstRepo.getCrossReferences).mockImplementationOnce(async () => {
+      markFirstStarted();
+      await holdFirst;
+      return { references: [{ reference: 'Romans 1:20', votes: 50 }], total: 1, showing: 1, hasMore: false };
+    });
+    const first = new ParallelPassageService(firstRepo, undefined, undefined, lookup);
+    const second = new ParallelPassageService(repository([{ reference: 'Genesis 1:1', votes: 40 }]), undefined, undefined, lookup);
+    const params = { reference: 'Luke 3:24-25', includeOpenBibleCrossReferences: true };
+
+    const firstCompleted = vi.fn();
+    const pending = first.lookup(params).then(result => {
+      firstCompleted();
+      return result;
+    });
+    const later = await firstStarted.then(() => second.lookup(params)).then(result => {
+      expect(firstCompleted).not.toHaveBeenCalled();
+      return result;
+    }).finally(releaseFirst);
+    const initial = await pending;
+    expect(firstCompleted).toHaveBeenCalledTimes(1);
+    expect(initial.parallels).toEqual(later.parallels);
+    expect(initial.parallels.map(parallel => parallel.reference)).toEqual(['Matthew 1:1', 'John 1:1']);
+    expect(initial.openBibleCrossReferences).toEqual([{ reference: 'Romans 1:20', votes: 50 }]);
+    initial.parallels[0]!.notes = 'request edit';
+    initial.parallels[0]!.provenanceIds!.push('request edit');
+    initial.parallels.pop();
+
+    expect(later.parallels).toEqual((await second.lookup(params)).parallels);
+    expect(later.parallels.map(parallel => parallel.reference)).toEqual(['Matthew 1:1', 'John 1:1']);
+    expect(later.parallels[0]!.notes).toBe('synoptic note');
+    expect(later.parallels[0]!.provenanceIds).not.toContain('request edit');
+    expect(later.openBibleCrossReferences).toEqual([{ reference: 'Genesis 1:1', votes: 40 }]);
+    expect(readParallels).toHaveBeenCalledTimes(1);
   });
 
   it.each([
