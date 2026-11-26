@@ -3,12 +3,38 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. The latest November 25 verification established the
-application release on the Norton and Thomas Aquinas corpus and the observed
-preview control. Earlier releases and custody records below preserve dated
-historical evidence.
+identity authority. The latest November 26 verification established the
+original-language study v3 application release on the Norton and Thomas Aquinas
+corpus and the observed preview control. Earlier releases and custody records
+below preserve dated historical evidence.
 
-## Latest verified production release — November 25, 2026
+## Latest verified production release — November 26, 2026
+
+[PR #214](https://github.com/TJ-Frederick/TheologAI/pull/214) made schema v3
+the public `original_language_study` contract. Omitted `depth` selects
+`intermediate`, `technical` adds bounded indexed occurrence pages, and clients
+with a v2 cursor restart the study with the current schema.
+
+Production source `c794aacea7a553645f6ecde64fd570d4d06784aa` matches tree
+`7b46107a5a7f974dd45f057e5c8785960bd26360`, accepted by
+[protected preview run 45765090892](https://github.com/TJ-Frederick/TheologAI/actions/runs/45765090892).
+[Protected production run 45821581700](https://github.com/TJ-Frederick/TheologAI/actions/runs/45821581700),
+attempt 1, promoted that bundle on the existing schema-0010 production D1.
+Preview and production each passed **8/8** application checks, including the
+advertised v3 tool schema in both MCP protocol versions. Final routing matched
+the accepted Worker and D1, and the preview control stayed stable throughout
+production promotion.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — verified serving assignment | `2af3f9eb-f2fd-48c5-9108-9287becd4e84` | `3935b66e-8a5a-4932-9f3c-63eb59150bd6` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control at production verification | `30f78b5e-8717-4baa-9851-ab0f5dfcfa15` | `5a029d6b-9216-4ffb-a0df-3e2ca8c3023a` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The protected run retained its matched predecessor and acceptance receipt.
+The receipt SHA-256 is
+`efdccbaca047c0901332bfba8a45ff1cb869727dd06f9bd476856fe10da29355`.
+
+## Historical application release — November 25, 2026
 
 [PR #209](https://github.com/TJ-Frederick/TheologAI/pull/209) reuses the bundled
 legacy parallel-passage index within each Worker isolate. Repositories and
