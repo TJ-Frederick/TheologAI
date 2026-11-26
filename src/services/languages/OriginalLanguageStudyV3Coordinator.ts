@@ -73,7 +73,7 @@ export class OriginalLanguageStudyV3Coordinator {
     }
 
     const selectedToken = evidence.v1Result.selectedToken;
-    if (!selectedToken || evidence.v1Result.status === 'needs_disambiguation') {
+    if (evidence.v1Result.status === 'needs_disambiguation' || !selectedToken) {
       return Object.freeze({
         request,
         evidence,

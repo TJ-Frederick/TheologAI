@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { OriginalLanguageStudyService } from '../../../../src/services/languages/OriginalLanguageStudyService.js';
+import { OriginalLanguageStudyService, type OriginalLanguageStudyDomainResult, type StudyToken } from '../../../../src/services/languages/OriginalLanguageStudyService.js';
 import type { IMorphologyRepository, IStrongsRepository, MorphWord } from '../../../../src/kernel/repositories.js';
 import { AdapterError, NotFoundError } from '../../../../src/kernel/errors.js';
 import { expandHebrewMorphCode } from '../../../../src/adapters/shared/hebrewMorphExpander.js';
@@ -27,6 +27,17 @@ function repos(words: MorphWord[] = [loved], options: { dictionary?: boolean; le
 }
 
 describe('OriginalLanguageStudyService', () => {
+  it('requires either a selected token or disambiguation candidates', () => {
+    type Base = Pick<OriginalLanguageStudyDomainResult, 'reference' | 'language' | 'target' | 'warnings'>;
+    expectTypeOf<Base & { status: 'partial'; selectedToken: StudyToken }>().toExtend<OriginalLanguageStudyDomainResult>();
+    expectTypeOf<Base & { status: 'needs_disambiguation'; candidates: StudyToken[] }>().toExtend<OriginalLanguageStudyDomainResult>();
+    expectTypeOf<Base & { status: 'complete' }>().not.toExtend<OriginalLanguageStudyDomainResult>();
+    expectTypeOf<Base & { status: 'needs_disambiguation' }>().not.toExtend<OriginalLanguageStudyDomainResult>();
+    expectTypeOf<Base & {
+      status: 'needs_disambiguation'; candidates: StudyToken[]; selectedToken: StudyToken;
+    }>().not.toExtend<OriginalLanguageStudyDomainResult>();
+  });
+
   it('resolves a local gloss and canonical Strong identity with source evidence', async () => {
     const { morphology, strongs } = repos([loved], { expansion: 'Verb, Aorist, Active, Indicative, 3rd Singular' });
     const result = await new OriginalLanguageStudyService(morphology, strongs).study({ reference: 'John 3:16', target: 'loved' });
