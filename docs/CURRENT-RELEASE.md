@@ -3,12 +3,37 @@
 <!-- theologai-release-authority v1 role=current-snapshot current=self -->
 
 This dated, sanitized record is the repository's sole present-tense release
-identity authority. The latest November 26 verification established the shared
-runtime cursor codec release on the Norton and Thomas Aquinas corpus and the
+identity authority. The latest November 26 verification established the UBS
+single-segment lookup release on the Norton and Thomas Aquinas corpus and the
 observed preview control. Earlier releases and custody records below preserve
 dated historical evidence.
 
 ## Latest verified production release — November 26, 2026
+
+[PR #218](https://github.com/TJ-Frederick/TheologAI/pull/218) starts
+single-segment UBS parallel lookahead from the matching segments. Multi-segment
+lookup retains planner-selected join order. Group ordering, continuation, and
+the public tool contract stay the same.
+
+Production source `f921238dca06f058b8dd86a9b7f2aa4272b37cbf` matches tree
+`e873774379c333d4f5a5beeedb57b308dfee692a`, accepted by
+[protected preview run 45844257978](https://github.com/TJ-Frederick/TheologAI/actions/runs/45844257978).
+[Protected production run 45846352500](https://github.com/TJ-Frederick/TheologAI/actions/runs/45846352500),
+attempt 1, promoted that bundle on the existing schema-0010 production D1.
+Preview and production each passed **8/8** checks across both MCP protocol
+versions. Final routing matched the accepted Worker and D1, and the preview
+control stayed stable throughout production promotion.
+
+| Environment | Deployment | Worker | D1 |
+| --- | --- | --- | --- |
+| Production — verified serving assignment | `c76b0490-76b9-42f5-b285-e6b8bbbe17af` | `645191de-b4e8-4c12-ac4d-f57a01d824f3` | `theologai-preview-20260811-schema0009-a` / `74f456e2-6951-4003-bb6f-91951342bf8f` |
+| Preview — control at production verification | `723c7c21-dbb8-4686-969a-dffc6f6cc449` | `093b2c1c-109c-4539-b6bc-b24ecede576d` | `theologai-preview-20260728-transform11-a` / `62b871a6-5b4d-4d9b-8f52-301f6c878f48` |
+
+The protected run retained its matched predecessor and acceptance receipt.
+The receipt SHA-256 is
+`de63a8786847ff7db4420264506ffaa19f82d7d0880f4df5b0fdc8ec32b40ba8`.
+
+## Historical application release — November 26, 2026
 
 [PR #217](https://github.com/TJ-Frederick/TheologAI/pull/217) shares UTF-8
 base64url encoding across hierarchy, Strong’s occurrence, and UBS parallel
