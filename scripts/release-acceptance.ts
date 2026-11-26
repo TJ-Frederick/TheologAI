@@ -156,7 +156,10 @@ async function applicationSmoke(options: AcceptanceOptions, endpoint: URL) {
       const studyInputs = record(study?.inputSchema.properties);
       const depths = ['beginner', 'intermediate', 'technical'];
       const outputs = records(record(study?.outputSchema)?.oneOf);
-      if (!studyInputs || Object.hasOwn(studyInputs, 'detail')
+      if (!studyInputs || study?.inputSchema.additionalProperties !== false
+          || JSON.stringify([...(study.inputSchema.required ?? [])].sort()) !== '["reference","target"]'
+          || record(studyInputs.reference)?.type !== 'string' || record(studyInputs.target)?.type !== 'string'
+          || Object.hasOwn(studyInputs, 'detail')
           || JSON.stringify(record(studyInputs.depth)?.enum) !== JSON.stringify(depths)
           || outputs.length !== depths.length
           || !depths.every(depth => outputs.some(output => {

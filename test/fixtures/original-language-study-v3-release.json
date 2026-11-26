@@ -5,7 +5,11 @@
     "semanticArtifactIdentity": "bd19fb99f7bbfd13ad68f2184aaded4a6e5587196ad76b68b0c22bf971fc90f6",
     "morphologyUsageIdentity": "c3600bb55da75aa600f8c97885efa7d58a3e8c29c3fcc6445a553091011beabd",
     "h0216SenseId": "ubs-sense-000206001001000",
-    "h3027SenseCount": 78
+    "h3027SenseCount": 78,
+    "g3056PageSha256": [
+      "a3e1f3b01d9ad82663b2b3ffb686046016f178c17924b842e8fa938ee8eb013a",
+      "a34531b737c87029ab66b86143389d0f24819ead6d2d9a5baeb5b452ff397b7e"
+    ]
   },
   "cases": [
     {

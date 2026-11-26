@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { releaseReadFetch } from '../../../scripts/audit-corpus-release.js';
 import { describe, expect, it, vi } from 'vitest';
 import { runReleaseAcceptance, type AcceptanceOptions } from '../../../scripts/release-acceptance.js';
+import { assertLanguageReleaseSuccess, type LanguageReleaseFixture } from '../../../scripts/original-language-study-release.js';
 
 const immediately: NonNullable<AcceptanceOptions['pace']> = (signal, guard, dispatch) => {
   guard();
@@ -18,7 +20,10 @@ const knownTools = ['bible_lookup', 'bible_verse_morphology', 'primary_source_se
 const depths = ['beginner', 'intermediate', 'technical'];
 const languageStudy = (version: string) => ({
   name: 'original_language_study',
-  inputSchema: { type: 'object', properties: { depth: { enum: depths } } },
+  inputSchema: {
+    type: 'object', additionalProperties: false, required: ['reference', 'target'],
+    properties: { reference: { type: 'string' }, target: { type: 'string' }, depth: { enum: depths } },
+  },
   outputSchema: { type: 'object', oneOf: depths.map(depth => ({
     properties: { schemaVersion: { const: version }, depth: { const: depth } },
   })) },
@@ -116,6 +121,49 @@ describe('shared release acceptance', () => {
       .rejects.toThrow('requires a database and a live dispatch guard');
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+});
+
+it('requires the exact ordered language occurrence continuation and truthful response bytes', () => {
+  const args = { reference: 'John 1:1', target: 'G3056', position: 5, depth: 'technical' };
+  const first = { id: 'greek-technical', arguments: args, mode: 'success' } as const;
+  const second = { id: 'occurrence-continuation', arguments: args, mode: 'success', cursorFrom: first.id } as const;
+  const rows = (start: number) => Array.from({ length: 20 }, (_, index) => ({
+    canonicalOrder: 43, chapter: 1, verse: start + index, position: 5, sourceForm: 'λόγος', exactMorphologyKey: 'G3056',
+  }));
+  const digest = (occurrences: ReturnType<typeof rows>) => createHash('sha256').update(JSON.stringify(
+    occurrences.map(row => [row.canonicalOrder, row.chapter, row.verse, row.position, row.sourceForm]),
+  )).digest('hex');
+  const fixture: LanguageReleaseFixture = {
+    authorityAnchors: { semanticArtifactIdentity: 'a', morphologyUsageIdentity: 'b', h0216SenseId: 'c', h3027SenseCount: 78,
+      g3056PageSha256: [digest(rows(1)), digest(rows(21))] },
+    cases: [first, second],
+  };
+  const result = (occurrences: ReturnType<typeof rows>) => {
+    const boundary = { status: 'not_performed', responsibility: 'guided_prompt' };
+    const output = {
+      kind: 'original_language_study', schemaVersion: '3', depth: 'technical', request: args,
+      study: { schemaVersion: '1', context: { reference: args.reference, language: 'Greek', selectedToken: { position: 5 } } },
+      lexicalRange: { scope: 'source_attested_non_exhaustive' },
+      englishTranslationComparison: boundary, contextualInterpretation: boundary,
+      semanticEvidence: { language: 'Greek', status: 'not_applicable' },
+      corpusOccurrences: { status: 'available', exactMorphologyKey: 'G3056', corpusIdentity: 'b', occurrences,
+        resultWindow: { maximumReturned: 20, returnedCount: 20, hasMore: true,
+          continuation: { operation: 'original_language_study_corpus_occurrences', cursor: 'olsv3c1_abc' } } },
+      responseWindow: { unit: 'utf8_bytes', maximum: 32 * 1024, truncated: false, used: 0 },
+    };
+    const bytes = () => Buffer.byteLength(JSON.stringify(output));
+    while (output.responseWindow.used !== bytes()) output.responseWindow.used = bytes();
+    return { content: [{ type: 'text', text: 'study' }], structuredContent: output };
+  };
+  const cursors = new Map<string, string>();
+  const pages = new Map<string, string[]>();
+  assertLanguageReleaseSuccess(first, result(rows(1)), fixture, cursors, pages);
+  expect(() => assertLanguageReleaseSuccess(second, result(rows(41)), fixture, cursors, pages)).toThrow();
+  expect(() => assertLanguageReleaseSuccess(second, result(rows(21).reverse()), fixture, cursors, pages)).toThrow();
+  const inaccurate = result(rows(21));
+  inaccurate.structuredContent.responseWindow.used--;
+  expect(() => assertLanguageReleaseSuccess(second, inaccurate, fixture, cursors, pages)).toThrow();
+  assertLanguageReleaseSuccess(second, result(rows(21)), fixture, cursors, pages);
 });
 
 it('permits discovery and refuses forbidden MCP requests before the transport sees them', async () => {

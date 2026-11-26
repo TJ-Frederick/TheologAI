@@ -21,13 +21,16 @@ const releaseOperations = new Set([
   'scripts/hosted-corpus-profile.mjs',
   'scripts/hosted-corpus-profile.d.mts',
   'scripts/norton-aquinas-live.ts',
+  'scripts/original-language-study-release.ts', // Executed by release acceptance, outside corpus materialization.
   'scripts/pr-release-eligibility.d.mts',
   'scripts/pr-release-eligibility.mjs',
   'scripts/release-acceptance.ts',
   'scripts/release-promotion.mjs',
   'test/fixtures/release-workers/replay.py',
+  'test/fixtures/original-language-study-v3-release.json',
   'test/helpers/corpusTransportFixture.ts',
   'test/helpers/hostedCorpusRecoveryFixture.ts',
+  'test/helpers/mcpTransportContract.ts',
   'test/test-topology.json',
   'test/unit/config/workflowTopology.test.ts',
   'test/unit/scripts/nortonAquinasLiveWorkflow.test.ts',
@@ -39,7 +42,11 @@ const runtimeOnlyPaths = new Set([
   'src/adapters/shared/primarySourceSearchSql.ts',
   'src/adapters/shared/morphologyExpansion.ts',
   'src/adapters/shared/HttpClient.ts',
+  'src/kernel/originalLanguageStudyV3Contract.ts',
   'src/kernel/repositories.ts',
+  'src/kernel/types.ts', // Shared TypeScript declarations only.
+  'skills/passage-exegesis/SKILL.md',
+  'skills/word-study/SKILL.md',
   'test/fixtures/expandedMorphology.ts',
   'test/fixtures/mcpCompositionRoot.ts',
 ]);

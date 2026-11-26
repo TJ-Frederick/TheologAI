@@ -67,6 +67,20 @@ const exactMorphologyPaths = [
 ] as const;
 const exactCachePath = 'src/adapters/shared/HttpClient.ts';
 const narrowRuntimePaths = [...exactMorphologyPaths, exactCachePath];
+const languageDepthPaths = [
+  'src/kernel/originalLanguageStudyV3Contract.ts',
+  'src/kernel/repositories.ts',
+  'src/kernel/types.ts',
+  'src/services/languages/OriginalLanguageStudyV3Coordinator.ts',
+  'src/adapters/d1/D1MorphologyRepository.ts',
+  'src/adapters/data/MorphologyRepository.ts',
+  'skills/passage-exegesis/SKILL.md',
+  'skills/word-study/SKILL.md',
+  'scripts/audit-corpus-release.ts',
+  'scripts/original-language-study-release.ts',
+  'test/fixtures/original-language-study-v3-release.json',
+  'test/helpers/mcpTransportContract.ts',
+] as const;
 const nodeE2eEntries = [
   ['package.json', '1a931cc4d60bd88d3968388bbfcb90fd08dc0ab6', '5471d433642480d3bbb02f78028d37489ff01e77'],
   ['scripts/node-e2e-fixture.ts', null, 'c0555b9e5f378d6c3c3e0e2419cf17125ffe21f9'],
@@ -144,6 +158,23 @@ function classifyOrdinaryCi(root: string, pr: {merge: string; head: string}) {
   expect(ci.status, ci.stderr).toBe(0);
   return JSON.parse(ci.stdout);
 }
+
+it('treats v3 depth and its MCP checks as an application release while ordinary CI stays full', () => {
+  const f = repo();
+  const pr = f.mergeCandidate(f.git('rev-parse', 'HEAD'), languageDepthPaths, 'application and MCP validation');
+  const release = f.classifyCandidate(pr, {productionSource: f.record.productionSource, targets: f.record.predecessors});
+  expect(release.status, release.stderr).toBe(0);
+  expect(release.outputs).toContain('mode=application\n');
+  expect(classifyOrdinaryCi(f.root, pr)).toMatchObject({mode: 'full', data: true, serving: true});
+});
+
+it.each(['migrations/0001_initial_schema.sql', 'data/manifest.json', 'scripts/verify-database.ts',
+  'src/kernel/otherLanguageContract.ts', 'test/fixtures/other-language-fixture.json', 'package-lock.json'])
+('keeps the corpus gate when v3 depth also changes %s', path => {
+  const f = repo();
+  f.commit([...languageDepthPaths, path], 'mixed application and corpus change');
+  expect(f.run('classify')).toBe('corpus');
+});
 
 const morphologyPaths = [
   ...exactMorphologyPaths,
